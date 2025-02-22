@@ -65,7 +65,7 @@ constructor(private val objTypes: ObjTypeList, private val enumResolver: EnumTyp
             if (packedStyles == backing.defaultReturnValue()) {
                 return WeaponStyleList(null, null, null, null)
             }
-            val styles = StyleInternals.PackedStyles(packedStyles)
+            val styles = PackedStyles(packedStyles)
             val (style1, style2, style3, style4) = styles
             return WeaponStyleList(style1, style2, style3, style4)
         }
