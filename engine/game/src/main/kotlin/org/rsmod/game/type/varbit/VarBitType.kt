@@ -10,13 +10,13 @@ public sealed class VarBitType : CacheType() {
     internal abstract var internalMsb: Int?
 
     public val baseVar: VarpType
-        get() = internalVarp ?: error("`varp` must not be null.")
+        get() = internalVarp ?: error("`internalVarp` must not be null.")
 
     public val lsb: Int
-        get() = internalLsb ?: error("`lsb` must not be null.")
+        get() = internalLsb ?: error("`internalLsb` must not be null.")
 
     public val msb: Int
-        get() = internalMsb ?: error("`msb` must not be null.")
+        get() = internalMsb ?: error("`internalMsb` must not be null.")
 
     public val bits: IntRange
         get() = lsb..msb
