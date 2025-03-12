@@ -41,7 +41,7 @@ internal object InternalNpcHeadbars {
         }
     }
 
-    fun createNpcSource(
+    private fun createNpcSource(
         sourceSlot: Int,
         currHp: Int,
         maxHp: Int,
@@ -60,7 +60,7 @@ internal object InternalNpcHeadbars {
         )
     }
 
-    fun createPlayerSource(
+    private fun createPlayerSource(
         sourceSlot: Int,
         currHp: Int,
         maxHp: Int,
@@ -80,7 +80,12 @@ internal object InternalNpcHeadbars {
         )
     }
 
-    fun createNoSource(currHp: Int, maxHp: Int, headbar: HeadbarType, clientDelay: Int): Headbar {
+    private fun createNoSource(
+        currHp: Int,
+        maxHp: Int,
+        headbar: HeadbarType,
+        clientDelay: Int,
+    ): Headbar {
         val fill = calculateFill(headbar.segments, currHp, maxHp)
         return Headbar.fromNoSource(
             self = headbar.id,
