@@ -9,6 +9,8 @@ import org.rsmod.api.player.interact.LocTInteractions
 import org.rsmod.api.player.interact.NpcInteractions
 import org.rsmod.api.player.interact.NpcTInteractions
 import org.rsmod.api.player.interact.ObjInteractions
+import org.rsmod.api.player.interact.PlayerInteractions
+import org.rsmod.api.player.isValidTarget
 import org.rsmod.api.player.output.ChatType
 import org.rsmod.api.player.output.clearMapFlag
 import org.rsmod.api.player.output.mes
@@ -27,6 +29,9 @@ import org.rsmod.game.interact.InteractionNpc
 import org.rsmod.game.interact.InteractionNpcOp
 import org.rsmod.game.interact.InteractionNpcT
 import org.rsmod.game.interact.InteractionObj
+import org.rsmod.game.interact.InteractionPlayer
+import org.rsmod.game.interact.InteractionPlayerOp
+import org.rsmod.game.movement.RouteRequestPathingEntity
 import org.rsmod.interact.InteractionStep
 import org.rsmod.interact.InteractionTarget
 import org.rsmod.interact.Interactions
@@ -46,6 +51,7 @@ constructor(
     private val npcInteractions: NpcInteractions,
     private val npcTInteractions: NpcTInteractions,
     private val objInteractions: ObjInteractions,
+    private val playerInteractions: PlayerInteractions,
     private val protectedAccess: ProtectedAccessLauncher,
 ) {
     public fun processPreMovement(player: Player, interaction: Interaction) {
@@ -61,6 +67,9 @@ constructor(
             return
         }
 
+        if (interaction.persistent) {
+            player.routeTo(interaction)
+        }
         player.preMovementInteraction(interaction)
     }
 
@@ -127,11 +136,13 @@ constructor(
                     interacted = true
 
                     val newInteractionSet = this@processInteractionStep.interaction != interaction
-                    if (newInteractionSet) {
-                        abortRoute()
-                    } else if (apRangeCalled) {
-                        routeDestination.recalcRequest = cachedRecalc
-                        routeDestination.addAll(cachedWaypoints)
+                    when {
+                        newInteractionSet -> abortRoute()
+                        apRangeCalled -> {
+                            routeDestination.recalcRequest = cachedRecalc
+                            routeDestination.addAll(cachedWaypoints)
+                        }
+                        persistent -> walk(coords)
                     }
                 }
                 InteractionStep.TriggerEngineAp -> {
@@ -149,20 +160,29 @@ constructor(
 
     private fun Player.clearFinishedInteraction() {
         val interaction = interaction ?: return
-        if (interaction.isCompleted()) {
+        if (interaction.isCompleted() && !interaction.persistent) {
             clearInteraction()
             clearRouteRecalc()
             clearMapFlag()
         }
     }
 
-    private fun Interaction.isCompleted(): Boolean = interacted && !apRangeCalled && !persistent
+    private fun Interaction.isCompleted(): Boolean = interacted && !apRangeCalled
+
+    private fun Player.routeTo(interaction: Interaction): Unit =
+        when (interaction) {
+            is InteractionLoc -> routeTo(interaction)
+            is InteractionNpc -> routeTo(interaction)
+            is InteractionObj -> routeTo(interaction)
+            is InteractionPlayer -> routeTo(interaction)
+        }
 
     private fun Player.determinePreMovementStep(interaction: Interaction): InteractionStep =
         when (interaction) {
             is InteractionLoc -> preMovementStep(interaction)
             is InteractionNpc -> preMovementStep(interaction)
             is InteractionObj -> preMovementStep(interaction)
+            is InteractionPlayer -> preMovementStep(interaction)
         }
 
     private fun Player.determinePostMovementStep(interaction: Interaction): InteractionStep =
@@ -170,6 +190,7 @@ constructor(
             is InteractionLoc -> postMovementStep(interaction)
             is InteractionNpc -> postMovementStep(interaction)
             is InteractionObj -> postMovementStep(interaction)
+            is InteractionPlayer -> postMovementStep(interaction)
         }
 
     private fun Player.triggerOp(interaction: Interaction): Unit =
@@ -179,6 +200,7 @@ constructor(
             is InteractionNpcOp -> triggerOp(this, interaction)
             is InteractionNpcT -> triggerOp(this, interaction)
             is InteractionObj -> triggerOp(this, interaction)
+            is InteractionPlayerOp -> triggerAp(this, interaction)
         }
 
     private fun Player.triggerAp(interaction: Interaction): Unit =
@@ -188,6 +210,7 @@ constructor(
             is InteractionNpcOp -> triggerAp(this, interaction)
             is InteractionNpcT -> triggerAp(this, interaction)
             is InteractionObj -> triggerAp(this, interaction)
+            is InteractionPlayerOp -> triggerAp(this, interaction)
         }
 
     /* Loc interactions */
@@ -221,6 +244,13 @@ constructor(
             length = interaction.target.adjustedLength,
             distance = interaction.apRange,
         )
+
+    private fun Player.routeTo(interaction: InteractionLoc) {
+        if (isWithinOpRange(interaction)) {
+            return
+        }
+        walk(interaction.target.coords)
+    }
 
     /* Npc interactions */
     private fun Player.preMovementStep(interaction: InteractionNpc): InteractionStep =
@@ -260,6 +290,14 @@ constructor(
         return isWithinApRange
     }
 
+    private fun Player.routeTo(interaction: InteractionNpc) {
+        if (isWithinOpRange(interaction)) {
+            return
+        }
+        val routeRequest = RouteRequestPathingEntity(interaction.target.avatar)
+        this.routeRequest = routeRequest
+    }
+
     /* Obj interactions */
     private fun Player.preMovementStep(interaction: InteractionObj): InteractionStep =
         Interactions.earlyStep(
@@ -291,6 +329,59 @@ constructor(
             distance = interaction.apRange,
         )
 
+    private fun Player.routeTo(interaction: InteractionObj) {
+        if (coords == interaction.target.coords) {
+            return
+        }
+        walk(interaction.target.coords)
+    }
+
+    /* Player interactions */
+    private fun Player.preMovementStep(interaction: InteractionPlayer): InteractionStep =
+        Interactions.earlyStep(
+            target = InteractionTarget.Pathing,
+            hasScriptOp = interaction.hasOpTrigger,
+            hasScriptAp = interaction.hasApTrigger,
+            validOpLine = isWithinOpRange(interaction),
+            validApLine = isWithinApRange(interaction),
+        )
+
+    private fun Player.postMovementStep(interaction: InteractionPlayer): InteractionStep =
+        Interactions.lateStep(
+            hasMoved = hasMovedThisCycle,
+            target = InteractionTarget.Pathing,
+            hasScriptOp = interaction.hasOpTrigger,
+            hasScriptAp = interaction.hasApTrigger,
+            validOpLine = isWithinOpRange(interaction),
+            validApLine = isWithinApRange(interaction),
+        )
+
+    private fun Player.isWithinOpRange(interaction: InteractionPlayer): Boolean =
+        boundValidator.touches(source = avatar, target = interaction.target.avatar)
+
+    private fun Player.isWithinApRange(interaction: InteractionPlayer): Boolean {
+        val isUnderTarget = boundValidator.collides(avatar, interaction.target.avatar)
+        if (isUnderTarget) {
+            return false
+        }
+        val isWithinApRange =
+            isValidApRange(
+                target = interaction.target.coords,
+                width = interaction.target.size,
+                length = interaction.target.size,
+                distance = interaction.apRange,
+            )
+        return isWithinApRange
+    }
+
+    private fun Player.routeTo(interaction: InteractionPlayer) {
+        if (isWithinOpRange(interaction)) {
+            return
+        }
+        val routeRequest = RouteRequestPathingEntity(interaction.target.avatar)
+        this.routeRequest = routeRequest
+    }
+
     /* Utility functions */
     private fun Player.isValidApRange(
         target: CoordGrid,
@@ -318,6 +409,7 @@ constructor(
             is InteractionLoc -> !interaction.isValid()
             is InteractionNpc -> !interaction.isValid()
             is InteractionObj -> !interaction.isValid(this)
+            is InteractionPlayer -> !interaction.isValid()
         }
 
     private fun InteractionLoc.isValid(): Boolean {
@@ -332,18 +424,20 @@ constructor(
         return objRegistry.isValid(observer, target)
     }
 
+    private fun InteractionPlayer.isValid(): Boolean {
+        return target.isValidTarget() && uid == target.uid
+    }
+
     /* Interaction event launch functions */
     public fun triggerOp(player: Player, interaction: InteractionLocOp) {
-        val loc = interaction.target
-        val op = locInteractions.opTrigger(player, loc, interaction.op)
+        val op = locInteractions.opTrigger(player, interaction.target, interaction.op)
         if (op != null) {
             protectedAccess.launch(player) { eventBus.publish(this, op) }
         }
     }
 
     public fun triggerAp(player: Player, interaction: InteractionLocOp) {
-        val loc = interaction.target
-        val ap = locInteractions.apTrigger(player, loc, interaction.op)
+        val ap = locInteractions.apTrigger(player, interaction.target, interaction.op)
         if (ap != null) {
             protectedAccess.launch(player) { eventBus.publish(this, ap) }
         }
@@ -372,16 +466,14 @@ constructor(
     }
 
     public fun triggerOp(player: Player, interaction: InteractionNpcOp) {
-        val npc = interaction.target
-        val op = npcInteractions.opTrigger(player, npc, interaction.op)
+        val op = npcInteractions.opTrigger(player, interaction.target, interaction.op)
         if (op != null) {
             protectedAccess.launch(player) { eventBus.publish(this, op) }
         }
     }
 
     public fun triggerAp(player: Player, interaction: InteractionNpcOp) {
-        val npc = interaction.target
-        val ap = npcInteractions.apTrigger(player, npc, interaction.op)
+        val ap = npcInteractions.apTrigger(player, interaction.target, interaction.op)
         if (ap != null) {
             protectedAccess.launch(player) { eventBus.publish(this, ap) }
         }
@@ -410,16 +502,28 @@ constructor(
     }
 
     private fun triggerOp(player: Player, interaction: InteractionObj) {
-        val obj = interaction.target
-        val op = objInteractions.opTrigger(obj, interaction.op)
+        val op = objInteractions.opTrigger(interaction.target, interaction.op)
         if (op != null) {
             protectedAccess.launch(player) { eventBus.publish(this, op) }
         }
     }
 
     public fun triggerAp(player: Player, interaction: InteractionObj) {
-        val obj = interaction.target
-        val ap = objInteractions.apTrigger(obj, interaction.op)
+        val ap = objInteractions.apTrigger(interaction.target, interaction.op)
+        if (ap != null) {
+            protectedAccess.launch(player) { eventBus.publish(this, ap) }
+        }
+    }
+
+    public fun triggerOp(player: Player, interaction: InteractionPlayerOp) {
+        val op = playerInteractions.opTrigger(interaction.target, interaction.op)
+        if (op != null) {
+            protectedAccess.launch(player) { eventBus.publish(this, op) }
+        }
+    }
+
+    public fun triggerAp(player: Player, interaction: InteractionPlayerOp) {
+        val ap = playerInteractions.apTrigger(interaction.target, interaction.op)
         if (ap != null) {
             protectedAccess.launch(player) { eventBus.publish(this, ap) }
         }
