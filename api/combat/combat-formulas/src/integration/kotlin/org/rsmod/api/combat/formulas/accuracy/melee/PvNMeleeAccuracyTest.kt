@@ -3,9 +3,8 @@ package org.rsmod.api.combat.formulas.accuracy.melee
 import com.google.inject.Inject
 import org.rsmod.api.combat.commons.styles.MeleeAttackStyle
 import org.rsmod.api.combat.commons.types.MeleeAttackType
-import org.rsmod.api.config.refs.npcs
+import org.rsmod.api.combat.formulas.test_npcs
 import org.rsmod.api.config.refs.objs
-import org.rsmod.api.config.refs.params
 import org.rsmod.api.config.refs.stats
 import org.rsmod.api.config.refs.varbits
 import org.rsmod.api.player.back
@@ -19,7 +18,6 @@ import org.rsmod.api.player.righthand
 import org.rsmod.api.player.ring
 import org.rsmod.api.player.torso
 import org.rsmod.api.testing.GameTestState
-import org.rsmod.api.testing.factory.npcTypeFactory
 import org.rsmod.api.testing.params.TestArgs
 import org.rsmod.api.testing.params.TestArgsProvider
 import org.rsmod.api.testing.params.TestWithArgs
@@ -28,8 +26,6 @@ import org.rsmod.game.entity.Npc
 import org.rsmod.game.obj.InvObj
 import org.rsmod.game.type.npc.UnpackedNpcType
 import org.rsmod.game.type.obj.ObjType
-import org.rsmod.game.type.util.ParamMap
-import org.rsmod.game.type.util.ParamMapBuilder
 import org.rsmod.game.type.varbit.VarBitType
 
 class PvNMeleeAccuracyTest {
@@ -76,7 +72,7 @@ class PvNMeleeAccuracyTest {
 
     data class Matchup(
         val expectedAccuracy: Double,
-        val npc: UnpackedNpcType = man,
+        val npc: UnpackedNpcType = test_npcs.man,
         val npcCurrHp: Int = 1,
         val npcMaxHp: Int = 1,
         val blockType: MeleeAttackType? = null,
@@ -101,10 +97,6 @@ class PvNMeleeAccuracyTest {
     ) {
         fun withNpcTarget(npc: UnpackedNpcType) = copy(npc = npc)
 
-        fun withNpcHp(currHp: Int, maxHp: Int) = copy(npcCurrHp = currHp, npcMaxHp = maxHp)
-
-        fun withBlockType(blockType: MeleeAttackType?) = copy(blockType = blockType)
-
         fun withHelm(obj: ObjType?) = copy(hat = obj?.let(::InvObj))
 
         fun withCape(obj: ObjType?) = copy(back = obj?.let(::InvObj))
@@ -114,8 +106,6 @@ class PvNMeleeAccuracyTest {
         fun withWeapon(obj: ObjType?) = copy(righthand = obj?.let(::InvObj))
 
         fun withBody(obj: ObjType?) = copy(torso = obj?.let(::InvObj))
-
-        fun withShield(obj: ObjType?) = copy(lefthand = obj?.let(::InvObj))
 
         fun withLegs(obj: ObjType?) = copy(legs = obj?.let(::InvObj))
 
@@ -158,7 +148,7 @@ class PvNMeleeAccuracyTest {
                     "attackLevel=$attackLvl / $baseAttackLvl, " +
                     "hitpoints=$hitpoints / $baseHitpointsLvl, " +
                     "prayers=${concatenatePrayers()}, " +
-                    concatenateWorn() +
+                    "worn=[${concatenateWorn()}]" +
                     ")"
             }
 
@@ -196,7 +186,7 @@ class PvNMeleeAccuracyTest {
                 Matchup(expectedAccuracy = 96.93)
                     .withAttackType(MeleeAttackType.Crush)
                     .withAttackStyle(MeleeAttackStyle.Accurate)
-                    .withNpcTarget(man),
+                    .withNpcTarget(test_npcs.man),
                 Matchup(expectedAccuracy = 46.57)
                     .withAttackType(MeleeAttackType.Stab)
                     .withAttackStyle(MeleeAttackStyle.Accurate)
@@ -210,7 +200,7 @@ class PvNMeleeAccuracyTest {
                     .withFeet(objs.primordial_boots)
                     .withRing(objs.ultor_ring)
                     .withPrayers(varbits.piety)
-                    .withNpcTarget(corporealBeast),
+                    .withNpcTarget(test_npcs.corporeal_beast),
                 Matchup(expectedAccuracy = 92.86)
                     .withAttackType(MeleeAttackType.Stab)
                     .withAttackStyle(MeleeAttackStyle.Aggressive)
@@ -224,7 +214,7 @@ class PvNMeleeAccuracyTest {
                     .withFeet(objs.primordial_boots)
                     .withRing(objs.ultor_ring)
                     .withPrayers(varbits.chivalry)
-                    .withNpcTarget(abyssalDemon),
+                    .withNpcTarget(test_npcs.abyssal_demon),
                 Matchup(expectedAccuracy = 96.83)
                     .withAttackType(MeleeAttackType.Stab)
                     .withAttackStyle(MeleeAttackStyle.Aggressive)
@@ -239,52 +229,10 @@ class PvNMeleeAccuracyTest {
                     .withRing(objs.ultor_ring)
                     .withPrayers(varbits.chivalry)
                     .withSpecMultiplier(1.5)
-                    .withNpcTarget(abyssalDemon),
+                    .withNpcTarget(test_npcs.abyssal_demon),
             )
         }
     }
 
     private class MeleeAccuracyTestDependencies @Inject constructor(val accuracy: PvNMeleeAccuracy)
-
-    private companion object {
-        val man =
-            npcTypeFactory.create {
-                name = "Man"
-                hitpoints = 7
-                paramMap = buildParams {
-                    this[params.defence_stab] = -21
-                    this[params.defence_slash] = -21
-                    this[params.defence_crush] = -21
-                }
-            }
-
-        val corporealBeast =
-            npcTypeFactory.create(npcs.corporeal_beast.id) {
-                name = "Corporeal Beast"
-                size = 5
-                hitpoints = 2000
-                defence = 310
-                paramMap = buildParams {
-                    this[params.defence_stab] = 25
-                    this[params.defence_slash] = 200
-                    this[params.defence_crush] = 100
-                }
-            }
-
-        val abyssalDemon =
-            npcTypeFactory.create {
-                name = "Abyssal demon"
-                hitpoints = 300
-                defence = 135
-                paramMap = buildParams {
-                    this[params.defence_stab] = 20
-                    this[params.defence_slash] = 20
-                    this[params.defence_crush] = 20
-                }
-            }
-
-        private fun buildParams(init: ParamMapBuilder.() -> Unit): ParamMap {
-            return ParamMapBuilder().apply(init).toParamMap()
-        }
-    }
 }
