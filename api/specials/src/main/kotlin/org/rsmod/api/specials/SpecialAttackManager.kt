@@ -3,7 +3,9 @@ package org.rsmod.api.specials
 import jakarta.inject.Inject
 import org.rsmod.api.combat.commons.CombatAttack
 import org.rsmod.api.combat.commons.styles.MeleeAttackStyle
+import org.rsmod.api.combat.commons.styles.RangedAttackStyle
 import org.rsmod.api.combat.commons.types.MeleeAttackType
+import org.rsmod.api.combat.commons.types.RangedAttackType
 import org.rsmod.api.combat.manager.PlayerAttackManager
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.specials.energy.SpecialAttackEnergy
@@ -165,4 +167,100 @@ constructor(
         damage: Int,
         delay: Int = 1,
     ): Hit = manager.queueMeleeHit(source.player, target, damage, delay)
+
+    /** @see [PlayerAttackManager.rollRangedDamage] */
+    public fun rollRangedDamage(
+        source: ProtectedAccess,
+        target: PathingEntity,
+        attack: CombatAttack.Ranged,
+        accuracyBoost: Int = 0,
+        maxHitBoost: Int = 0,
+        attackType: RangedAttackType? = attack.type,
+        attackStyle: RangedAttackStyle? = attack.style,
+        blockType: RangedAttackType? = attack.type,
+        boltSpecDamage: Int = 0,
+    ): Int =
+        manager.rollRangedDamage(
+            source = source.player,
+            target = target,
+            attack = attack,
+            accuracyBoost = accuracyBoost,
+            maxHitBoost = maxHitBoost,
+            attackType = attackType,
+            attackStyle = attackStyle,
+            blockType = blockType,
+            boltSpecDamage = boltSpecDamage,
+        )
+
+    /** @see [PlayerAttackManager.rollRangedAccuracy] */
+    public fun rollRangedAccuracy(
+        source: ProtectedAccess,
+        target: PathingEntity,
+        attackType: RangedAttackType?,
+        attackStyle: RangedAttackStyle?,
+        blockType: RangedAttackType?,
+        percentBoost: Int,
+    ): Boolean =
+        manager.rollRangedAccuracy(
+            source = source.player,
+            target = target,
+            attackType = attackType,
+            attackStyle = attackStyle,
+            blockType = blockType,
+            percentBoost = percentBoost,
+        )
+
+    /** @see [PlayerAttackManager.rollRangedMaxHit] */
+    public fun rollRangedMaxHit(
+        source: ProtectedAccess,
+        target: PathingEntity,
+        attackType: RangedAttackType?,
+        attackStyle: RangedAttackStyle?,
+        percentBoost: Int,
+        boltSpecDamage: Int,
+    ): Int =
+        manager.rollRangedMaxHit(
+            source = source.player,
+            target = target,
+            attackType = attackType,
+            attackStyle = attackStyle,
+            percentBoost = percentBoost,
+            boltSpecDamage = boltSpecDamage,
+        )
+
+    /** @see [PlayerAttackManager.calculateRangedMaxHit] */
+    public fun calculateRangedMaxHit(
+        source: ProtectedAccess,
+        target: PathingEntity,
+        attackType: RangedAttackType?,
+        attackStyle: RangedAttackStyle?,
+        percentBoost: Int,
+        boltSpecDamage: Int,
+    ): Int =
+        manager.calculateRangedMaxHit(
+            source = source.player,
+            target = target,
+            attackType = attackType,
+            attackStyle = attackStyle,
+            percentBoost = percentBoost,
+            boltSpecDamage = boltSpecDamage,
+        )
+
+    /** @see [PlayerAttackManager.queueRangedHit] */
+    public fun queueRangedHit(
+        source: ProtectedAccess,
+        target: PathingEntity,
+        ammo: ObjType?,
+        damage: Int,
+        clientDelay: Int,
+        hitDelay: Int = 1 + (clientDelay / 30),
+    ): Hit =
+        manager.queueRangedHit(
+            source = source.player,
+            target = target,
+            ammo = ammo,
+            damage = damage,
+            clientDelay = clientDelay,
+            hitDelay = hitDelay,
+        )
 }
