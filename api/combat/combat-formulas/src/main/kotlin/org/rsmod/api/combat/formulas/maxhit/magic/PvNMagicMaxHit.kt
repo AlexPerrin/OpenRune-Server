@@ -96,7 +96,7 @@ constructor(
 
         val modifiedDamage =
             computeSpellModifiedDamage(source, baseMaxHit, spellAttributes, npcAttributes)
-        return modifySpellPostSpec(
+        return MagicMaxHitOperations.modifySpellDamageRange(
             modifiedDamage = modifiedDamage,
             baseDamage = baseMaxHit,
             attackRate = attackRate,
@@ -124,23 +124,6 @@ constructor(
         )
     }
 
-    public fun modifySpellPostSpec(
-        modifiedDamage: Int,
-        baseDamage: Int,
-        attackRate: Int,
-        targetWeaknessPercent: Int,
-        spellAttributes: EnumSet<CombatSpellAttributes>,
-        npcAttributes: EnumSet<CombatNpcAttributes>,
-    ): IntRange =
-        MagicMaxHitOperations.modifySpellPostSpec(
-            modifiedDamage = modifiedDamage,
-            baseDamage = baseDamage,
-            attackRate = attackRate,
-            targetWeaknessPercent = targetWeaknessPercent,
-            spellAttributes = spellAttributes,
-            npcAttributes = npcAttributes,
-        )
-
     /**
      * Computes the maximum magic hit for a powered staff's built-in spell used by [player] against
      * [target].
@@ -154,7 +137,12 @@ constructor(
      * @param baseMaxHit The base max hit for the powered staff's built-in spell before any
      *   modifiers are applied.
      */
-    public fun getStaffMaxHit(player: Player, target: Npc, baseMaxHit: Int): Int {
+    public fun getStaffMaxHit(
+        player: Player,
+        target: Npc,
+        baseMaxHit: Int,
+        specialMultiplier: Double,
+    ): Int {
         val maxHit =
             computeStaffMaxHit(
                 source = player,
@@ -162,6 +150,7 @@ constructor(
                 targetCurrHp = target.hitpoints,
                 targetMaxHp = target.baseHitpointsLvl,
                 baseMaxHit = baseMaxHit,
+                specialMultiplier = specialMultiplier,
             )
         player.maxHit = maxHit
         return maxHit
@@ -173,13 +162,16 @@ constructor(
         targetCurrHp: Int,
         targetMaxHp: Int,
         baseMaxHit: Int,
+        specialMultiplier: Double,
     ): Int {
         val staffAttributes = magicAttributes.staffCollect(source, random)
 
         val slayerTask = target.isSlayerTask(source)
         val npcAttributes = npcAttributes.collect(target, targetCurrHp, targetMaxHp, slayerTask)
 
-        return computeStaffModifiedDamage(source, baseMaxHit, staffAttributes, npcAttributes)
+        val modifiedDamage =
+            computeStaffModifiedDamage(source, baseMaxHit, staffAttributes, npcAttributes)
+        return (modifiedDamage * specialMultiplier).toInt()
     }
 
     public fun computeStaffModifiedDamage(
