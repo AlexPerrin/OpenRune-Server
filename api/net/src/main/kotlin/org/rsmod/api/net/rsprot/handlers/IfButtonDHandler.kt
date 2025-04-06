@@ -55,8 +55,8 @@ constructor(
 
         // Client replaces empty obj ids with `6512`. To make life easier, we simply replace those
         // with null obj types as that's what associated scripts should treat them as.
-        val selectedType = convertNullReplacement(message.selectedObj)
-        val targetType = convertNullReplacement(message.targetObj)
+        val selectedObjType = convertNullReplacement(message.selectedObj)
+        val targetObjType = convertNullReplacement(message.targetObj)
 
         val isSelectedOverlay = !isSelectedOpenedModal
         if (isSelectedOverlay) {
@@ -64,9 +64,9 @@ constructor(
                 IfOverlayDrag(
                     player = player,
                     selectedSlot = message.selectedSub,
-                    selectedObj = selectedType,
+                    selectedObj = selectedObjType,
                     targetSlot = message.targetSub,
-                    targetObj = targetType,
+                    targetObj = targetObjType,
                     selectedComponent = selectedComponent,
                     targetComponent = targetComponent,
                 )
@@ -78,9 +78,9 @@ constructor(
         val modalDrag =
             IfModalDrag(
                 selectedSlot = message.selectedSub,
-                selectedObj = selectedType,
+                selectedObj = selectedObjType,
                 targetSlot = message.targetSub,
-                targetObj = targetType,
+                targetObj = targetObjType,
                 selectedComponent = selectedComponent,
                 targetComponent = targetComponent,
             )
