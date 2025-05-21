@@ -40,7 +40,13 @@ constructor(
             return
         }
 
-        val npc = npcList[message.index] ?: return
+        val npc = npcList[message.index]
+        if (npc == null) {
+            player.clearMapFlag()
+            player.clearPendingAction(eventBus)
+            return
+        }
+
         val speed = if (message.controlKey) player.ctrlMoveSpeed() else null
         val opTrigger = npcInteractions.hasOpTrigger(player, npc, message.interactionOp)
         val apTrigger = npcInteractions.hasApTrigger(player, npc, message.interactionOp)

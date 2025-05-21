@@ -145,8 +145,6 @@ constructor(
                 }
             }
 
-            // TODO: mes("playername is fighting another player.") for pvp.
-
             // TODO(combat): Support for npcs that only target a single player, such as barrows.
             if (npc.lastCombat + ACTIVE_COMBAT_DELAY > mapClock) {
                 if (npc.aggressivePlayer != null && npc.aggressivePlayer != player.uid) {
