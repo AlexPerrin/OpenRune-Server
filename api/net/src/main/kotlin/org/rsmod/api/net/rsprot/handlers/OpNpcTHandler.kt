@@ -40,9 +40,11 @@ constructor(
             return
         }
 
-        val npc = npcList[message.index] ?: return
+        val npc = npcList[message.index]
 
-        if (npc.isDelayed) {
+        if (npc == null || npc.isDelayed) {
+            player.clearMapFlag()
+            player.clearPendingAction(eventBus)
             return
         }
 
@@ -53,6 +55,8 @@ constructor(
         val isValidInterface =
             player.ui.containsOverlay(interfaceType) || player.ui.containsModal(interfaceType)
         if (!isValidInterface) {
+            player.clearMapFlag()
+            player.clearPendingAction(eventBus)
             return
         }
 
@@ -61,6 +65,8 @@ constructor(
         val targetEnabled =
             InterfaceEvents.isEnabled(player.ui, componentType, comsub, IfEvent.TgtNpc)
         if (!targetEnabled) {
+            player.clearMapFlag()
+            player.clearPendingAction(eventBus)
             return
         }
 
