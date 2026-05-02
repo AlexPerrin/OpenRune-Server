@@ -9,6 +9,7 @@ kotlin {
 dependencies {
     implementation(libs.guice)
     implementation(projects.api.config)
+    implementation(projects.api.mechanics.toxins)
     implementation(projects.api.npc)
     implementation(projects.api.player)
     implementation(projects.api.playerOutput)
