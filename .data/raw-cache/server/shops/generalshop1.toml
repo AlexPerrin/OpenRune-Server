@@ -1,15 +1,21 @@
 [[inventory]]
 isServerOnly = true
 id = "inv.generalshop1"
+name = "Al Kharid General Store"
 
 scope = "Shared"
 stack = "Always"
-size = 40
+
+sellMultiplier = 1300
+buyMultiplier = 400
+delta = 30
+
+size = 13
 
 protect = false
 runWeight = false
 restock = true
-allStock = true
+allStock = false
 placeholders = false
 
 [[inventory.stock]]
@@ -30,11 +36,6 @@ restockCycles = 20
 [[inventory.stock]]
 obj = "obj.shears"
 count = 2
-restockCycles = 100
-
-[[inventory.stock]]
-obj = "obj.knife"
-count = 5
 restockCycles = 100
 
 [[inventory.stock]]
@@ -68,11 +69,6 @@ count = 2
 restockCycles = 100
 
 [[inventory.stock]]
-obj = "obj.spade"
-count = 5
-restockCycles = 100
-
-[[inventory.stock]]
 obj = "obj.hammer"
 count = 5
 restockCycles = 100
@@ -86,3 +82,4 @@ restockCycles = 100
 obj = "obj.sos_security_book"
 count = 5
 restockCycles = 100
+
