@@ -9,6 +9,7 @@ import org.rsmod.api.player.events.interact.ApEvent
 import org.rsmod.api.player.events.interact.NpcContentEvents
 import org.rsmod.api.player.events.interact.NpcDefaultEvents
 import org.rsmod.api.player.events.interact.NpcEvents
+import org.rsmod.api.player.events.interact.NpcOverrideEvents
 import org.rsmod.api.player.events.interact.NpcUnimplementedEvents
 import org.rsmod.api.player.events.interact.OpEvent
 import org.rsmod.events.EventBus
@@ -20,7 +21,12 @@ import org.rsmod.game.movement.RouteRequestPathingEntity
 import org.rsmod.game.vars.VarPlayerIntMap
 import org.rsmod.utils.bits.getBits
 
-public class NpcInteractions @Inject constructor(private val eventBus: EventBus) {
+public class NpcInteractions
+@Inject
+constructor(
+    private val eventBus: EventBus,
+    private val overrides: NpcOpOverrides = NpcOpOverrides(),
+) {
     public fun interact(player: Player, npc: Npc, op: InteractionOp) {
         val opTrigger = hasOpTrigger(player, npc, op)
         val apTrigger = hasApTrigger(player, npc, op)
@@ -43,6 +49,13 @@ public class NpcInteractions @Inject constructor(private val eventBus: EventBus)
         op: InteractionOp,
         type: NpcServerType = npc.visType,
     ): OpEvent? {
+        if (overrides.claims(player, npc, type.id, op)) {
+            val overrideEvent = NpcOverrideEvents.Op(npc, type, op)
+            if (eventBus.contains(overrideEvent::class.java, overrideEvent.id)) {
+                return overrideEvent
+            }
+        }
+
         val multiNpcType = multiNpc(type, player.vars)
         if (multiNpcType != null) {
             val multiNpcTrigger = opTrigger(player, npc, op, multiNpcType)
