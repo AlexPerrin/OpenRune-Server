@@ -35,6 +35,7 @@ import org.rsmod.api.registry.zone.ZoneUpdateMap
 import org.rsmod.api.repo.npc.NpcRepository
 import org.rsmod.api.repo.world.WorldRepository
 import org.rsmod.content.areas.city.varrock.npcs.Gertrude
+import org.rsmod.content.interfaces.diary.DiaryTasks
 import org.rsmod.content.other.pets.PetFollowers
 import org.rsmod.content.other.pets.cats.CatCare
 import org.rsmod.content.other.pets.cats.CatStage
@@ -299,6 +300,38 @@ class GertrudesCatInteractionTest {
         assertEquals(100, early.player.inv.count(Coins))
     }
 
+    @Test fun `picking a kitten's colour completes the Varrock diary task on every path`() {
+        val quickBuy = Fixture(6)
+        quickBuy.player.inv[0] = InvObj(Coins, 100)
+        quickBuy.wearCharos()
+        quickBuy.quickBuyKitten()
+        quickBuy.finish()
+        assertEquals(1, quickBuy.kittens())
+        assertTrue(quickBuy.kittenColourTaskDone())
+
+        val random = Fixture(6)
+        random.player.inv[0] = InvObj(Coins, 100)
+        random.quickBuyKitten()
+        random.finish()
+        assertEquals(1, random.kittens())
+        assertFalse(random.kittenColourTaskDone())
+
+        val charm = Fixture(6)
+        charm.player.inv[0] = InvObj(Coins, 100)
+        charm.wearCharos()
+        charm.talkToGertrude()
+        charm.finish(listOf(1, 3))
+        assertEquals(1, charm.kittens())
+        assertTrue(charm.kittenColourTaskDone())
+
+        val reward = Fixture(5)
+        reward.wearCharos()
+        reward.talkToGertrude()
+        reward.finish()
+        assertEquals(1, reward.kittens())
+        assertTrue(reward.kittenColourTaskDone())
+    }
+
     @Test fun `owning a kitten blocks buying another one after the quest`() {
         val f = Fixture(6)
         f.player.inv[0] = InvObj(Cats.objsOf(CatStage.Kitten).first(), 1)
@@ -445,6 +478,13 @@ class GertrudesCatInteractionTest {
         fun slotOf(obj: String): Int =
             (0 until 28).firstOrNull { player.inv[it]?.id == obj.asRSCM() } ?: 0
 
+        fun wearCharos() {
+            player.worn[RING_SLOT] = InvObj("obj.ring_of_charos_unlocked", 1)
+        }
+
+        fun kittenColourTaskDone(): Boolean =
+            DiaryTasks.isDone(player, DiaryTasks.Area.Varrock, DiaryTasks.Tier.Medium, 3)
+
         fun kittens(): Int = Cats.objsOf(CatStage.Kitten).sumOf { player.inv.count(it) }
 
         fun removeKittens() {
@@ -548,8 +588,14 @@ class GertrudesCatInteractionTest {
                             val parent =
                                 listOf("chat_left", "chat_right", "messagebox").firstOrNull {
                                     player.ui.containsModal("interface.$it")
-                                } ?: error("Unknown dialogue: ${output()}")
-                            ResumePauseButtonInput("component.$parent:continue", -1)
+                                }
+                            when {
+                                parent != null -> ResumePauseButtonInput("component.$parent:continue", -1)
+                                // The colour menu (main modal) stays open behind later chatbox dialogues.
+                                player.ui.containsModal("interface.menu") ->
+                                    ResumePauseButtonInput("component.menu:lj_layer1", 0)
+                                else -> error("Unknown dialogue: ${output()}")
+                            }
                         }
                     }
                 coroutine.resumeWith(input)
@@ -592,6 +638,7 @@ class GertrudesCatInteractionTest {
         private const val FluffsKitten = "obj.gertrudekittens"
         private const val Cake = "obj.chocolate_cake"
         private const val Stew = "obj.stew"
+        private const val RING_SLOT = 12
         private val restored = mutableListOf<() -> Unit>()
 
         @OptIn(InternalApi::class)

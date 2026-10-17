@@ -3,7 +3,9 @@ package org.rsmod.content.interfaces.diary
 import dev.openrune.ServerCacheManager
 import dev.openrune.definition.type.FontType
 import dev.openrune.definition.type.widget.IfEvent
+import dev.openrune.rscm.RSCM
 import dev.openrune.rscm.RSCM.asRSCM
+import dev.openrune.rscm.RSCMType
 import dev.openrune.types.aconverted.interf.IfButtonOp
 import org.rsmod.api.player.events.skilling.SkillingActionCompleteEvent
 import org.rsmod.api.player.events.skilling.SkillingActionContext
@@ -18,6 +20,7 @@ import org.rsmod.api.script.onIfOverlayButton
 import org.rsmod.api.script.onPlayerLogin
 import org.rsmod.api.table.AchievementDiariesRow
 import org.rsmod.api.table.AchievementDiaryTasksRow
+import org.rsmod.content.interfaces.emotes.PlayEmote
 import org.rsmod.plugin.scripts.PluginScript
 import org.rsmod.plugin.scripts.ScriptContext
 
@@ -46,10 +49,14 @@ class AchievementDiaryScript : PluginScript() {
             val product = context as? SkillingActionContext.Product ?: return@onEvent
             when (val source = product.source) {
                 is SkillingProductSource.Mining -> DiaryHooks.oreMined(player, product.item, source.rock.coords)
-                is SkillingProductSource.Woodcutting -> DiaryHooks.logsCut(player, product.item, source.tree.coords)
-                else -> Unit
+                is SkillingProductSource.Woodcutting -> {
+                    DiaryHooks.logsCut(player, product.item, source.tree.coords)
+                    DiaryHooks.logsChopped(player, product.item, source.tree.coords)
+                }
+                is SkillingProductSource.Fishing -> DiaryHooks.fishCaught(player, product.item, player.coords)
             }
         }
+        onEvent<PlayEmote> { DiaryHooks.emotePerformed(player, RSCM.getReverseMapping(RSCMType.SEQ, seq.id)) }
         onIfOpen("interface.area_task") {
             player.ifSetEvents(TASKBOX, 0 until AREAS, IfEvent.Op1, IfEvent.Op2)
         }

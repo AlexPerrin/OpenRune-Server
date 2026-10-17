@@ -51,3 +51,10 @@ isServerOnly = true
 id = "varp.diary_progress_lumbridge"
 scope = "Perm"
 transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.diary_progress_varrock"
+scope = "Perm"
+transmit = "Never"
+

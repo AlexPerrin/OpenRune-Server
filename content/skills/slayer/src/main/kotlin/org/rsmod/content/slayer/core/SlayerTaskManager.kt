@@ -22,6 +22,7 @@ import org.rsmod.api.table.slayer.SlayerMasterTaskRow
 import org.rsmod.api.table.slayer.SlayerMastersRow
 import org.rsmod.api.table.slayer.SlayerTaskRow
 import org.rsmod.api.table.slayer.SlayerUnlockRow
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import org.rsmod.game.entity.Npc
 import org.rsmod.game.entity.Player
 
@@ -619,6 +620,7 @@ object SlayerTaskManager {
         VarPlayerIntMapSetter.set(player, "varp.slayer_count_original", amount)
         VarPlayerIntMapSetter.set(player, "varp.slayer_count", amount)
         VarPlayerIntMapSetter.set(player, "varp.slayer_target", task.task.id)
+        DiaryHooks.slayerTaskAssigned(player, master.masterId)
 
         val assignedKonarArea = if (master.masterId == KONAR_MASTER_ID) {
             val areaId = KonarSlayerAreas.resolveTaskArea(player, task, konarAreaId)

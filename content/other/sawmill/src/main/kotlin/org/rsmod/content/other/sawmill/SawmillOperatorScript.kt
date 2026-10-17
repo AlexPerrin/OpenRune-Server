@@ -170,7 +170,7 @@ constructor(private val shops: Shops, private val hooks: SawmillHooks) : PluginS
                 this.strictCount = amount
             }
         }
-        if (result.success) DiaryHooks.planksMade(player, plank.plank.internalName)
+        if (result.success) DiaryHooks.planksMade(player, plank.plank.internalName, amount)
     }
 
     private fun openSupplies(player: Player) {

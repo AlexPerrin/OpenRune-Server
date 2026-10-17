@@ -4,6 +4,8 @@ plugins {
 }
 
 dependencies {
+    implementation(projects.content.interfaces.emotes)
+    implementation(projects.api.death)
     implementation(projects.api.pluginCommons)
 }
 

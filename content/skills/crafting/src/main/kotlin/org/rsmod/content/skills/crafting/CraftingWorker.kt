@@ -10,6 +10,7 @@ import org.rsmod.api.player.stat.craftingLvl
 import org.rsmod.api.player.vars.intVarBit
 import org.rsmod.api.repo.world.WorldRepository
 import org.rsmod.api.script.onPlayerQueueWithArgs
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import org.rsmod.content.skills.SkillMultiConfig
 import org.rsmod.content.skills.SkillMultiEntry
 import org.rsmod.content.skills.crafting.util.CraftingConfig
@@ -236,6 +237,7 @@ suspend fun ProtectedAccess.craftOnce(product: CraftingProduct): Boolean {
     }
 
     product.byproducts.forEach { invAdd(inv, it.internal, it.count) }
+    DiaryHooks.crafted(player, product.output, player.coords)
 
     if (product.consumesThread && !holdsCostumeNeedle()) {
         consumeThreadCharge()

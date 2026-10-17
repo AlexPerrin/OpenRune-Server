@@ -6,6 +6,7 @@ import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.script.onOpNpc1
 import org.rsmod.api.script.onOpNpc3
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import org.rsmod.content.other.pets.cats.CatCare
 import org.rsmod.content.other.pets.cats.CatColour
 import org.rsmod.content.other.pets.cats.CatStage
@@ -89,12 +90,15 @@ constructor(private val care: CatCare, private val gertrudesCat: GertrudesCatQue
             "Oh, by the way: the kitten can live in your backpack, but to make it grow you must " +
                 "take it out and feed and stroke it often.",
         )
-        val colour = if (wearingCharos(player)) pickColour() ?: access.randomColour() else access.randomColour()
+        val picked = if (wearingCharos(player)) pickColour() else null
+        val colour = picked ?: access.randomColour()
         val kitten = Cats.of(CatStage.Kitten, colour).obj
         objbox(kitten, "Gertrude gives you a kitten.")
         mesbox("...and some food!")
         if (!rewardQuest(kitten)) {
             chatNpc(neutral, "You'll need $REWARD_SLOTS free spaces in your pack. Come straight back!")
+        } else if (picked != null) {
+            DiaryHooks.kittenColourSelected(player)
         }
     }
 
@@ -164,7 +168,7 @@ constructor(private val care: CatCare, private val gertrudesCat: GertrudesCatQue
                 chatPlayer(happy, "I'm quite fussy over cats - can I pick my own?")
                 chatNpc(happy, "Well okay, but they're all just as cuddly as each other.")
                 val colour = pickColour() ?: return
-                if (access.giveKitten(colour)) {
+                if (access.giveChosenKitten(colour)) {
                     mesbox("Gertrude gives you another kitten.")
                 }
             }
@@ -191,8 +195,13 @@ constructor(private val care: CatCare, private val gertrudesCat: GertrudesCatQue
             return
         }
         startDialogue(npc) {
-            val colour = if (wearingCharos(player)) pickColour() ?: return@startDialogue else access.randomColour()
-            if (access.giveKitten(colour)) {
+            val given =
+                if (wearingCharos(player)) {
+                    access.giveChosenKitten(pickColour() ?: return@startDialogue)
+                } else {
+                    access.giveKitten(access.randomColour())
+                }
+            if (given) {
                 mesbox("Gertrude gives you another kitten.")
             }
         }
@@ -205,6 +214,15 @@ constructor(private val care: CatCare, private val gertrudesCat: GertrudesCatQue
     }
 
     private fun ProtectedAccess.randomColour(): CatColour = CatColour.natural[random.of(CatColour.natural.size)]
+
+    /** A kitten of the colour the player picked (Ring of Charos): Varrock Diary medium 3. */
+    private fun ProtectedAccess.giveChosenKitten(colour: CatColour): Boolean {
+        if (!giveKitten(colour)) {
+            return false
+        }
+        DiaryHooks.kittenColourSelected(player)
+        return true
+    }
 
     private fun ProtectedAccess.giveKitten(colour: CatColour): Boolean {
         if (inv.isFull()) {
