@@ -16,7 +16,9 @@ import org.rsmod.api.script.onIfClose
 import org.rsmod.api.script.onIfModalButton
 import org.rsmod.api.script.onIfOpen
 import org.rsmod.api.script.onApNpc3
+import org.rsmod.api.script.onApNpc4
 import org.rsmod.api.script.onOpNpc3
+import org.rsmod.api.script.onOpNpc4
 import org.rsmod.api.script.onPlayerLogin
 import org.rsmod.api.script.onPlayerSoftTimer
 import org.rsmod.content.interfaces.grandexchange.GrandExchange.commas
@@ -35,6 +37,8 @@ class GrandExchangeScript @Inject constructor(private val marketPrices: MarketPr
         for (clerk in CLERKS) {
             onOpNpc3(clerk) { openExchange() }
             onApNpc3(clerk) { if (isWithinApRange(it.npc, distance = 2)) openExchange() }
+            onOpNpc4(clerk) { openHistory() }
+            onApNpc4(clerk) { if (isWithinApRange(it.npc, distance = 2)) openHistory() }
         }
 
         onPlayerLogin {
@@ -63,6 +67,9 @@ class GrandExchangeScript @Inject constructor(private val marketPrices: MarketPr
             }
         }
         onIfModalButton("component.ge_offers:back") { backToIndex() }
+        onIfModalButton("component.ge_offers:history") { openHistory() }
+        onIfModalButton("component.ge_history:exchange") { openExchange() }
+        onIfModalButton("component.ge_history:list") { historyOp(it.comsub, it.op) }
         onIfModalButton("component.ge_offers:setup") { setupOp(it.comsub, it.op) }
         onIfModalButton("component.ge_offers:setup_confirm") { confirm() }
         onIfModalButton("component.ge_offers:details_status") {
@@ -127,6 +134,48 @@ class GrandExchangeScript @Inject constructor(private val marketPrices: MarketPr
         )
         ifSetEvents("component.ge_offers:collectall", 0..1, IfEvent.Op1, IfEvent.Op2)
         ifSetEvents("component.ge_offers_side:items", inv.indices, IfEvent.Op1, IfEvent.Op10)
+    }
+
+    /** The trade history (`ge_history` 383), drawn by scripts 1644-1646, newest first. */
+    private fun ProtectedAccess.openHistory() {
+        ifOpenMain("interface.ge_history")
+        player.runClientScript(HISTORY_INIT_SCRIPT)
+        GrandExchange.history(player).forEachIndexed { i, trade ->
+            player.runClientScript(
+                HISTORY_ADDLINE_SCRIPT,
+                i,
+                trade.item,
+                if (trade.sold) 1 else 0,
+                trade.count,
+                trade.gold.toLong(),
+                trade.tax.toLong(),
+            )
+        }
+        player.runClientScript(HISTORY_FINISH_SCRIPT)
+        ifSetEvents(
+            "component.ge_history:list",
+            0 until GrandExchange.HISTORY_SIZE * HISTORY_LINE_COMPONENTS,
+            IfEvent.Op1,
+            IfEvent.Op10,
+        )
+    }
+
+    /** "Buy-offer" on a history line opens a buy offer for its item; "Examine" examines it. */
+    private fun ProtectedAccess.historyOp(comsub: Int, op: IfButtonOp) {
+        val trade = GrandExchange.history(player).getOrNull(comsub / HISTORY_LINE_COMPONENTS) ?: return
+        val type = GrandExchange.type(trade.item) ?: return
+        if (op == IfButtonOp.Op10) {
+            mes(type.examine)
+            return
+        }
+        val slot = firstFreeSlot()
+        openExchange()
+        if (slot == null) {
+            mes("You have no free offer slots.")
+            return
+        }
+        resetSetup(player, slot + 1)
+        selectItem(type, quantity = 1)
     }
 
     private fun setCollectionBoxEvents(player: Player) {
@@ -408,6 +457,18 @@ class GrandExchangeScript @Inject constructor(private val marketPrices: MarketPr
         const val ENTER_PRICE = 12
         val QUANTITY_DELTAS = mapOf(1 to -1, 2 to 1, 3 to 1, 4 to 10, 5 to 100, 6 to Int.MAX_VALUE)
         val PRICE_DELTAS = mapOf(8 to -1, 9 to 1, 10 to -5, 13 to 5)
+
+        /** Components `ge_history_addline` creates per line (its sub ids are line * 6 + n). */
+        const val HISTORY_LINE_COMPONENTS = 6
+        val HISTORY_INIT_SCRIPT: Int by lazy {
+            "clientscript.[clientscript,ge_history_init]".asRSCM(RSCMType.CLIENTSCRIPT)
+        }
+        val HISTORY_ADDLINE_SCRIPT: Int by lazy {
+            "clientscript.[clientscript,ge_history_addline]".asRSCM(RSCMType.CLIENTSCRIPT)
+        }
+        val HISTORY_FINISH_SCRIPT: Int by lazy {
+            "clientscript.[clientscript,ge_history_finish]".asRSCM(RSCMType.CLIENTSCRIPT)
+        }
 
         val SETDESC_SCRIPT: Int by lazy {
             "clientscript.[clientscript,ge_offers_setdesc]".asRSCM(RSCMType.CLIENTSCRIPT)

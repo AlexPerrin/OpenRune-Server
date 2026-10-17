@@ -45,6 +45,11 @@ class GrandExchangeScriptTest {
             GrandExchange.clear(player, slot)
             player.clearInv(GrandExchange.collectionInv(player, slot))
         }
+        for (i in 0 until GrandExchange.HISTORY_SIZE) {
+            for (field in listOf("obj", "count", "gold", "tax")) {
+                GrandExchange.set(player, "varp.ge_history${i}_$field", 0)
+            }
+        }
         for (i in 0 until GrandExchange.LIMIT_TRACKERS) {
             for (field in listOf("item", "start", "bought")) {
                 GrandExchange.set(player, "varp.ge_limit${i}_$field", 0)
@@ -290,6 +295,43 @@ class GrandExchangeScriptTest {
                 GrandExchange.buyLimit(limited.last())!! - 1,
                 GrandExchange.limitRemaining(player, limited.last(), NOW + 20),
             )
+        }
+
+    @Test
+    fun GameTestState.`finished and partly filled aborted offers go into the history, newest first`() =
+        runInjectedGameTest(GrandExchangeScript::class, null, GrandExchangeScript::class) { script ->
+            resetGe(player)
+            player.inv[0] = InvObj(id("obj.coins"), 100_000)
+            repeat(3) { player.inv[1 + it] = InvObj(lobster.id, 1) }
+            with(script) {
+                player.withProtectedAccess {
+                    setUp(slot = 0, sell = false, item = lobster.id, count = 10, price = guide)
+                    assertTrue(confirm())
+                    setUp(slot = 1, sell = true, item = lobster.id, count = 3, price = 1)
+                    assertTrue(confirm())
+                    setUp(slot = 2, sell = false, item = lobster.id, count = 5, price = 1)
+                    assertTrue(confirm())
+                }
+            }
+            GrandExchange.fillOpenOffers(player, NOW) { it.cost }
+            assertTrue(GrandExchange.abort(player, 0))
+            assertTrue(GrandExchange.abort(player, 2))
+            fillAll(player)
+            val history = GrandExchange.history(player)
+            assertEquals(2, history.size)
+            assertEquals(GrandExchange.Trade(lobster.id, true, 3, 3 * guide, 3 * GrandExchange.taxPerItem(guide)), history[0])
+            assertEquals(GrandExchange.Trade(lobster.id, false, 3, 3 * guide, 0), history[1])
+
+            repeat(GrandExchange.HISTORY_SIZE) {
+                GrandExchange.recordHistory(
+                    player,
+                    GrandExchange.Offer(0, id("obj.coal"), 1, 1, 1, it + 1, GrandExchange.STATE_FINISHED),
+                )
+            }
+            val full = GrandExchange.history(player)
+            assertEquals(GrandExchange.HISTORY_SIZE, full.size)
+            assertEquals(GrandExchange.HISTORY_SIZE, full.first().gold)
+            assertEquals(1, full.last().gold)
         }
 
     private companion object {
