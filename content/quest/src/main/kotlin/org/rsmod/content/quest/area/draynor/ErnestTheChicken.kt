@@ -153,6 +153,7 @@ constructor(
             introduceErnest()
             return
         }
+        markTalkedToOddenstein()
 
         if (progress.hasReceivedParts(player) || progress.hasAllParts(player)) {
             handIn(npc)
@@ -238,6 +239,14 @@ constructor(
                 "which I'm going to need to get this thing started again.",
         )
         progress.foundErnest.set(player, true)
+        markTalkedToOddenstein()
+    }
+
+    private fun Dialogue.markTalkedToOddenstein() {
+        val stage = quest.getQuestStage(player)
+        if (stage < STAGE_TALKED_TO_ODDENSTEIN) {
+            quest.advanceQuestStage(access, STAGE_TALKED_TO_ODDENSTEIN - stage)
+        }
     }
 
     private suspend fun Dialogue.handIn(npc: Npc) {
@@ -344,6 +353,8 @@ constructor(
     }
 
     private companion object {
+        /** Varp `haunted` after Professor Oddenstein's first talk, as in OSRS (Quest Helper's stage 2). */
+        private const val STAGE_TALKED_TO_ODDENSTEIN = 2
         private const val RubberTube = "obj.rubber_tube"
         private const val PressureGauge = "obj.pressure_gauge"
         private const val OilCan = "obj.oil_can"
