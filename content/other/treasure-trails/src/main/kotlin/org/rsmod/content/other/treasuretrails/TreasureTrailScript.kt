@@ -12,6 +12,8 @@ import jakarta.inject.Singleton
 import org.rsmod.api.config.Constants
 import org.rsmod.api.invtx.invAdd
 import org.rsmod.api.invtx.invClear
+import org.rsmod.api.npc.interact.AiPlayerInteractions
+import org.rsmod.api.npc.opPlayer2
 import org.rsmod.api.npc.owner.assignSpawnOwner
 import org.rsmod.api.player.events.interact.LocOverrideEvents
 import org.rsmod.api.player.events.interact.NpcOverrideEvents
@@ -73,8 +75,10 @@ constructor(
     private val collision: CollisionFlagMap,
     private val mapClock: MapClock,
     private val random: GameRandom,
+    private val aiPlayerInteractions: AiPlayerInteractions,
 ) : PluginScript(), SpadeDigHook {
     private val uris = HashMap<Player, Npc>()
+    private val foes = HashMap<Player, Npc>()
 
     fun uriOf(player: Player): Npc? = uris[player]
 
@@ -100,9 +104,12 @@ constructor(
         registerLocSteps()
         onEvent<PlayEmote> { emoted(player, seq.id) }
         for (tier in TrailTier.entries) onOpNpc1(tier.uri) { talkToUri(it.npc) }
-        onPlayerLogout { uris.remove(player)?.let(::leave) }
+        onPlayerLogout {
+            uris.remove(player)?.let(::leave)
+            foes.remove(player)?.let(::leave)
+        }
         onCommand("clue") {
-            desc = "Get a clue scroll: ::clue [beginner|easy|medium|hard] [step row or 'list'] [steps left]"
+            desc = "Get a clue scroll: ::clue [beginner|easy|medium|hard|solve] [step row or 'list'] [steps left]"
             cheat(::giveClue)
         }
     }
@@ -461,6 +468,16 @@ constructor(
         val step = steps.firstOrNull { it.seq == seq } ?: return
         if (!holdsClue(player, step) || !step.covers(player.coords, step.coord, TrailSteps.EMOTE_RADIUS)) return
         if (uris[player]?.isSlotAssigned == true) return
+        val agentDue = step.tier == TrailTier.Hard && player.vars[step.tier.stepsDoneVarp] > 0
+        if (agentDue && player.vars[step.tier.auxVarp] != FOE_DEFEATED) {
+            summonFoe(player, doubleAgent(player), "I expect you to die!")
+            return
+        }
+        summonUri(player, step)
+    }
+
+    private fun summonUri(player: Player, step: TrailStep.Emote) {
+        if (uris[player]?.isSlotAssigned == true) return
         val uri = Npc(step.tier.uri, besideTile(player.coords))
         uri.mode = NpcMode.None
         npcRepo.add(uri, URI_LIFETIME)
@@ -490,7 +507,47 @@ constructor(
 
     override suspend fun ProtectedAccess.dig() {
         val step = digStep(player) ?: return
+        if (step is TrailStep.Dig && step.foes.isNotEmpty() && player.vars[step.tier.auxVarp] != FOE_DEFEATED) {
+            summonFoe(player, step.foes.first(), wizardCall(step.foes.first()))
+            return
+        }
         completeStep(step)
+    }
+
+    /**
+     * Hard coordinate wizards and the hard Double agent (OSRS Wiki): the foe appears beside the
+     * player, calls out and attacks; killing it ([foeKilled]) lets the dig or Uri go ahead. One foe
+     * per player at a time.
+     */
+    fun summonFoe(player: Player, type: Int, call: String) {
+        if (foes[player]?.isSlotAssigned == true) return
+        val foe = Npc(dev.openrune.rscm.RSCM.getReverseMapping(RSCMType.NPC, type), besideTile(player.coords))
+        npcRepo.add(foe, FOE_LIFETIME)
+        foe.assignSpawnOwner(player, mapClock.cycle)
+        foes[player] = foe
+        foe.say(call)
+        foe.opPlayer2(player, aiPlayerInteractions)
+    }
+
+    fun foeOf(player: Player): Npc? = foes[player]
+
+    fun foeKilled(player: Player, npc: Npc) {
+        if (foes[player] !== npc) return
+        foes.remove(player)
+        val step = TrailTier.entries.firstNotNullOfOrNull { tier ->
+            currentStep(player, tier)?.takeIf { it is TrailStep.Dig || it is TrailStep.Emote }
+        } ?: return
+        VarPlayerIntMapSetter.set(player, step.tier.auxVarp, FOE_DEFEATED)
+        if (step is TrailStep.Emote && wearsOutfit(player, step.outfits)) summonUri(player, step)
+    }
+
+    private fun wizardCall(type: Int): String =
+        if (type == ZAMORAK_WIZARD.asRSCM(RSCMType.NPC)) "Die, human!" else "For Saradomin!"
+
+    private fun doubleAgent(player: Player): Int {
+        val c = player.coords
+        val wilderness = c.x in WILDERNESS_X && c.z in WILDERNESS_Z
+        return (if (wilderness) DOUBLE_AGENT_WILDERNESS else DOUBLE_AGENT).asRSCM(RSCMType.NPC)
     }
 
     fun digStep(player: Player): TrailStep? =
@@ -597,6 +654,16 @@ constructor(
 
     fun giveClue(cheat: Cheat) {
         val player = cheat.player
+        if (cheat.args.getOrNull(0) == "solve") {
+            val box = puzzleBoxes().firstOrNull { player.inv.count(objName(it.obj)) > 0 }
+            if (box == null) {
+                player.mes("You have no puzzle box.")
+                return
+            }
+            setPuzzle(player, TrailPuzzle.solved(box.puzzle))
+            player.mes("Puzzle box solved.")
+            return
+        }
         val tier = TrailTier.entries.firstOrNull { it.label == cheat.args.getOrNull(0) } ?: TrailTier.Beginner
         val steps = TrailSteps.ALL.getValue(tier)
         val arg = cheat.args.getOrNull(1)
@@ -709,6 +776,13 @@ constructor(
         const val HOT_COLD_LAST_VARP = "varp.trail_beginner_hot_cold_last"
         const val URI_LIFETIME = 100
         const val SECOND_EMOTE_DONE = 1
+        const val FOE_DEFEATED = 3
+        const val FOE_LIFETIME = 500
+        const val ZAMORAK_WIZARD = "npc.trail_hard"
+        const val DOUBLE_AGENT = "npc.double_agent_2"
+        const val DOUBLE_AGENT_WILDERNESS = "npc.double_agent_1"
+        val WILDERNESS_X = 2944..3391
+        val WILDERNESS_Z = 3520..3967
         const val KEY_DROP_DURATION = 200
         const val LIST_CHUNK = 12
         const val BLOCKED_FLAGS = CollisionFlag.BLOCK_WALK or CollisionFlag.BLOCK_PLAYERS

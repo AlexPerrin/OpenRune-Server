@@ -294,6 +294,49 @@ class TreasureTrailScriptTest {
         }
 
     @Test
+    fun GameTestState.`a hard coordinate's wizard must die before the dig pays`() =
+        runInjectedGameTest(TreasureTrailScript::class, null, TreasureTrailScript::class) { script ->
+            prepare()
+            val hard = TrailTier.Hard
+            val step =
+                TrailSteps.ALL.getValue(hard).filterIsInstance<TrailStep.Dig>().first { it.foes.isNotEmpty() }
+            script.giveClue(Cheat(player, "clue", listOf("hard", "${step.row}", "2")))
+            allocZoneCollision(step.coord)
+            player.teleport(step.coord)
+            with(script) { player.withProtectedAccess { dig() } }
+            val foe = checkNotNull(script.foeOf(player))
+            assertTrue(foe.id in step.foes)
+            assertEquals(step.row, currentStep(player, hard)?.row)
+            with(script) { player.withProtectedAccess { dig() } }
+            assertTrue(script.foeOf(player) === foe)
+            script.foeKilled(player, foe)
+            assertNull(script.foeOf(player))
+            with(script) { player.withProtectedAccess { dig() } }
+            assertEquals(1, player.vars[hard.stepsLeftVarp])
+            assertTrue(currentStep(player, hard)?.row != step.row)
+        }
+
+    @Test
+    fun GameTestState.`a hard emote after the first step brings the double agent first`() =
+        runInjectedGameTest(TreasureTrailScript::class, null, TreasureTrailScript::class) { script ->
+            prepare()
+            val hard = TrailTier.Hard
+            val step = TrailSteps.ALL.getValue(hard).filterIsInstance<TrailStep.Emote>().first()
+            script.giveClue(Cheat(player, "clue", listOf("hard", "${step.row}", "2")))
+            VarPlayerIntMapSetter.set(player, hard.stepsDoneVarp, 1)
+            allocZoneCollision(step.coord)
+            player.teleport(step.coord)
+            script.emoted(player, step.seq)
+            val agent = checkNotNull(script.foeOf(player))
+            assertEquals("npc.double_agent_2".asRSCM(RSCMType.NPC), agent.id)
+            assertNull(script.uriOf(player))
+            script.foeKilled(player, agent)
+            assertEquals(TreasureTrailScript.FOE_DEFEATED, player.vars[hard.auxVarp])
+            script.emoted(player, step.seq)
+            assertNotNull(script.uriOf(player))
+        }
+
+    @Test
     fun GameTestState.`the strange device reads the distance to the spot`() =
         runInjectedGameTest(TreasureTrailScript::class, null, TreasureTrailScript::class) { script ->
             prepare()

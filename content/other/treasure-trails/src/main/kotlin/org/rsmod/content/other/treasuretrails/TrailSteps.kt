@@ -68,8 +68,16 @@ sealed class TrailStep(val row: Int, val tier: TrailTier, val text: String?) {
     ) : TrailStep(row, tier, text)
 
     /** Dig within [radius] of [coord]; map clues open [map]. */
-    class Dig(row: Int, tier: TrailTier, text: String?, val coord: CoordGrid, val radius: Int, val map: String?) :
-        TrailStep(row, tier, text)
+    /** Dig within [radius] of [coord]; with [foes] (hard coordinates), one must be killed first. */
+    class Dig(
+        row: Int,
+        tier: TrailTier,
+        text: String?,
+        val coord: CoordGrid,
+        val radius: Int,
+        val map: String?,
+        val foes: List<Int> = emptyList(),
+    ) : TrailStep(row, tier, text)
 
     /** Perform [seq] near [coord] in one of [outfits]; Uri then comes ([seq2]: then do that one too). */
     class Emote(
@@ -141,7 +149,8 @@ object TrailSteps {
         }
         for (r in CluehelperClueCoordinateRow.all().filter { it.difficulty == d }) {
             val text = coordinateText(r.clueText) ?: continue
-            steps += TrailStep.Dig(r.rowId, tier, text, r.target.coord, MAP_RADIUS, null)
+            val foes = r.combatEncounter.flatMap { encounter -> encounter.npcs.map { it.id } }
+            steps += TrailStep.Dig(r.rowId, tier, text, r.target.coord, MAP_RADIUS, null, foes)
         }
         for (r in CluehelperClueCrypticRow.all().filter { it.difficulty == d }) {
             steps += cryptic(tier, r) ?: continue

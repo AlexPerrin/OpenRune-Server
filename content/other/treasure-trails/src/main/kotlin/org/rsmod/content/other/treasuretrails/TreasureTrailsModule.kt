@@ -9,5 +9,6 @@ class TreasureTrailsModule : PluginModule() {
         bindInstance<TreasureTrailScript>()
         addSetBinding<SpadeDigHook>(TreasureTrailScript::class.java)
         addSetBinding<NpcDeathKillHook>(TrailKeyDropHook::class.java)
+        addSetBinding<NpcDeathKillHook>(TrailFoeHook::class.java)
     }
 }
