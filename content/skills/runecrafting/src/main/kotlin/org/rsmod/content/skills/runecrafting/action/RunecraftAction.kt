@@ -1,5 +1,6 @@
 package org.rsmod.content.skills.runecrafting.action
 
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import dev.openrune.types.ItemServerType
 import kotlin.math.floor
 import org.rsmod.api.player.protect.ProtectedAccess
@@ -192,6 +193,7 @@ object RunecraftAction {
 
         invAdd(inv, rune.output.internalName, totalRunes)
         advanceRunecraftingXp(xp, xpMods)
+        if (!ouraniaAltar) DiaryHooks.runesCrafted(player, rune.output.internalName)
     }
 
     private suspend fun ProtectedAccess.canCraftRune(rune: RunecraftingRunesRow): Boolean {

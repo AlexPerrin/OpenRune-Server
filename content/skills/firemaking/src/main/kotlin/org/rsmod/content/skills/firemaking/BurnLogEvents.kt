@@ -1,5 +1,6 @@
 package org.rsmod.content.skills.firemaking
 
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import dev.openrune.map.MapSingletons.collision
 import dev.openrune.rscm.RSCM
 import dev.openrune.rscm.RSCMType
@@ -173,6 +174,7 @@ public class BurnLogEvents @Inject constructor(
         val xp = task.log.xp * task.method.xpMultiplier(task.log.input.internalName) * xpModifier
         statAdvance("stat.firemaking", xp)
         mes("The fire catches and the logs begin to burn.")
+        DiaryHooks.logsBurned(player, task.log.input.internalName, fireCoords)
 
         moveAwayFromFire(fireCoords)
         faceSquare(fireCoords)

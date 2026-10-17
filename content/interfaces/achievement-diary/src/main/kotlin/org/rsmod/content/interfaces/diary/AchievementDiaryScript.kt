@@ -8,7 +8,12 @@ import dev.openrune.types.aconverted.interf.IfButtonOp
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.player.ui.ifSetEvents
 import org.rsmod.api.script.onIfOpen
+import org.rsmod.api.player.events.skilling.SkillingActionCompleteEvent
+import org.rsmod.api.player.events.skilling.SkillingActionContext
+import org.rsmod.api.player.events.skilling.SkillingProductSource
+import org.rsmod.api.script.onEvent
 import org.rsmod.api.script.onIfOverlayButton
+import org.rsmod.api.script.onPlayerLogin
 import org.rsmod.api.table.AchievementDiariesRow
 import org.rsmod.api.table.AchievementDiaryTasksRow
 import org.rsmod.plugin.scripts.PluginScript
@@ -19,8 +24,8 @@ import org.rsmod.plugin.scripts.ScriptContext
  * builds one entry per enum 595 area) opens the journal scroll (741) with the area's tasks per
  * tier. RuneLite's Diary Requirements plugin reads 741: the title must start with "Achievement
  * Diary", the first line names the diary ("Lumbridge & Draynor Tasks"), and it matches task lines
- * (joined across wrapped lines) against its own task texts. No task progress is tracked yet, so no
- * line is struck through.
+ * (joined across wrapped lines) against its own task texts. Done tasks ([DiaryTasks], Lumbridge &
+ * Draynor and Varrock only) are struck through line by line.
  *
  * Guesses: the title wording, the tier heading lines and their colour. Areas without a row in
  * `achievement_diaries` say so in the chat.
@@ -29,6 +34,15 @@ class AchievementDiaryScript : PluginScript() {
     private val font: FontType by lazy { ServerCacheManager.getFont("font.p12_full".asRSCM())!! }
 
     override fun ScriptContext.startup() {
+        onPlayerLogin { DiaryTasks.sync(player) }
+        onEvent<SkillingActionCompleteEvent> {
+            val product = context as? SkillingActionContext.Product ?: return@onEvent
+            when (val source = product.source) {
+                is SkillingProductSource.Mining -> DiaryHooks.oreMined(player, product.item, source.rock.coords)
+                is SkillingProductSource.Woodcutting -> DiaryHooks.logsCut(player, product.item, source.tree.coords)
+                else -> Unit
+            }
+        }
         onIfOpen("interface.area_task") { player.ifSetEvents(TASKBOX, 0 until AREAS, IfEvent.Op1) }
         onIfOverlayButton(TASKBOX) {
             if (it.op == IfButtonOp.Op1) openJournal(it.comsub)
@@ -41,7 +55,7 @@ class AchievementDiaryScript : PluginScript() {
             mes("That diary's journal isn't available yet.")
             return
         }
-        val lines = journalLines(diary)
+        val lines = journalLines(diary, doneTasks(diary.area))
         ifOpenMain("interface.journalscroll")
         ifSetText("component.journalscroll:title", TITLE)
         val shown = lines.take(MAX_LINES)
@@ -49,7 +63,16 @@ class AchievementDiaryScript : PluginScript() {
         runClientScript(JOURNAL_SCROLL_SETUP, 1, shown.size)
     }
 
-    fun journalLines(diary: AchievementDiariesRow): List<String> {
+    private fun ProtectedAccess.doneTasks(area: Int): (Int, Int) -> Boolean {
+        val tracked = TRACKED_AREAS[area] ?: return { _, _ -> false }
+        val done = DiaryTasks.Tier.entries.map { DiaryTasks.doneTasks(player, tracked, it) }
+        return { tier, task -> task in done[tier] }
+    }
+
+    fun journalLines(
+        diary: AchievementDiariesRow,
+        isDone: (tier: Int, task: Int) -> Boolean = { _, _ -> false },
+    ): List<String> {
         val lines = mutableListOf(diary.heading)
         val tasks = AchievementDiaryTasksRow.all().filter { it.area == diary.area }
         for ((tier, name) in TIER_NAMES.withIndex()) {
@@ -57,8 +80,9 @@ class AchievementDiaryScript : PluginScript() {
             if (tierTasks.isEmpty()) continue
             lines += ""
             lines += "<col=$TIER_COLOUR>$name</col>"
-            for (task in tierTasks) {
-                lines += wrap(task.text)
+            for ((index, task) in tierTasks.withIndex()) {
+                val wrapped = wrap(task.text)
+                lines += if (isDone(tier, index + 1)) wrapped.map { "<str>$it</str>" } else wrapped
             }
         }
         return lines
@@ -91,5 +115,6 @@ class AchievementDiaryScript : PluginScript() {
         const val MAX_LINES = 200
         const val JOURNAL_SCROLL_SETUP = 6845
         val TIER_NAMES = listOf("Easy", "Medium", "Hard", "Elite")
+        val TRACKED_AREAS = mapOf(6 to DiaryTasks.Area.Lumbridge, 8 to DiaryTasks.Area.Varrock)
     }
 }

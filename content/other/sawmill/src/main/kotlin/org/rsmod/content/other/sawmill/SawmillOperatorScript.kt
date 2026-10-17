@@ -1,5 +1,6 @@
 package org.rsmod.content.other.sawmill
 
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import jakarta.inject.Inject
@@ -151,7 +152,7 @@ constructor(private val shops: Shops, private val hooks: SawmillHooks) : PluginS
             )
             return
         }
-        player.invTransaction(access.inv) {
+        val result = player.invTransaction(access.inv) {
             val from = select(access.inv)
             delete {
                 this.from = from
@@ -169,6 +170,7 @@ constructor(private val shops: Shops, private val hooks: SawmillHooks) : PluginS
                 this.strictCount = amount
             }
         }
+        if (result.success) DiaryHooks.planksMade(player, plank.plank.internalName)
     }
 
     private fun openSupplies(player: Player) {

@@ -1,5 +1,6 @@
 package org.rsmod.content.skills.magic.spell.teleports
 
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import dev.openrune.ServerCacheManager
 import dev.openrune.rscm.RSCM
 import dev.openrune.rscm.RSCM.asRSCM
@@ -95,6 +96,7 @@ constructor(
             return
         }
         telejump(CoordGrid(task.destination))
+        DiaryHooks.spellTeleport(player, task.teleport.name.lowercase())
         val endAnim = task.teleport.style.endAnim
         if (endAnim != null) anim(endAnim) else resetAnim()
         statAdvance("stat.magic", spell.castXp)

@@ -1,5 +1,6 @@
 package org.rsmod.content.skills.runecrafting.essence
 
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.player.output.soundSynth
 import org.rsmod.api.player.protect.ProtectedAccess
@@ -64,6 +65,7 @@ suspend fun Dialogue.teleportToRuneEssenceMine() {
     player.soundSynth("synth.curse_hit", delay = 15)
     delay(1)
     access.telejump(dest)
+    DiaryHooks.essenceMineTeleport(player, npc.type.internalName)
 }
 
 suspend fun Dialogue.teleportToMainLand() {

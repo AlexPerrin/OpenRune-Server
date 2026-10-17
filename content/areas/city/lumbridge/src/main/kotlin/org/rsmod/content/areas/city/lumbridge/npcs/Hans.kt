@@ -1,5 +1,6 @@
 package org.rsmod.content.areas.city.lumbridge.npcs
 
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
 import org.rsmod.api.player.dialogue.Dialogue
@@ -13,7 +14,10 @@ import org.rsmod.plugin.scripts.ScriptContext
 class Hans : PluginScript() {
     override fun ScriptContext.startup() {
         onOpNpc1("npc.hans") { hansDialogue(it.npc) }
-        onOpNpc3("npc.hans") { hansAgeDialogue(it.npc) }
+        onOpNpc3("npc.hans") {
+            hansAgeDialogue(it.npc)
+            DiaryHooks.hansAge(player)
+        }
     }
 
     private suspend fun ProtectedAccess.hansDialogue(npc: Npc) =

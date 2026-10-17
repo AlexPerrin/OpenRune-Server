@@ -1,5 +1,6 @@
 package org.rsmod.content.skills.cooking
 
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import jakarta.inject.Inject
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.player.stat.cookingLvl
@@ -219,6 +220,8 @@ class CookingEvents @Inject constructor(
             val xpModifier = xpMods.get(player, "stat.cooking")
             statAdvance("stat.cooking", food.xp.toDouble() * xpModifier)
             mes("You successfully cook the ${food.raw.name}.")
+            val lumbridgeRange = surface is CookingSurface.Range && surface.rangeType == RangeType.LUMBRIDGE
+            DiaryHooks.cooked(player, food.cooked.internalName, lumbridgeRange)
         }
     }
 
