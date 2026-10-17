@@ -1,6 +1,8 @@
 [gamevals.dbtable]
 impling_types = 60000
 birdhouse_types = 60001
+hunter_traps = 60011
+hunter_trap_creatures = 60012
 
 [gamevals.dbrow]
 impling_type_baby = 60124
@@ -23,3 +25,17 @@ birdhouse_type_mahogany = 60145
 birdhouse_type_yew = 60146
 birdhouse_type_magic = 60147
 birdhouse_type_redwood = 60148
+hunter_trap_bird_snare = 60350
+hunter_trap_box_trap = 60351
+hunter_trap_creature_crimson_swift = 60352
+hunter_trap_creature_golden_warbler = 60353
+hunter_trap_creature_copper_longtail = 60354
+hunter_trap_creature_cerulean_twitch = 60355
+hunter_trap_creature_tropical_wagtail = 60356
+hunter_trap_creature_ferret = 60357
+hunter_trap_creature_chinchompa = 60358
+hunter_trap_creature_chinchompa_big = 60359
+hunter_trap_creature_chinchompa_black = 60360
+
+[gamevals.timer]
+hunter_traps = 470
