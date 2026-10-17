@@ -95,9 +95,14 @@ constructor(private val validator: PlayerTeleportValidator, private val areaChec
 
     /** Swaps [item] in [from] for its next charge (or removes it) and sends the charge messages. */
     fun ProtectedAccess.useCharge(item: JewelleryTeleportItemsRow, from: Inventory): Boolean {
-        val obj = item.obj.internalName
+        val slot = from.indexOfFirst { it?.id == item.obj.id }
+        if (slot < 0) return false
         val used =
-            if (item.crumbles == 1) invDel(from, obj, 1) else invReplace(from, obj, 1, item.next.internalName)
+            if (item.crumbles == 1) {
+                invDel(from, item.obj.internalName, 1)
+            } else {
+                invReplaceSlot(from, slot, 1, item.next)
+            }
         if (used.failure) return false
         mes("You rub the ${item.rubWord}...")
         val left = item.charges - 1

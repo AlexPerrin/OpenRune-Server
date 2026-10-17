@@ -24,10 +24,11 @@ class JewelleryTeleportScriptTest {
     fun GameTestState.`a use swaps the necklace for one charge less`() =
         runInjectedGameTest(JewelleryTeleportScript::class, null, JewelleryTeleportScript::class) { script ->
             prepare()
-            player.inv[0] = obj("obj.necklace_of_minigames_8")
+            player.inv[5] = obj("obj.necklace_of_minigames_8")
             assertTrue(use(script, "dbrow.jewellery_teleport_games_necklace_8", inventory = true))
             assertEquals(0, player.inv.count("obj.necklace_of_minigames_8"))
             assertEquals(1, player.inv.count("obj.necklace_of_minigames_7"))
+            assertEquals("obj.necklace_of_minigames_7".asRSCM(RSCMType.OBJ), player.inv[5]?.id)
             val sent = client.mapOf(MessageGame::message)
             assertTrue("You rub the necklace..." in sent, sent.toString())
             assertTrue(sent.any { "Your games necklace has seven uses left." in it }, sent.toString())
@@ -45,6 +46,7 @@ class JewelleryTeleportScriptTest {
             assertTrue(use(script, "dbrow.jewellery_teleport_amulet_of_glory_1", inventory = false))
             assertEquals(0, player.worn.count("obj.amulet_of_glory_1"))
             assertEquals(1, player.worn.count("obj.amulet_of_glory"))
+            assertEquals("obj.amulet_of_glory".asRSCM(RSCMType.OBJ), player.worn[NECK_SLOT]?.id)
             val sent = client.mapOf(MessageGame::message)
             assertTrue(sent.any { "Your ring of dueling crumbles to dust." in it }, sent.toString())
             assertTrue(sent.any { "You use your amulet's last charge." in it }, sent.toString())
