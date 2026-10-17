@@ -19,11 +19,17 @@ import org.rsmod.game.type.uncert
 /**
  * A minimal Grand Exchange. The server is the only counterparty and trades at the guide price
  * (`MarketPrices`, the obj's store cost):
- * - a buy offer priced at or above the guide fills at once at the guide price; the overpayment
- *   comes back as coins in the slot's collection inv;
- * - a sell offer priced at or below the guide fills at once at the guide price, less the 2% tax
- *   (floored, capped at 5M per item, nothing below 50 gp);
- * - any other offer stays open (BUYING/SELLING) until aborted. No partial fills, no buy limits.
+ * - a buy offer priced at or above the guide fills at the guide price; the overpayment comes back
+ *   as coins in the slot's collection inv;
+ * - a sell offer priced at or below the guide fills at the guide price, less the 2% tax (floored,
+ *   capped at 5M per item, nothing below 50 gp);
+ * - fills come in up to [FILL_STEPS] parts ([FILL_DELAY] ticks after Confirm, then every
+ *   [FILL_INTERVAL] ticks), each one sent as a partial update;
+ * - buys count against the item's 4-hour buy limit (`enum.ge_buy_limits`, from the wiki); an offer
+ *   over the limit stays BUYING until the window that started with the first buy runs out;
+ * - offers keep filling while the player is logged out: the login applies those fills
+ *   ([catchUp]) before it sends the slots;
+ * - any other offer stays open (BUYING/SELLING) until aborted.
  *
  * Offer state lives in server varps (`ge_slotN_*`, perm) and goes to the client only through
  * UPDATE_STOCKMARKET_SLOT; the collected items sit in the slot's inv from enum 150
@@ -46,6 +52,21 @@ object GrandExchange {
     const val TAX_MIN_PRICE = 50
 
     const val FILL_TIMER = "timer.ge_offer_fill"
+    const val FILL_DELAY = 2
+    const val FILL_INTERVAL = 5
+    const val FILL_STEPS = 4
+
+    /** How often a limit-blocked offer looks again (100 ticks = 1 minute). */
+    const val LIMIT_RECHECK = 100
+
+    const val LIMIT_WINDOW_MINUTES = 240
+    const val LIMIT_TRACKERS = 16
+    const val LOGOUT_VARP = "varp.ge_logout_minute"
+
+    /** Epoch minutes; tests replace it. */
+    var clock: () -> Int = { (System.currentTimeMillis() / 60_000L).toInt() }
+
+    private val buyLimitsEnum: Int by lazy { "enum.ge_buy_limits".asRSCM(RSCMType.ENUM) }
     private val newOfferPriceVarp: Int by lazy {
         "varp.ge_newoffer_price".asRSCM(RSCMType.VARP)
     }
@@ -166,36 +187,152 @@ object GrandExchange {
     fun canFill(offer: Offer, guide: Int): Boolean =
         offer.state == STATE_OPEN && if (offer.sell) offer.price <= guide else offer.price >= guide
 
+    /** The item's 4-hour buy limit, or null when it has none. */
+    fun buyLimit(item: Int): Int? =
+        (ServerCacheManager.getEnum(buyLimitsEnum)?.values?.get(item) as? Number)?.toInt()
+
+    private fun limitVarp(index: Int, field: String) = "varp.ge_limit${index}_$field"
+
+    private fun activeTracker(player: Player, item: Int, now: Int): Int? =
+        (0 until LIMIT_TRACKERS).firstOrNull { i ->
+            player.vars[limitVarp(i, "item")] == item + 1 &&
+                now - player.vars[limitVarp(i, "start")] < LIMIT_WINDOW_MINUTES
+        }
+
+    private fun freeTracker(player: Player, now: Int): Int? =
+        (0 until LIMIT_TRACKERS).firstOrNull { i ->
+            player.vars[limitVarp(i, "item")] == 0 ||
+                now - player.vars[limitVarp(i, "start")] >= LIMIT_WINDOW_MINUTES
+        }
+
     /**
-     * Fills every open offer the market takes (see the class comment). Returns the slots filled.
+     * How many more of [item] may be bought now (Int.MAX_VALUE without a limit). A live window is
+     * never dropped: with all [LIMIT_TRACKERS] in use, a new limited item waits for one to end.
      */
-    fun fillOpenOffers(player: Player, guidePrice: (ItemServerType) -> Int): List<Int> {
-        val filled = mutableListOf<Int>()
+    fun limitRemaining(player: Player, item: Int, now: Int = clock()): Int {
+        val limit = buyLimit(item) ?: return Int.MAX_VALUE
+        val tracker =
+            activeTracker(player, item, now)
+                ?: return if (freeTracker(player, now) != null) limit else 0
+        return (limit - player.vars[limitVarp(tracker, "bought")]).coerceAtLeast(0)
+    }
+
+    /** The first moment after [after] at which a running limit window ends, or null. */
+    fun nextLimitExpiry(player: Player, after: Int): Int? =
+        (0 until LIMIT_TRACKERS)
+            .filter { player.vars[limitVarp(it, "item")] != 0 }
+            .map { player.vars[limitVarp(it, "start")] + LIMIT_WINDOW_MINUTES }
+            .filter { it > after }
+            .minOrNull()
+
+    /** Minutes until [item]'s limit window ends, or 0 when no window is running. */
+    fun limitResetMinutes(player: Player, item: Int, now: Int = clock()): Int {
+        val tracker = activeTracker(player, item, now) ?: return 0
+        return LIMIT_WINDOW_MINUTES - (now - player.vars[limitVarp(tracker, "start")])
+    }
+
+    fun recordBought(player: Player, item: Int, count: Int, now: Int = clock()) {
+        if (buyLimit(item) == null || count <= 0) return
+        val active = activeTracker(player, item, now)
+        if (active != null) {
+            val bought = player.vars[limitVarp(active, "bought")].toLong() + count
+            set(player, limitVarp(active, "bought"), bought.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+            return
+        }
+        val index = freeTracker(player, now) ?: return
+        set(player, limitVarp(index, "item"), item + 1)
+        set(player, limitVarp(index, "start"), now)
+        set(player, limitVarp(index, "bought"), count)
+    }
+
+    fun stepSize(count: Int): Int = ((count + FILL_STEPS - 1) / FILL_STEPS).coerceAtLeast(1)
+
+    sealed interface StepResult {
+        /** Something filled; the offer may have more to fill. */
+        data object Filled : StepResult
+
+        /** Nothing filled because of the buy limit; try again later. */
+        data object LimitBlocked : StepResult
+
+        /** Nothing to do for this offer (not open, or priced away from the guide). */
+        data object Idle : StepResult
+    }
+
+    /**
+     * Fills the next part of every open offer the market takes (see the class comment). Returns
+     * what happened per slot.
+     */
+    fun fillOpenOffers(
+        player: Player,
+        now: Int = clock(),
+        announce: Boolean = true,
+        guidePrice: (ItemServerType) -> Int,
+    ): Map<Int, StepResult> {
+        val results = mutableMapOf<Int, StepResult>()
         for (slot in 0 until SLOTS) {
             val offer = offer(player, slot)
             val type = type(offer.item) ?: continue
             val guide = guidePrice(type)
             if (!canFill(offer, guide)) continue
-            val inv = collectionInv(player, slot)
-            val gold = offer.count * guide
-            if (offer.sell) {
-                val net = gold - offer.count * taxPerItem(guide)
-                addTo(inv, 1, coinsId, net)
-            } else {
-                addTo(inv, 0, offer.item, offer.count)
-                val refund = offer.count * (offer.price - guide)
-                if (refund > 0) addTo(inv, 1, coinsId, refund)
-            }
-            store(
-                player,
-                offer.copy(done = offer.count, gold = gold, status = finishedStatus(offer.sell)),
-            )
-            sendSlot(player, slot)
-            val verb = if (offer.sell) "selling" else "buying"
-            player.mes("Grand Exchange: Finished $verb ${offer.count.commas()} x ${type.name}.")
-            filled += slot
+            results[slot] = fillStep(player, offer, type, guide, now, announce)
         }
-        return filled
+        return results
+    }
+
+    private fun fillStep(
+        player: Player,
+        offer: Offer,
+        type: ItemServerType,
+        guide: Int,
+        now: Int,
+        announce: Boolean,
+    ): StepResult {
+        val remaining = offer.count - offer.done
+        var amount = minOf(stepSize(offer.count), remaining)
+        if (!offer.sell) amount = minOf(amount, limitRemaining(player, offer.item, now))
+        if (amount <= 0) return StepResult.LimitBlocked
+        val inv = collectionInv(player, offer.slot)
+        val gold = amount * guide
+        if (offer.sell) {
+            addTo(inv, 1, coinsId, gold - amount * taxPerItem(guide))
+        } else {
+            addTo(inv, 0, offer.item, amount)
+            val refund = amount * (offer.price - guide)
+            if (refund > 0) addTo(inv, 1, coinsId, refund)
+            recordBought(player, offer.item, amount, now)
+        }
+        val done = offer.done + amount
+        val finished = done >= offer.count
+        val status = if (finished) finishedStatus(offer.sell) else offer.status
+        store(player, offer.copy(done = done, gold = offer.gold + gold, status = status))
+        if (!announce) return StepResult.Filled
+        sendSlot(player, offer.slot)
+        val verb = if (offer.sell) "selling" else "buying"
+        if (finished) {
+            player.mes("Grand Exchange: Finished $verb ${offer.count.commas()} x ${type.name}.")
+        } else {
+            val past = if (offer.sell) "Sold" else "Bought"
+            player.mes("Grand Exchange: $past ${done.commas()} / ${offer.count.commas()} x ${type.name}.")
+        }
+        return StepResult.Filled
+    }
+
+    /**
+     * Applies what the market filled while the player was logged out, from [since] (the logout
+     * minute) to [now]: every part that fills at once, then again each time a buy limit window
+     * ends, so a new window starts when the old one ran out. No chat lines; the login sends the
+     * slots afterwards.
+     */
+    fun catchUp(player: Player, since: Int, now: Int, guidePrice: (ItemServerType) -> Int) {
+        var time = since.coerceAtMost(now)
+        while (true) {
+            var results: Map<Int, StepResult>
+            do {
+                results = fillOpenOffers(player, time, announce = false, guidePrice)
+            } while (StepResult.Filled in results.values)
+            if (StepResult.LimitBlocked !in results.values) return
+            time = nextLimitExpiry(player, time)?.takeIf { it <= now } ?: return
+        }
     }
 
     /** Aborts an open offer: what was put in waits in the collection inv. */

@@ -292,6 +292,252 @@ id = "varp.ge_setup_price"
 scope = "Temp"
 transmit = "Never"
 
+[[varp]]
+id = "varp.ge_limit0_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit0_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit0_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit1_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit1_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit1_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit2_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit2_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit2_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit3_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit3_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit3_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit4_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit4_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit4_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit5_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit5_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit5_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit6_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit6_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit6_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit7_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit7_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit7_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit8_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit8_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit8_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit9_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit9_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit9_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit10_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit10_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit10_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit11_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit11_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit11_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit12_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit12_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit12_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit13_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit13_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit13_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit14_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit14_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit14_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit15_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit15_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit15_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_logout_minute"
+scope = "Perm"
+transmit = "Never"
+
 [[inventory]]
 isServerOnly = true
 id = "inv.tradingpost_sell_0"

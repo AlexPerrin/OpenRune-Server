@@ -45,6 +45,18 @@ class GrandExchangeScriptTest {
             GrandExchange.clear(player, slot)
             player.clearInv(GrandExchange.collectionInv(player, slot))
         }
+        for (i in 0 until GrandExchange.LIMIT_TRACKERS) {
+            for (field in listOf("item", "start", "bought")) {
+                GrandExchange.set(player, "varp.ge_limit${i}_$field", 0)
+            }
+        }
+    }
+
+    /** Runs fill steps until nothing fills any more. */
+    private fun fillAll(player: Player, now: Int = NOW) {
+        while (GrandExchange.StepResult.Filled in GrandExchange.fillOpenOffers(player, now) { it.cost }.values) {
+            continue
+        }
     }
 
     @Test
@@ -72,7 +84,16 @@ class GrandExchangeScriptTest {
             assertEquals(GrandExchange.STATE_OPEN, open.status)
             assertEquals(0, player.vars["varbit.ge_selectedslot"])
 
-            assertEquals(listOf(2), GrandExchange.fillOpenOffers(player) { it.cost })
+            val first = GrandExchange.fillOpenOffers(player, NOW) { it.cost }
+            assertEquals(mapOf(2 to GrandExchange.StepResult.Filled), first)
+            val partial = GrandExchange.offer(player, 2)
+            assertEquals(GrandExchange.STATE_OPEN, partial.status)
+            assertEquals(3, partial.done)
+            assertEquals(3 * guide, partial.gold)
+            assertEquals(InvObj(lobster.id, 3), GrandExchange.collectionInv(player, 2)[0])
+            assertEquals(InvObj(id("obj.coins"), 15), GrandExchange.collectionInv(player, 2)[1])
+
+            fillAll(player)
             val filled = GrandExchange.offer(player, 2)
             assertEquals(GrandExchange.STATE_FINISHED, filled.status)
             assertEquals(10, filled.done)
@@ -107,7 +128,7 @@ class GrandExchangeScriptTest {
             }
             assertEquals(0, GrandExchange.heldCount(player.inv, lobster.id))
             assertEquals(GrandExchange.STATE_OPEN or GrandExchange.SELL_BIT, GrandExchange.offer(player, 0).status)
-            GrandExchange.fillOpenOffers(player) { it.cost }
+            fillAll(player)
             val net = 5 * guide - 5 * GrandExchange.taxPerItem(guide)
             assertEquals(InvObj(id("obj.coins"), net), GrandExchange.collectionInv(player, 0)[1])
             assertNull(GrandExchange.collectionInv(player, 0)[0])
@@ -128,7 +149,7 @@ class GrandExchangeScriptTest {
                 }
             }
             assertEquals(997, player.inv.count("obj.coins"))
-            assertTrue(GrandExchange.fillOpenOffers(player) { it.cost }.isEmpty())
+            assertTrue(GrandExchange.fillOpenOffers(player, NOW) { it.cost }.isEmpty())
             assertTrue(GrandExchange.abort(player, 1))
             assertFalse(GrandExchange.abort(player, 1))
             val aborted = GrandExchange.offer(player, 1)
@@ -198,7 +219,7 @@ class GrandExchangeScriptTest {
                     assertTrue(confirm())
                 }
             }
-            GrandExchange.fillOpenOffers(player) { it.cost }
+            fillAll(player)
             player.fillInv()
             with(script) {
                 player.withProtectedAccess { assertFalse(collect(0, 0, IfButtonOp.Op2)) }
@@ -222,5 +243,121 @@ class GrandExchangeScriptTest {
         assertEquals(0, GrandExchange.taxPerItem(49))
         assertEquals(1, GrandExchange.taxPerItem(50))
         assertEquals(GrandExchange.TAX_CAP, GrandExchange.taxPerItem(Int.MAX_VALUE))
+    }
+
+    @Test
+    fun GameTestState.`aborting a partly filled buy keeps what was bought and returns the rest`() =
+        runInjectedGameTest(GrandExchangeScript::class, null, GrandExchangeScript::class) { script ->
+            resetGe(player)
+            player.inv[0] = InvObj(id("obj.coins"), 100_000)
+            val price = guide + 5
+            with(script) {
+                player.withProtectedAccess {
+                    setUp(slot = 0, sell = false, item = lobster.id, count = 10, price = price)
+                    assertTrue(confirm())
+                }
+            }
+            GrandExchange.fillOpenOffers(player, NOW) { it.cost }
+            assertTrue(GrandExchange.abort(player, 0))
+            val collection = GrandExchange.collectionInv(player, 0)
+            assertEquals(InvObj(lobster.id, 3), collection[0])
+            assertEquals(InvObj(id("obj.coins"), 3 * 5 + 7 * price), collection[1])
+            assertTrue(GrandExchange.fillOpenOffers(player, NOW) { it.cost }.isEmpty())
+            with(script) { player.withProtectedAccess { collectAll(toBank = false) } }
+            assertEquals(100_000 - 3 * guide, player.inv.count("obj.coins"))
+            assertEquals(3, GrandExchange.heldCount(player.inv, lobster.id))
+            assertTrue(GrandExchange.offer(player, 0).empty)
+        }
+
+    @Test
+    fun GameTestState.`a buy over the buy limit waits for the 4-hour window`() =
+        runInjectedGameTest(GrandExchangeScript::class, null, GrandExchangeScript::class) { script ->
+            resetGe(player)
+            val pickaxe = checkNotNull(ServerCacheManager.getItem(id("obj.rune_pickaxe")))
+            val limit = checkNotNull(GrandExchange.buyLimit(pickaxe.id))
+            assertEquals(40, limit)
+            val price = pickaxe.cost.coerceAtLeast(1)
+            player.inv[0] = InvObj(id("obj.coins"), 50 * price)
+            with(script) {
+                player.withProtectedAccess {
+                    setUp(slot = 1, sell = false, item = pickaxe.id, count = 50, price = price)
+                    assertTrue(confirm())
+                }
+            }
+            fillAll(player)
+            assertEquals(40, GrandExchange.offer(player, 1).done)
+            assertEquals(GrandExchange.STATE_OPEN, GrandExchange.offer(player, 1).state)
+            assertEquals(0, GrandExchange.limitRemaining(player, pickaxe.id, NOW))
+            assertEquals(
+                mapOf(1 to GrandExchange.StepResult.LimitBlocked),
+                GrandExchange.fillOpenOffers(player, NOW + 239) { it.cost },
+            )
+
+            fillAll(player, NOW + GrandExchange.LIMIT_WINDOW_MINUTES)
+            val offer = GrandExchange.offer(player, 1)
+            assertEquals(GrandExchange.STATE_FINISHED, offer.state)
+            assertEquals(50, offer.done)
+            assertEquals(InvObj(pickaxe.id, 50), GrandExchange.collectionInv(player, 1)[0])
+            assertEquals(limit - 10, GrandExchange.limitRemaining(player, pickaxe.id, NOW + 240))
+            assertEquals(Int.MAX_VALUE, GrandExchange.limitRemaining(player, id("obj.coins"), NOW))
+        }
+
+    @Test
+    fun GameTestState.`a full set of limit trackers never drops a live window`() =
+        runInjectedGameTest(GrandExchangeScript::class, null, GrandExchangeScript::class) {
+            resetGe(player)
+            val limited =
+                ServerCacheManager.getItems().keys.filter { GrandExchange.buyLimit(it) != null }
+                    .take(GrandExchange.LIMIT_TRACKERS + 1)
+            val newest = limited.last()
+            limited.dropLast(1).forEachIndexed { i, item -> GrandExchange.recordBought(player, item, 1, NOW + i) }
+            assertEquals(0, GrandExchange.limitRemaining(player, newest, NOW + 20))
+            GrandExchange.recordBought(player, newest, 1, NOW + 20)
+            limited.dropLast(1).forEach {
+                assertEquals(GrandExchange.buyLimit(it)!! - 1, GrandExchange.limitRemaining(player, it, NOW + 20))
+            }
+            assertEquals(NOW + GrandExchange.LIMIT_WINDOW_MINUTES, GrandExchange.nextLimitExpiry(player, NOW + 20))
+
+            val expired = NOW + GrandExchange.LIMIT_WINDOW_MINUTES
+            assertEquals(GrandExchange.buyLimit(newest), GrandExchange.limitRemaining(player, newest, expired))
+            GrandExchange.recordBought(player, newest, 1, expired)
+            assertEquals(GrandExchange.buyLimit(newest)!! - 1, GrandExchange.limitRemaining(player, newest, expired))
+            assertEquals(GrandExchange.buyLimit(limited[1])!! - 1, GrandExchange.limitRemaining(player, limited[1], expired))
+        }
+
+    @Test
+    fun GameTestState.`offers fill while logged out, with limit windows restarting on time`() =
+        runInjectedGameTest(GrandExchangeScript::class, null, GrandExchangeScript::class) { script ->
+            resetGe(player)
+            val pickaxe = checkNotNull(ServerCacheManager.getItem(id("obj.rune_pickaxe")))
+            val price = pickaxe.cost.coerceAtLeast(1)
+            player.inv[0] = InvObj(id("obj.coins"), 100 * price + 10 * guide)
+            with(script) {
+                player.withProtectedAccess {
+                    setUp(slot = 0, sell = false, item = pickaxe.id, count = 100, price = price)
+                    assertTrue(confirm())
+                    setUp(slot = 1, sell = false, item = lobster.id, count = 10, price = guide)
+                    assertTrue(confirm())
+                }
+            }
+            val window = GrandExchange.LIMIT_WINDOW_MINUTES
+            GrandExchange.catchUp(player, since = NOW, now = NOW + window + 30) { it.cost }
+            assertEquals(GrandExchange.STATE_FINISHED, GrandExchange.offer(player, 1).state)
+            assertEquals(InvObj(lobster.id, 10), GrandExchange.collectionInv(player, 1)[0])
+            val pickaxes = GrandExchange.offer(player, 0)
+            assertEquals(GrandExchange.STATE_OPEN, pickaxes.state)
+            assertEquals(80, pickaxes.done)
+            assertEquals(InvObj(pickaxe.id, 80), GrandExchange.collectionInv(player, 0)[0])
+            assertEquals(NOW + 2 * window, GrandExchange.nextLimitExpiry(player, NOW + window + 30))
+
+            GrandExchange.catchUp(player, since = NOW + window + 30, now = NOW + 2 * window) { it.cost }
+            val finished = GrandExchange.offer(player, 0)
+            assertEquals(GrandExchange.STATE_FINISHED, finished.state)
+            assertEquals(100, finished.done)
+            assertEquals(20, GrandExchange.limitRemaining(player, pickaxe.id, NOW + 2 * window))
+        }
+
+    private companion object {
+        const val NOW = 29_000_000
     }
 }

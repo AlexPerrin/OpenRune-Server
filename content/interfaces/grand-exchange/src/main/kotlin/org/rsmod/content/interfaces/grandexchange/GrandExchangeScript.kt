@@ -18,6 +18,7 @@ import org.rsmod.api.script.onIfModalButton
 import org.rsmod.api.script.onIfOpen
 import org.rsmod.api.script.onOpNpc3
 import org.rsmod.api.script.onPlayerLogin
+import org.rsmod.api.script.onPlayerLogout
 import org.rsmod.api.script.onPlayerSoftTimer
 import org.rsmod.content.interfaces.grandexchange.GrandExchange.commas
 import org.rsmod.game.entity.Player
@@ -38,6 +39,9 @@ class GrandExchangeScript @Inject constructor(private val marketPrices: MarketPr
         }
 
         onPlayerLogin {
+            val now = GrandExchange.clock()
+            val logout = player.vars[GrandExchange.LOGOUT_VARP].takeIf { it > 0 } ?: now
+            GrandExchange.catchUp(player, logout, now) { it.guide }
             for (slot in 0 until GrandExchange.SLOTS) {
                 player.startInvTransmit(GrandExchange.collectionInv(player, slot))
                 GrandExchange.sendSlot(player, slot)
@@ -45,9 +49,16 @@ class GrandExchangeScript @Inject constructor(private val marketPrices: MarketPr
             resetItemSinkVars(player)
             if (hasFillable(player)) player.softTimer(GrandExchange.FILL_TIMER, 1)
         }
+        onPlayerLogout { GrandExchange.set(player, GrandExchange.LOGOUT_VARP, GrandExchange.clock()) }
         onPlayerSoftTimer(GrandExchange.FILL_TIMER) {
             player.clearSoftTimer(GrandExchange.FILL_TIMER)
-            GrandExchange.fillOpenOffers(player) { it.guide }
+            val results = GrandExchange.fillOpenOffers(player) { it.guide }
+            when {
+                hasFillable(player, ignoreLimit = false) ->
+                    player.softTimer(GrandExchange.FILL_TIMER, GrandExchange.FILL_INTERVAL)
+                GrandExchange.StepResult.LimitBlocked in results.values || hasFillable(player) ->
+                    player.softTimer(GrandExchange.FILL_TIMER, GrandExchange.LIMIT_RECHECK)
+            }
         }
 
         for (slot in 0 until GrandExchange.SLOTS) {
@@ -76,11 +87,14 @@ class GrandExchangeScript @Inject constructor(private val marketPrices: MarketPr
         onIfOpen("interface.ge_collect") { setCollectionBoxEvents(player) }
     }
 
-    private fun hasFillable(player: Player): Boolean =
+    /** Whether an open offer can fill now (with [ignoreLimit] false: and its buy limit allows it). */
+    private fun hasFillable(player: Player, ignoreLimit: Boolean = true): Boolean =
         (0 until GrandExchange.SLOTS).any { slot ->
             val offer = GrandExchange.offer(player, slot)
             val type = GrandExchange.type(offer.item)
-            type != null && GrandExchange.canFill(offer, type.guide)
+            type != null &&
+                GrandExchange.canFill(offer, type.guide) &&
+                (ignoreLimit || offer.sell || GrandExchange.limitRemaining(player, offer.item) > 0)
         }
 
     private fun resetItemSinkVars(player: Player) {
@@ -300,7 +314,7 @@ class GrandExchangeScript @Inject constructor(private val marketPrices: MarketPr
         GrandExchange.store(player, offer)
         GrandExchange.sendSlot(player, slot)
         resetSetup(player, slot = 0)
-        softTimer(GrandExchange.FILL_TIMER, FILL_DELAY)
+        softTimer(GrandExchange.FILL_TIMER, GrandExchange.FILL_DELAY)
         return true
     }
 
@@ -409,7 +423,6 @@ class GrandExchangeScript @Inject constructor(private val marketPrices: MarketPr
 
         const val BUY_BUTTON = 3
         const val SELL_BUTTON = 4
-        const val FILL_DELAY = 2
 
         const val CHOOSE_ITEM = 0
         const val ENTER_QUANTITY = 7
