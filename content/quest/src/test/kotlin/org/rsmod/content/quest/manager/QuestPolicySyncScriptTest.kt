@@ -25,7 +25,7 @@ class QuestPolicySyncScriptTest {
     fun `clientscript symbol resolves`() {
         GameValProvider.load()
         val id = "clientscript.quest_policy_complete_set".asRSCM(RSCMType.CLIENTSCRIPT)
-        assertEquals(45553, id)
+        assertEquals(9974, id)
     }
 
     @Test

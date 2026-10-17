@@ -1,21 +1,20 @@
 package dev.openrune.pack
 
 import dev.openrune.DirectoryConstants
+import dev.openrune.cache.tools.cs2.Cs2Overrides
 import dev.openrune.cache.tools.cs2.PackCs2
+import dev.openrune.cache.tools.cs2.UnpackDefaultCs2
 import dev.openrune.cache.tools.iftype.PackIfType
 import dev.openrune.cache.tools.tasks.CacheTask
 import dev.openrune.cache.tools.tasks.impl.PackDBTables
-import dev.openrune.cache.tools.tasks.impl.PackWorldMap
 import dev.openrune.cache.tools.tasks.impl.PackModels
+import dev.openrune.cache.tools.tasks.impl.PackSprites
+import dev.openrune.cache.tools.tasks.impl.PackWorldMap
 import dev.openrune.cache.tools.tasks.impl.defs.PackConfig
 import dev.openrune.definition.dbtables.DBTable
 import dev.openrune.gamevals.GameValProvider
-import dev.openrune.cache.tools.cs2.Cs2Overrides
-import dev.openrune.cache.tools.cs2.UnpackDefaultCs2
-import dev.openrune.cache.tools.tasks.impl.PackSprites
 import io.github.classgraph.ClassGraph
 import java.io.File
-
 
 class PluginPacks(val projectRoot: File, val all: List<PluginPack>) {
     val active: List<PluginPack> = all.filter { it.shouldPack(projectRoot) }
@@ -118,11 +117,34 @@ class PluginPacks(val projectRoot: File, val all: List<PluginPack>) {
             }
         }
 
+        checkClientScriptIds(symbols["clientscript"].orEmpty().values)
+
         return Cs2Overrides(sources, symbols.mapValues { (_, byName) -> byName.values.toList() })
+    }
+
+    /**
+     * Custom clientscripts must take the ids right after the stock maximum (9972 in rev 241): some
+     * clients (the official Android client among them) size their script table from the archive
+     * and crash at cache sync on groups far above the stock range. Fails the cache build otherwise.
+     * `OPENRUNE_MAX_CLIENTSCRIPT_ID` overrides the limit.
+     */
+    private fun checkClientScriptIds(lines: Collection<String>) {
+        val limit = System.getenv("OPENRUNE_MAX_CLIENTSCRIPT_ID")?.toIntOrNull() ?: MAX_CLIENTSCRIPT_ID
+        val bad = lines.mapNotNull { line ->
+            val id = line.substringBefore('\t').toIntOrNull() ?: return@mapNotNull null
+            if (id > limit) line else null
+        }
+        check(bad.isEmpty()) {
+            "Custom clientscript ids above $limit can crash clients at cache sync; renumber them " +
+                "to follow the stock maximum: $bad"
+        }
     }
 
     companion object {
         private val SCANNED_PACKAGES = arrayOf("dev.openrune.pack", "org.rsmod.content")
+
+        /** Stock rev-241 clientscripts end at 9972; custom ones follow densely (9973-9985). */
+        private const val MAX_CLIENTSCRIPT_ID = 9999
 
         private val SYMBOL_LINE = Regex("""^\s*(\S+)\s+(.+?)\s*$""")
 
