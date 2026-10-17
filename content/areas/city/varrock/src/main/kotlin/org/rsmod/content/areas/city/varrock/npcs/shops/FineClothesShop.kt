@@ -1,5 +1,6 @@
 package org.rsmod.content.areas.city.varrock.npcs.shops
 
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import jakarta.inject.Inject
 import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.player.protect.ProtectedAccess
@@ -21,6 +22,7 @@ class FineClothesShop @Inject constructor(private val shops: Shops) : PluginScri
 
     private fun Player.openFineClothesShop(npc: Npc) {
         shops.open(this, npc, "Thessalia's Fine Clothes", "inv.clotheshop")
+        DiaryHooks.thessaliaStoreBrowsed(this)
     }
 
     private suspend fun ProtectedAccess.shopDialogue(npc: Npc) =

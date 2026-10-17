@@ -1,5 +1,6 @@
 package org.rsmod.content.travel.canoe.scripts
 
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import dev.openrune.ServerCacheManager
 import dev.openrune.definition.type.widget.IfEvent
 import dev.openrune.rscm.RSCM.asRSCM
@@ -134,6 +135,7 @@ class CanoeTravelling @Inject private constructor(private val cutscene: CanoeCut
 
         val cutsceneType = if (wilderness) CutsceneType.Wilderness else CutsceneType.Grass
         cutscene.start(this, destination, cutsceneType)
+        DiaryHooks.canoeTravelled(player, canoe == Canoe.Waka, station.currentLocation().name, destination.name)
     }
 
     private fun resolveValidDestinations(station: Station, canoe: Canoe): List<CanoeDestination> {

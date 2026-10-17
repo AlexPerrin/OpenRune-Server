@@ -1,5 +1,6 @@
 package org.rsmod.content.travel.canoe.scripts
 
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import dev.openrune.ServerCacheManager
 import dev.openrune.definition.type.widget.IfEvent
 import dev.openrune.rscm.RSCM
@@ -150,6 +151,7 @@ constructor(
             val station = resolveStation()
             this[station, canoe] = CanoeState.Ready
             confirmedCanoeType = false
+            DiaryHooks.canoeShaped(player, canoe == Canoe.Waka, station.name)
 
             val xp = lcParam(ServerCacheManager.getObject(canoe.loc.asRSCM(RSCMType.LOC))!!, params.skill_xp) * xpMods.get(player, "stat.woodcutting")
             resetAnim()

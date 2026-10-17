@@ -3,6 +3,7 @@ plugins {
 }
 
 dependencies {
+    implementation(projects.content.interfaces.achievementDiary)
     implementation(projects.api.combat.combatManager)
     implementation(projects.api.player)
     implementation(projects.api.pluginCommons)

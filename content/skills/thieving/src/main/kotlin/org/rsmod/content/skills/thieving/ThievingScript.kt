@@ -1,5 +1,6 @@
 package org.rsmod.content.skills.thieving
 
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import dev.openrune.ServerCacheManager
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
@@ -143,6 +144,7 @@ constructor(
             mes("You steal ${describe(loot.obj, count)}.", ChatType.Spam)
         }
         statAdvance(THIEVING, target.xp)
+        DiaryHooks.pickpocketed(player, npc.type.internalName, npc.name, npc.coords)
     }
 
     private fun ProtectedAccess.openPouches(pouch: CoinPouch, all: Boolean) {

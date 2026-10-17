@@ -52,4 +52,61 @@ class DiaryTasksTest {
         assertTrue(lines.contains("<str>Learn your age from Hans in Lumbridge.</str>"))
         assertTrue(lines.contains("Have Sedridor teleport you to the Essence Mine."))
     }
+
+    @Test
+    fun GameTestState.`skilling hooks check the item and the area`() = runGameTest {
+        DiaryHooks.fishCaught(player, "obj.raw_anchovies", CoordGrid(3000, 3400, 0))
+        assertFalse(DiaryTasks.isDone(player, Area.Lumbridge, Tier.Easy, 9))
+        DiaryHooks.fishCaught(player, "obj.raw_anchovies", CoordGrid(3267, 3148, 0))
+        assertTrue(DiaryTasks.isDone(player, Area.Lumbridge, Tier.Easy, 9))
+        DiaryHooks.fishCaught(player, "obj.raw_trout", CoordGrid(3104, 3430, 0))
+        assertTrue(DiaryTasks.isDone(player, Area.Varrock, Tier.Easy, 13))
+        DiaryHooks.oreMined(player, "obj.iron_ore", CoordGrid(3285, 3368, 0))
+        assertTrue(DiaryTasks.isDone(player, Area.Varrock, Tier.Easy, 3))
+        assertFalse(DiaryTasks.isDone(player, Area.Lumbridge, Tier.Easy, 11))
+        DiaryHooks.logsChopped(player, "obj.willow_logs", CoordGrid(3087, 3235, 0))
+        assertTrue(DiaryTasks.isDone(player, Area.Lumbridge, Tier.Medium, 8))
+        DiaryHooks.pickpocketed(player, "npc.man", "Man", CoordGrid(3222, 3218, 0))
+        assertTrue(DiaryTasks.isDone(player, Area.Lumbridge, Tier.Easy, 6))
+        DiaryHooks.npcKilled(player, "Zombie", CoordGrid(3124, 9662, 0))
+        assertTrue(DiaryTasks.isDone(player, Area.Lumbridge, Tier.Easy, 8))
+        DiaryHooks.npcKilled(player, "Cave bug", CoordGrid(3160, 9580, 0))
+        assertTrue(DiaryTasks.isDone(player, Area.Lumbridge, Tier.Easy, 2))
+        DiaryHooks.slayerTaskAssigned(player, 3)
+        assertTrue(DiaryTasks.isDone(player, Area.Varrock, Tier.Medium, 9))
+        DiaryHooks.planksMade(player, "obj.mahogany_plank", 19)
+        assertFalse(DiaryTasks.isDone(player, Area.Varrock, Tier.Medium, 10))
+        DiaryHooks.planksMade(player, "obj.mahogany_plank", 20)
+        assertTrue(DiaryTasks.isDone(player, Area.Varrock, Tier.Medium, 10))
+    }
+
+    @Test
+    fun GameTestState.`a bowl counts only when spun and fired in Barbarian Village`() = runGameTest {
+        val village = CoordGrid(3086, 3409, 0)
+        DiaryHooks.crafted(player, "obj.bowl_empty", village)
+        assertFalse(DiaryTasks.isDone(player, Area.Varrock, Tier.Easy, 10))
+        DiaryHooks.crafted(player, "obj.bowl_unfired", CoordGrid(3200, 3240, 0))
+        DiaryHooks.crafted(player, "obj.bowl_empty", village)
+        assertFalse(DiaryTasks.isDone(player, Area.Varrock, Tier.Easy, 10))
+        DiaryHooks.crafted(player, "obj.bowl_unfired", village)
+        DiaryHooks.crafted(player, "obj.bowl_empty", village)
+        assertTrue(DiaryTasks.isDone(player, Area.Varrock, Tier.Easy, 10))
+    }
+
+    @Test
+    fun GameTestState.`the four Stronghold emotes and the Waka canoe tasks`() = runGameTest {
+        for (seq in listOf("seq.emote_panic_flap", "seq.emote_slap_head_loop", "seq.emote_lightbulb")) {
+            DiaryHooks.emotePerformed(player, seq)
+        }
+        DiaryHooks.emotePerformed(player, "seq.emote_wave")
+        assertFalse(DiaryTasks.isDone(player, Area.Varrock, Tier.Medium, 5))
+        DiaryHooks.emotePerformed(player, "seq.emote_stampfeet")
+        assertTrue(DiaryTasks.isDone(player, Area.Varrock, Tier.Medium, 5))
+        DiaryHooks.canoeTravelled(player, waka = false, from = "Lumbridge", to = "Edgeville")
+        assertFalse(DiaryTasks.isDone(player, Area.Lumbridge, Tier.Hard, 4))
+        DiaryHooks.canoeTravelled(player, waka = true, from = "Lumbridge", to = "Edgeville")
+        assertTrue(DiaryTasks.isDone(player, Area.Lumbridge, Tier.Hard, 4))
+        DiaryHooks.canoeShaped(player, waka = true, station = "Edgeville")
+        assertTrue(DiaryTasks.isDone(player, Area.Varrock, Tier.Hard, 3))
+    }
 }

@@ -1,5 +1,6 @@
 package org.rsmod.content.areas.city.varrock.npcs
 
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import jakarta.inject.Inject
 import org.rsmod.api.invtx.invTakeFee
 import org.rsmod.api.player.dialogue.Dialogue
@@ -165,6 +166,7 @@ constructor(private val care: CatCare, private val gertrudesCat: GertrudesCatQue
                 chatNpc(happy, "Well okay, but they're all just as cuddly as each other.")
                 val colour = pickColour() ?: return
                 if (access.giveKitten(colour)) {
+                    DiaryHooks.kittenColourSelected(access.player)
                     mesbox("Gertrude gives you another kitten.")
                 }
             }

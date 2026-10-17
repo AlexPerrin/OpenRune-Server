@@ -1,5 +1,6 @@
 package org.rsmod.content.areas.misc.stronghold_of_security
 
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.script.onOpLoc1
 import org.rsmod.api.table.StrongholdFloorsRow
@@ -12,7 +13,10 @@ class StrongholdTravel : PluginScript() {
     override fun ScriptContext.startup() {
         onOpLoc1("loc.sos_dung_ent_open") { climb(WarArrival) }
         onOpLoc1("loc.sos_war_ladd_up") { climb(Surface) }
-        onOpLoc1("loc.sos_war_ladd_down") { climb(FamineArrival) }
+        onOpLoc1("loc.sos_war_ladd_down") {
+            climb(FamineArrival)
+            DiaryHooks.strongholdSecondLevelEntered(player)
+        }
         onOpLoc1("loc.sos_fam_ladd_up") { climb(WarArrival) }
         onOpLoc1("loc.sos_fam_ladd_down") { climb(PestilenceArrival) }
         onOpLoc1("loc.sos_pest_ladd_up") { climb(FamineArrival) }

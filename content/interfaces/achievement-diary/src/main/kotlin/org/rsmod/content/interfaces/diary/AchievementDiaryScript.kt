@@ -3,7 +3,10 @@ package org.rsmod.content.interfaces.diary
 import dev.openrune.ServerCacheManager
 import dev.openrune.definition.type.FontType
 import dev.openrune.definition.type.widget.IfEvent
+import dev.openrune.rscm.RSCM
 import dev.openrune.rscm.RSCM.asRSCM
+import dev.openrune.rscm.RSCMType
+import org.rsmod.content.interfaces.emotes.PlayEmote
 import dev.openrune.types.aconverted.interf.IfButtonOp
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.player.ui.ifSetEvents
@@ -39,10 +42,14 @@ class AchievementDiaryScript : PluginScript() {
             val product = context as? SkillingActionContext.Product ?: return@onEvent
             when (val source = product.source) {
                 is SkillingProductSource.Mining -> DiaryHooks.oreMined(player, product.item, source.rock.coords)
-                is SkillingProductSource.Woodcutting -> DiaryHooks.logsCut(player, product.item, source.tree.coords)
-                else -> Unit
+                is SkillingProductSource.Woodcutting -> {
+                    DiaryHooks.logsCut(player, product.item, source.tree.coords)
+                    DiaryHooks.logsChopped(player, product.item, source.tree.coords)
+                }
+                is SkillingProductSource.Fishing -> DiaryHooks.fishCaught(player, product.item, player.coords)
             }
         }
+        onEvent<PlayEmote> { DiaryHooks.emotePerformed(player, RSCM.getReverseMapping(RSCMType.SEQ, seq.id)) }
         onIfOpen("interface.area_task") { player.ifSetEvents(TASKBOX, 0 until AREAS, IfEvent.Op1) }
         onIfOverlayButton(TASKBOX) {
             if (it.op == IfButtonOp.Op1) openJournal(it.comsub)

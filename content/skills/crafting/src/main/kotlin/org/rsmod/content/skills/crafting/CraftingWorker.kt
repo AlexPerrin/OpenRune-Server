@@ -1,5 +1,6 @@
 package org.rsmod.content.skills.crafting
 
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import dev.openrune.ServerCacheManager
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
@@ -236,6 +237,7 @@ suspend fun ProtectedAccess.craftOnce(product: CraftingProduct): Boolean {
     }
 
     product.byproducts.forEach { invAdd(inv, it.internal, it.count) }
+    DiaryHooks.crafted(player, product.output, player.coords)
 
     if (product.consumesThread && !holdsCostumeNeedle()) {
         consumeThreadCharge()
