@@ -39,7 +39,8 @@ class HunterRumoursTest {
             val cervus = rumours.hunters.first { it.name == "Cervus" }
             assertNull(rumours.assign(player, ornus))
             val first = checkNotNull(rumours.assign(player, gilman))
-            assertTrue(first.name in setOf("tropical wagtail", "grey chinchompa"), first.name)
+            val novice53 = setOf("tropical wagtail", "sapphire glacialis", "snowy knight", "black warlock", "grey chinchompa")
+            assertTrue(first.name in novice53, first.name)
             val grey = rumours.rumours.first { it.name == "grey chinchompa" }
             rumours.assign(player, gilman, grey)
             assertNull(rumours.assign(player, cervus), "grey chinchompa is Gilman's already")

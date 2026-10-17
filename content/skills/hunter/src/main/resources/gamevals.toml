@@ -9,6 +9,7 @@ herbiboar_tunnels = 56008
 herbiboar_herbs = 56009
 hunter_rumour_hunters = 56010
 hunter_rumours = 56011
+hunter_butterflies = 56012
 
 [gamevals.dbrow]
 impling_type_baby = 60152
@@ -139,6 +140,18 @@ hunter_rumour_tropical_wagtail = 60277
 hunter_rumour_grey_chinchompa = 60278
 hunter_rumour_carnivorous_chinchompa = 60279
 hunter_rumour_herbiboar = 60280
+hunter_butterfly_ruby_harvest = 60281
+hunter_butterfly_sapphire_glacialis = 60282
+hunter_butterfly_snowy_knight = 60283
+hunter_butterfly_black_warlock = 60284
+hunter_butterfly_sunlight_moth = 60285
+hunter_butterfly_moonlight_moth = 60286
+hunter_butterfly_moonlight_moth_low_wander = 60287
+hunter_rumour_sapphire_glacialis = 60288
+hunter_rumour_snowy_knight = 60289
+hunter_rumour_black_warlock = 60290
+hunter_rumour_sunlight_moth = 60291
+hunter_rumour_moonlight_moth = 60292
 
 [gamevals.timer]
 hunter_traps = 436

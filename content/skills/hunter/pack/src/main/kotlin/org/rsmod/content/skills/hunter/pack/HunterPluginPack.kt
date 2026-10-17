@@ -16,5 +16,6 @@ class HunterPluginPack : PluginPack() {
             HerbiboarHerbsTable.herbiboarHerbs(),
             HunterRumourHuntersTable.hunterRumourHunters(),
             HunterRumoursTable.hunterRumours(),
+            HunterButterfliesTable.hunterButterflies(),
         )
 }
