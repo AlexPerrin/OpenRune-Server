@@ -65,6 +65,21 @@ enum class TrailTier(
         stashXp = 250.0,
         varpPrefix = "varp.trail_medium",
         uri = "npc.trail_medium_uri",
+    ),
+    Hard(
+        difficulty = 3,
+        clueObj = null,
+        clueName = "Clue scroll (hard)",
+        dropObj = null,
+        casket = "obj.trail_reward_casket_hard",
+        scrollBox = "obj.league_clue_box_hard",
+        lengths = listOf(4, 5, 6),
+        rolls = 4..6,
+        stashLevel = 55,
+        stashPlank = "obj.plank_teak",
+        stashXp = 400.0,
+        varpPrefix = "varp.trail_hard",
+        uri = "npc.trail_hard_uri",
     );
 
     val stepVarp: String get() = "${varpPrefix}_step"

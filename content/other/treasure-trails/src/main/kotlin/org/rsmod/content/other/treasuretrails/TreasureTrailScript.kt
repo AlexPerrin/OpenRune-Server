@@ -34,6 +34,7 @@ import org.rsmod.api.script.onPlayerLogout
 import org.rsmod.api.script.onProtectedEvent
 import org.rsmod.api.table.TrailBeginnerCasketRow
 import org.rsmod.api.table.TrailEasyCasketRow
+import org.rsmod.api.table.TrailHardCasketRow
 import org.rsmod.api.table.TrailMediumCasketRow
 import org.rsmod.api.table.cluehelper.CluehelperOutfitRow
 import org.rsmod.content.interfaces.emotes.PlayEmote
@@ -95,7 +96,7 @@ constructor(
         for (tier in TrailTier.entries) onOpNpc1(tier.uri) { talkToUri(it.npc) }
         onPlayerLogout { uris.remove(player)?.let(::leave) }
         onCommand("clue") {
-            desc = "Get a clue scroll: ::clue [beginner|easy] [step row or 'list'] [steps left]"
+            desc = "Get a clue scroll: ::clue [beginner|easy|medium|hard] [step row or 'list'] [steps left]"
             cheat(::giveClue)
         }
     }
@@ -658,6 +659,8 @@ constructor(
                     TrailEasyCasketRow.all().map { CasketRow(it.obj, it.min, it.max, it.weight, it.noted) },
                 TrailTier.Medium to
                     TrailMediumCasketRow.all().map { CasketRow(it.obj, it.min, it.max, it.weight, it.noted) },
+                TrailTier.Hard to
+                    TrailHardCasketRow.all().map { CasketRow(it.obj, it.min, it.max, it.weight, it.noted) },
             )
         }
 

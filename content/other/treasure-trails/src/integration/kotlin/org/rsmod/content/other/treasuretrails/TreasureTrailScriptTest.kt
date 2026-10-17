@@ -116,6 +116,30 @@ class TreasureTrailScriptTest {
     }
 
     @Test
+    fun `hard casket rolls follow the wiki table`() {
+        val table = CASKETS.getValue(TrailTier.Hard)
+        assertEquals(6971393, table.sumOf { it.weight })
+        assertEquals(234, table.size)
+    }
+
+    @Test
+    fun `hard steps come from jagex's clue tables`() {
+        val steps = TrailSteps.ALL.getValue(TrailTier.Hard)
+        println("hard steps by kind: ${steps.groupingBy { it::class.simpleName }.eachCount()}")
+        val talks = steps.filterIsInstance<TrailStep.Talk>()
+        assertEquals(20, talks.count { it.challenge != null })
+        assertEquals(54, steps.count { it is TrailStep.Dig && it.map == null && it.text?.contains("degrees") == true })
+        val maps = steps.mapNotNull { (it as? TrailStep.Dig)?.map ?: (it as? TrailStep.Search)?.map }
+        assertEquals(7, maps.size)
+        assertTrue("interface.trail_map05" in maps && "interface.trail_clue_hard_map007" in maps)
+        assertEquals(17, steps.count { it is TrailStep.Emote })
+        assertEquals(10, steps.count { it is TrailStep.Music })
+        val objs = steps.map { TrailSteps.clueObj(it) }
+        assertEquals(objs.size, objs.toSet().size)
+        assertEquals(16, UNITS.count { it.tier == TrailTier.Hard })
+    }
+
+    @Test
     fun GameTestState.`a key step's npc drops its key once, and only on that step`() =
         runInjectedGameTest(TreasureTrailScript::class, null, TreasureTrailScript::class) { script ->
             prepare()

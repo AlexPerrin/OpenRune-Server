@@ -98,6 +98,7 @@ object TrailSteps {
     private const val TARGET_LOC_TABLE = "dbtable.cluehelper_target_loc"
     private const val TARGET_COORD_TABLE = "dbtable.cluehelper_target_coord"
     private const val TARGET_KEY_TABLE = "dbtable.cluehelper_target_key"
+    private const val CHALLENGE_BOX_TABLE = "dbtable.cluehelper_challenge_box"
     private const val CHARLIE = "npc.tramppg"
     private const val RELDO = "npc.reldo"
 
@@ -111,6 +112,8 @@ object TrailSteps {
         val d = tier.difficulty
         val steps = mutableListOf<TrailStep>()
         for (r in CluehelperClueAnagramRow.all().filter { it.difficulty == d }) {
+            if (r.challenge?.tableId == CHALLENGE_BOX_TABLE.asRSCM(RSCMType.DBTABLE)) continue
+            if (!targetsOnly(r.rowId, "dbcol.cluehelper_clue_anagram:target", TARGET_NPC_TABLE)) continue
             val challenge = r.challenge?.let { challenge(it.rowId, r.rowId) }
             val text = "The anagram reveals<br>who to speak to next:<br>${r.clueText.uppercase()}"
             steps += TrailStep.Talk(r.rowId, tier, text, r.target.map { it.npc.id }.toSet(), challenge)
@@ -120,7 +123,7 @@ object TrailSteps {
             val text = "The cipher reveals<br>who to speak to next:<br>${r.clueText}"
             steps += TrailStep.Talk(r.rowId, tier, text, r.target.map { it.npc.id }.toSet(), challenge)
         }
-        for (r in CluehelperClueCoordinateRow.all().filter { it.difficulty == d && it.combatEncounter.isEmpty() }) {
+        for (r in CluehelperClueCoordinateRow.all().filter { it.difficulty == d }) {
             val text = coordinateText(r.clueText) ?: continue
             steps += TrailStep.Dig(r.rowId, tier, text, r.target.coord, MAP_RADIUS, null)
         }
@@ -162,6 +165,11 @@ object TrailSteps {
         val objs = STEP_OBJS.getValue(tier)
         return if (tier.clueObj == null) steps.filter { it.row in objs } else steps
     }
+
+    private fun targetsOnly(row: Int, column: String, table: String): Boolean =
+        DbHelper.row(row).list(column, DbColumnCodec.DbRowTypeCodec).all {
+            DbHelper.row(it.id).tableId == table.asRSCM(RSCMType.DBTABLE)
+        }
 
     private fun cryptic(tier: TrailTier, r: CluehelperClueCrypticRow): TrailStep? {
         val targets = DbHelper.row(r.rowId).list("dbcol.cluehelper_clue_cryptic:target", DbColumnCodec.DbRowTypeCodec)
