@@ -9,6 +9,7 @@ class TreasureTrailsPluginPack : PluginPack() {
             TrailDataTables.charlie(),
             TrailDataTables.maps(),
             TrailDataTables.emotes(),
+            TrailDataTables.puzzleBoxes(),
             BeginnerCasketTable.rewards(),
             EasyCasketTable.rewards(),
             MediumCasketTable.rewards(),

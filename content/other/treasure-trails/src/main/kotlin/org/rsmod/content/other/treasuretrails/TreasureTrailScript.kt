@@ -1,6 +1,7 @@
 package org.rsmod.content.other.treasuretrails
 
 import dev.openrune.ServerCacheManager
+import dev.openrune.definition.type.widget.IfEvent
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import dev.openrune.types.ItemServerType
@@ -27,6 +28,7 @@ import org.rsmod.api.repo.obj.ObjRepository
 import org.rsmod.api.script.onCommand
 import org.rsmod.api.script.onEvent
 import org.rsmod.api.script.onIfClose
+import org.rsmod.api.script.onIfModalButton
 import org.rsmod.api.script.onOpHeld1
 import org.rsmod.api.script.onOpHeld2
 import org.rsmod.api.script.onOpNpc1
@@ -84,6 +86,10 @@ constructor(
         for (challenge in challenges()) {
             onOpHeld1(objName(challenge.obj)) { readChallenge(challenge) }
         }
+        for (box in puzzleBoxes()) {
+            onOpHeld1(objName(box.obj)) { openPuzzle(box) }
+        }
+        onIfModalButton(PUZZLE_PIECES) { slidePiece(it.comsub) }
         for (tier in TrailTier.entries) {
             onOpHeld1(tier.scrollBox) { openScrollBox(tier) }
         }
@@ -109,6 +115,9 @@ constructor(
 
     private fun challenges(): List<Challenge> =
         TrailSteps.ALL.values.flatten().filterIsInstance<TrailStep.Talk>().mapNotNull { it.challenge }.distinctBy { it.obj }
+
+    private fun puzzleBoxes(): List<PuzzleBox> =
+        TrailSteps.ALL.values.flatten().filterIsInstance<TrailStep.Talk>().mapNotNull { it.puzzle }.distinctBy { it.obj }
 
     private fun ProtectedAccess.readChallenge(challenge: Challenge) {
         ifOpenMainModal(CLUE_TEXT_INTERFACE)
@@ -200,6 +209,11 @@ constructor(
 
     private suspend fun ProtectedAccess.talkToStepNpc(npc: Npc, npcType: Int) {
         val step = npcStep(player, npcType) ?: return
+        val puzzle = (step as? TrailStep.Talk)?.puzzle
+        if (puzzle != null) {
+            talkWithPuzzle(npc, step as TrailStep.Talk, puzzle)
+            return
+        }
         val challenge = (step as? TrailStep.Talk)?.challenge
         if (challenge != null) {
             talkWithChallenge(npc, step as TrailStep.Talk, challenge)
@@ -246,6 +260,65 @@ constructor(
         startDialogue(npc) {
             chatNpc(happy, "Spot on!")
             access.completeStep(step)
+        }
+    }
+
+    /**
+     * Hard and up: the npc hands out a scrambled puzzle box; once the box's slide puzzle is solved,
+     * talking again takes the box and moves the trail on. The npc lines are best guesses.
+     */
+    private suspend fun ProtectedAccess.talkWithPuzzle(npc: Npc, step: TrailStep.Talk, box: PuzzleBox) {
+        val boxName = objName(box.obj)
+        if (!playerContainsObj(boxName)) {
+            if (inv.freeSpace() == 0) {
+                startDialogue(npc) { chatNpc(neutral, "You'll need some space in your inventory for my puzzle.") }
+                return
+            }
+            invAdd(inv, boxName)
+            setPuzzle(player, TrailPuzzle.scramble(box.puzzle) { random.of(0, it - 1) })
+            startDialogue(npc) {
+                chatNpc(neutral, "Ah, a clue scroll. Solve this puzzle and I'll give you the next clue.")
+                objbox(boxName, "${npc.name} has given you a puzzle box!")
+            }
+            return
+        }
+        if (!TrailPuzzle.isSolved(box.puzzle, puzzleSlots(player))) {
+            startDialogue(npc) { chatNpc(neutral, "You haven't solved the puzzle yet. Come back when you have.") }
+            return
+        }
+        if (!holdsClue(player, step) || invDel(inv, boxName).failure) return
+        invClear(player.invMap.getOrPut(PUZZLE_INV))
+        startDialogue(npc) {
+            chatNpc(happy, "Well done, you solved it!")
+            access.completeStep(step)
+        }
+    }
+
+    fun ProtectedAccess.openPuzzle(box: PuzzleBox) {
+        if (puzzleSlots(player).filterNotNull().toSet() != TrailPuzzle.pieces(box.puzzle).toSet()) {
+            setPuzzle(player, TrailPuzzle.scramble(box.puzzle) { random.of(0, it - 1) })
+        }
+        VarPlayerIntMapSetter.set(player, PUZZLE_VARP, box.puzzle)
+        ifOpenMainModal(PUZZLE_INTERFACE)
+        ifSetEvents(PUZZLE_PIECES, 0 until TrailPuzzle.SLOTS, IfEvent.Op1)
+        invTransmit(player.invMap.getOrPut(PUZZLE_INV))
+    }
+
+    fun ProtectedAccess.slidePiece(slot: Int) {
+        val slid = TrailPuzzle.slide(puzzleSlots(player), slot) ?: return
+        setPuzzle(player, slid)
+    }
+
+    fun puzzleSlots(player: Player): List<Int?> {
+        val inv = player.invMap.getOrPut(PUZZLE_INV)
+        return (0 until TrailPuzzle.SLOTS).map { inv[it]?.id }
+    }
+
+    @OptIn(UncheckedType::class)
+    fun setPuzzle(player: Player, slots: List<Int?>) {
+        val inv = player.invMap.getOrPut(PUZZLE_INV)
+        for ((slot, obj) in slots.withIndex()) {
+            if (inv[slot]?.id != obj) inv[slot] = obj?.let { InvObj(it, 1) }
         }
     }
 
@@ -547,7 +620,7 @@ constructor(
 
     private fun removeClues(player: Player, tier: TrailTier) {
         val objs = (tier.clueObj?.let { setOf(it.asRSCM(RSCMType.OBJ)) } ?: TrailSteps.STEP_OBJS.getValue(tier).values.toSet()) +
-            listOfNotNull(tier.dropObj?.asRSCM(RSCMType.OBJ)) + challenges().map { it.obj }
+            listOfNotNull(tier.dropObj?.asRSCM(RSCMType.OBJ)) + challenges().map { it.obj } + puzzleBoxes().map { it.obj }
         for (slot in player.inv.indices) {
             if (player.inv[slot]?.id in objs) player.inv[slot] = null
         }
@@ -628,6 +701,10 @@ constructor(
         const val CLUE_TEXT = "component.trail_cluetext:text"
         const val REWARD_INTERFACE = "interface.trail_rewardscreen"
         const val REWARD_INV = "inv.trail_rewardinv"
+        const val PUZZLE_INV = "inv.trail_puzzleinv"
+        const val PUZZLE_INTERFACE = "interface.trail_slidepuzzle"
+        const val PUZZLE_PIECES = "component.trail_slidepuzzle:pieces"
+        const val PUZZLE_VARP = "varp.if1"
         const val HOT_COLD_SPOT_VARP = "varp.trail_beginner_hot_cold_spot"
         const val HOT_COLD_LAST_VARP = "varp.trail_beginner_hot_cold_last"
         const val URI_LIFETIME = 100

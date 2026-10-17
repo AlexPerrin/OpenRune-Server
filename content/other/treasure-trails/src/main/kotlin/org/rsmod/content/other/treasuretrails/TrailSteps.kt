@@ -11,6 +11,7 @@ import org.rsmod.api.table.MusicRow
 import org.rsmod.api.table.TrailCharlieTasksRow
 import org.rsmod.api.table.TrailEmoteSeqsRow
 import org.rsmod.api.table.TrailMapInterfacesRow
+import org.rsmod.api.table.TrailPuzzleBoxesRow
 import org.rsmod.api.table.cluehelper.CluehelperChallengeQuestionRow
 import org.rsmod.api.table.cluehelper.CluehelperClueAnagramRow
 import org.rsmod.api.table.cluehelper.CluehelperClueCipherRow
@@ -31,9 +32,18 @@ import org.rsmod.map.CoordGrid
 
 /** One clue step, built from a row of Jagex's `cluehelper_clue_*` tables. */
 sealed class TrailStep(val row: Int, val tier: TrailTier, val text: String?) {
-    /** Talk to one of [npcs] (anagrams, ciphers, npc cryptics); from medium up some ask [challenge]. */
-    class Talk(row: Int, tier: TrailTier, text: String, val npcs: Set<Int>, val challenge: Challenge? = null) :
-        TrailStep(row, tier, text)
+    /**
+     * Talk to one of [npcs] (anagrams, ciphers, npc cryptics); from medium up some ask [challenge],
+     * from hard up some hand out a [puzzle] box instead.
+     */
+    class Talk(
+        row: Int,
+        tier: TrailTier,
+        text: String,
+        val npcs: Set<Int>,
+        val challenge: Challenge? = null,
+        val puzzle: PuzzleBox? = null,
+    ) : TrailStep(row, tier, text)
 
     /** "Talk to Charlie the Tramp": he picks one of [tasks] and wants its item. */
     class Charlie(row: Int, tier: TrailTier, text: String, val npcs: Set<Int>, val tasks: List<CharlieTask>) :
@@ -84,6 +94,9 @@ sealed class TrailStep(val row: Int, val tier: TrailTier, val text: String?) {
 /** A challenge scroll question ([row] in `cluehelper_challenge_question`) and its scroll [obj]. */
 data class Challenge(val row: Int, val question: String, val answer: Int, val obj: Int)
 
+/** A puzzle box obj and its picture: the `if1` value the slide puzzle (306) draws from. */
+data class PuzzleBox(val obj: Int, val puzzle: Int)
+
 data class CharlieTask(val row: Int, val text: String, val obj: Int, val request: String)
 
 data class HotColdSpot(val row: Int, val coord: CoordGrid)
@@ -112,16 +125,19 @@ object TrailSteps {
         val d = tier.difficulty
         val steps = mutableListOf<TrailStep>()
         for (r in CluehelperClueAnagramRow.all().filter { it.difficulty == d }) {
-            if (r.challenge?.tableId == CHALLENGE_BOX_TABLE.asRSCM(RSCMType.DBTABLE)) continue
             if (!targetsOnly(r.rowId, "dbcol.cluehelper_clue_anagram:target", TARGET_NPC_TABLE)) continue
-            val challenge = r.challenge?.let { challenge(it.rowId, r.rowId) }
+            val boxed = r.challenge?.tableId == CHALLENGE_BOX_TABLE.asRSCM(RSCMType.DBTABLE)
+            val puzzle = if (boxed) puzzleBox(tier, r.rowId) ?: continue else null
+            val challenge = if (boxed) null else r.challenge?.let { challenge(it.rowId, r.rowId) }
             val text = "The anagram reveals<br>who to speak to next:<br>${r.clueText.uppercase()}"
-            steps += TrailStep.Talk(r.rowId, tier, text, r.target.map { it.npc.id }.toSet(), challenge)
+            steps += TrailStep.Talk(r.rowId, tier, text, r.target.map { it.npc.id }.toSet(), challenge, puzzle)
         }
         for (r in CluehelperClueCipherRow.all().filter { it.difficulty == d }) {
-            val challenge = r.challenge?.let { challenge(it.rowId, r.rowId) } ?: continue
+            val boxed = r.challenge?.tableId == CHALLENGE_BOX_TABLE.asRSCM(RSCMType.DBTABLE)
+            val puzzle = if (boxed) puzzleBox(tier, r.rowId) ?: continue else null
+            val challenge = if (boxed) null else r.challenge?.let { challenge(it.rowId, r.rowId) } ?: continue
             val text = "The cipher reveals<br>who to speak to next:<br>${r.clueText}"
-            steps += TrailStep.Talk(r.rowId, tier, text, r.target.map { it.npc.id }.toSet(), challenge)
+            steps += TrailStep.Talk(r.rowId, tier, text, r.target.map { it.npc.id }.toSet(), challenge, puzzle)
         }
         for (r in CluehelperClueCoordinateRow.all().filter { it.difficulty == d }) {
             val text = coordinateText(r.clueText) ?: continue
@@ -164,6 +180,15 @@ object TrailSteps {
         }
         val objs = STEP_OBJS.getValue(tier)
         return if (tier.clueObj == null) steps.filter { it.row in objs } else steps
+    }
+
+    /** The step scroll's own puzzle box (`<scroll>_puzzlebox`) and its picture (`trail_puzzle_boxes`). */
+    private fun puzzleBox(tier: TrailTier, row: Int): PuzzleBox? {
+        val scroll = STEP_OBJS.getValue(tier)[row] ?: return null
+        val name = dev.openrune.rscm.RSCM.getReverseMapping(RSCMType.OBJ, scroll) + "_puzzlebox"
+        val box = runCatching { name.asRSCM(RSCMType.OBJ) }.getOrNull() ?: return null
+        val puzzle = TrailPuzzleBoxesRow.all().firstOrNull { it.box.id == box }?.puzzle ?: return null
+        return PuzzleBox(box, puzzle)
     }
 
     private fun targetsOnly(row: Int, column: String, table: String): Boolean =

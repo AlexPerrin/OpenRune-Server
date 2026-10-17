@@ -128,6 +128,7 @@ class TreasureTrailScriptTest {
         println("hard steps by kind: ${steps.groupingBy { it::class.simpleName }.eachCount()}")
         val talks = steps.filterIsInstance<TrailStep.Talk>()
         assertEquals(20, talks.count { it.challenge != null })
+        assertEquals(8, talks.count { it.puzzle != null })
         assertEquals(54, steps.count { it is TrailStep.Dig && it.map == null && it.text?.contains("degrees") == true })
         val maps = steps.mapNotNull { (it as? TrailStep.Dig)?.map ?: (it as? TrailStep.Search)?.map }
         assertEquals(7, maps.size)
@@ -138,6 +139,50 @@ class TreasureTrailScriptTest {
         assertEquals(objs.size, objs.toSet().size)
         assertEquals(16, UNITS.count { it.tier == TrailTier.Hard })
     }
+
+    @Test
+    fun `puzzle boxes scramble into a solvable mix of their 24 pieces`() {
+        val pieces = TrailPuzzle.pieces(1)
+        assertEquals(24, pieces.size)
+        assertEquals("obj.trail_slidingpuzzleb01", TreasureTrailScript.objName(pieces.first()))
+        val rng = java.util.Random(7)
+        val scrambled = TrailPuzzle.scramble(1) { rng.nextInt(it) }
+        assertEquals(pieces.toSet(), scrambled.filterNotNull().toSet())
+        assertEquals(1, scrambled.count { it == null })
+        assertFalse(TrailPuzzle.isSolved(1, scrambled))
+        assertTrue(TrailPuzzle.isSolved(1, TrailPuzzle.solved(1)))
+        assertNull(TrailPuzzle.slide(TrailPuzzle.solved(1), 0))
+        val moved = checkNotNull(TrailPuzzle.slide(TrailPuzzle.solved(1), 23))
+        assertNull(moved[23])
+        assertEquals(pieces[23], moved[24])
+        assertNull(TrailPuzzle.slide(TrailPuzzle.solved(1), 19 - 1))
+    }
+
+    @Test
+    fun `hard puzzle steps hand out their own box`() {
+        val puzzles = TrailSteps.ALL.getValue(TrailTier.Hard).filterIsInstance<TrailStep.Talk>().mapNotNull { it.puzzle }
+        assertTrue(puzzles.size >= 5, puzzles.toString())
+        assertTrue(puzzles.all { TreasureTrailScript.objName(it.obj).endsWith("_puzzlebox") && it.puzzle in 1..3 })
+        for (box in puzzles) {
+            val type = checkNotNull(dev.openrune.ServerCacheManager.getItem(box.obj))
+            assertEquals(0, type.interfaceOptions.indexOf("Open"), type.name)
+        }
+    }
+
+    @Test
+    fun GameTestState.`sliding mirrors the client's move and only into the gap`() =
+        runInjectedGameTest(TreasureTrailScript::class, null, TreasureTrailScript::class) { script ->
+            prepare()
+            val solved = TrailPuzzle.solved(2)
+            script.setPuzzle(player, solved)
+            with(script) { player.withProtectedAccess { slidePiece(0) } }
+            assertEquals(solved, script.puzzleSlots(player))
+            with(script) { player.withProtectedAccess { slidePiece(19) } }
+            assertNull(script.puzzleSlots(player)[19])
+            assertEquals(solved[19], script.puzzleSlots(player)[24])
+            with(script) { player.withProtectedAccess { slidePiece(24) } }
+            assertTrue(TrailPuzzle.isSolved(2, script.puzzleSlots(player)))
+        }
 
     @Test
     fun GameTestState.`a key step's npc drops its key once, and only on that step`() =

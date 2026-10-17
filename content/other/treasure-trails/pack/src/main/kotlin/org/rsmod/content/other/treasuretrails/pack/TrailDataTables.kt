@@ -9,6 +9,10 @@ import dev.openrune.definition.util.VarType
  * interface each map clue row opens, and the emote seq for each emote slot the emote rows name.
  */
 object TrailDataTables {
+    private const val CASTLE = 1
+    private const val TREE = 2
+    private const val TROLL = 3
+
     private val CHARLIE =
         listOf(
             Triple(1811, "obj.trout", "a cooked trout"),
@@ -54,6 +58,32 @@ object TrailDataTables {
             2251 to "interface.trail_map14",
             2252 to "interface.trail_clue_hard_map006",
             2253 to "interface.trail_clue_hard_map007",
+        )
+
+    /** OSRS Wiki, Puzzle box: the castle, tree and troll pictures by box obj (hard tier). */
+    private val PUZZLE_BOXES =
+        listOf(
+            "obj.trail_clue_hard_riddle014_puzzlebox" to CASTLE,
+            "obj.trail_clue_hard_riddle016_puzzlebox" to CASTLE,
+            "obj.trail_clue_hard_riddle017_puzzlebox" to CASTLE,
+            "obj.trail_hard_riddle_exp1_puzzlebox" to CASTLE,
+            "obj.trail_hard_riddle_exp4_puzzlebox" to CASTLE,
+            "obj.trail_hard_anagram_exp11_puzzlebox" to CASTLE,
+            "obj.trail_clue_hard_cipher007_puzzlebox" to CASTLE,
+            "obj.trail_clue_hard_cipher008_puzzlebox" to CASTLE,
+            "obj.trail_clue_hard_riddle018_puzzlebox" to TREE,
+            "obj.trail_clue_hard_riddle019_puzzlebox" to TREE,
+            "obj.trail_clue_hard_riddle026_puzzlebox" to TREE,
+            "obj.trail_hard_riddle_exp2_puzzlebox" to TREE,
+            "obj.trail_hard_anagram_exp9_puzzlebox" to TREE,
+            "obj.trail_clue_hard_cipher009_puzzlebox" to TREE,
+            "obj.trail_clue_hard_riddle020_puzzlebox" to TROLL,
+            "obj.trail_clue_hard_riddle021_puzzlebox" to TROLL,
+            "obj.trail_clue_hard_riddle025_puzzlebox" to TROLL,
+            "obj.trail_hard_riddle_exp3_puzzlebox" to TROLL,
+            "obj.trail_hard_anagram_exp13_puzzlebox" to TROLL,
+            "obj.trail_hard_anagram_exp14_puzzlebox" to TROLL,
+            "obj.trail_clue_hard_cipher003_puzzlebox" to TROLL,
         )
 
     private val EMOTES =
@@ -116,6 +146,18 @@ object TrailDataTables {
                 row("dbrow.trail_emote_seq_$slot") {
                     column(0, slot)
                     column(1, seq)
+                }
+            }
+        }
+
+    fun puzzleBoxes() =
+        dbTable("dbtable.trail_puzzle_boxes", serverOnly = true) {
+            column("box", 0, VarType.OBJ)
+            column("puzzle", 1, VarType.INT)
+            for ((i, box) in PUZZLE_BOXES.withIndex()) {
+                row("dbrow.trail_puzzle_box_$i") {
+                    columnRSCM(0, box.first)
+                    column(1, box.second)
                 }
             }
         }
