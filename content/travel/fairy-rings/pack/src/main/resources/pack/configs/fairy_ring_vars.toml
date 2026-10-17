@@ -1,0 +1,11 @@
+[[varp]]
+isServerOnly = true
+id = "varp.fairyring_travel_log_a"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.fairyring_travel_log_b"
+scope = "Perm"
+transmit = "Never"
