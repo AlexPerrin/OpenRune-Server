@@ -10,5 +10,9 @@ class HunterPluginPack : PluginPack() {
             BirdHouseTypesTable.birdHouseTypes(),
             HunterTrapsTable.hunterTraps(),
             HunterTrapCreaturesTable.hunterTrapCreatures(),
+            HerbiboarLegsTable.herbiboarLegs(),
+            HerbiboarSpotsTable.herbiboarSpots(),
+            HerbiboarTunnelsTable.herbiboarTunnels(),
+            HerbiboarHerbsTable.herbiboarHerbs(),
         )
 }
