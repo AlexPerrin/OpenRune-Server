@@ -34,6 +34,7 @@ import org.rsmod.api.script.onPlayerLogout
 import org.rsmod.api.script.onProtectedEvent
 import org.rsmod.api.table.TrailBeginnerCasketRow
 import org.rsmod.api.table.TrailEasyCasketRow
+import org.rsmod.api.table.TrailMediumCasketRow
 import org.rsmod.api.table.cluehelper.CluehelperOutfitRow
 import org.rsmod.content.interfaces.emotes.PlayEmote
 import org.rsmod.game.MapClock
@@ -79,6 +80,9 @@ constructor(
             onOpHeld1(obj) { read(it.type) }
             onOpHeld2(obj) { checkSteps(it.type) }
         }
+        for (challenge in challenges()) {
+            onOpHeld1(objName(challenge.obj)) { readChallenge(challenge) }
+        }
         for (tier in TrailTier.entries) {
             onOpHeld1(tier.scrollBox) { openScrollBox(tier) }
         }
@@ -99,8 +103,16 @@ constructor(
     private fun clueObjs(): Set<String> =
         TrailTier.entries
             .flatMap { tier -> tier.clueObj?.let(::listOf) ?: TrailSteps.STEP_OBJS.getValue(tier).values.map(::objName) }
-            .plus(TrailTier.entries.map { it.dropObj })
+            .plus(TrailTier.entries.mapNotNull { it.dropObj })
             .toSet()
+
+    private fun challenges(): List<Challenge> =
+        TrailSteps.ALL.values.flatten().filterIsInstance<TrailStep.Talk>().mapNotNull { it.challenge }.distinctBy { it.obj }
+
+    private fun ProtectedAccess.readChallenge(challenge: Challenge) {
+        ifOpenMainModal(CLUE_TEXT_INTERFACE)
+        ifSetText(CLUE_TEXT, challenge.question)
+    }
 
     private fun ScriptContext.registerNpcSteps() {
         val npcs = TrailSteps.ALL.values.flatten().flatMap { npcsOf(it) }.toSet()
@@ -117,7 +129,8 @@ constructor(
         for ((loc, op) in searches.flatMap { it.locs }.map { it.first }.toSet().mapNotNull { loc -> TrailSteps.stepOp(loc)?.let { loc to it } }) {
             locOverrides.register(loc, op) { player, bound -> searchStep(player, loc, bound.coords) != null }
             onProtectedEvent<LocOverrideEvents.Op>(LocOverrideEvents.key(loc, op)) {
-                val step = searchStep(player, loc, it.loc.coords) ?: return@onProtectedEvent
+                val step = searchStep(player, loc, it.loc.coords) as? TrailStep.Search ?: return@onProtectedEvent
+                if (step.key != null && invDel(inv, objName(step.key)).failure) return@onProtectedEvent
                 completeStep(step)
             }
         }
@@ -135,7 +148,7 @@ constructor(
     private fun ProtectedAccess.read(obj: ItemServerType) {
         val tier = tierOf(obj.id) ?: return
         val step = stepForRead(player, tier, obj.id)
-        val map = (step as? TrailStep.Dig)?.map
+        val map = (step as? TrailStep.Dig)?.map ?: (step as? TrailStep.Search)?.map
         if (map != null) {
             ifOpenMainModal(map)
             return
@@ -186,6 +199,11 @@ constructor(
 
     private suspend fun ProtectedAccess.talkToStepNpc(npc: Npc, npcType: Int) {
         val step = npcStep(player, npcType) ?: return
+        val challenge = (step as? TrailStep.Talk)?.challenge
+        if (challenge != null) {
+            talkWithChallenge(npc, step as TrailStep.Talk, challenge)
+            return
+        }
         when (step) {
             is TrailStep.Charlie -> talkToCharlie(npc, step)
             is TrailStep.HotCold -> talkToReldo(npc)
@@ -195,6 +213,38 @@ constructor(
                     chatNpc(neutral, "Well done.")
                     access.completeStep(step)
                 }
+        }
+    }
+
+    /**
+     * Medium and up: the npc hands out the challenge scroll, then asks for the answer (count
+     * dialog); a right answer takes the challenge scroll and moves the trail on. The dialogue
+     * wording is a best guess (OSRS Wiki: Challenge scroll; no transcript).
+     */
+    private suspend fun ProtectedAccess.talkWithChallenge(npc: Npc, step: TrailStep.Talk, challenge: Challenge) {
+        val scroll = objName(challenge.obj)
+        if (!playerContainsObj(scroll)) {
+            if (inv.freeSpace() == 0) {
+                startDialogue(npc) { chatNpc(neutral, "You'll need some space in your inventory for my question.") }
+                return
+            }
+            invAdd(inv, scroll)
+            startDialogue(npc) {
+                chatNpc(neutral, "Ah, a clue scroll. Answer my question and I'll give you the next clue.")
+                objbox(scroll, "${npc.name} has given you a challenge scroll!")
+            }
+            return
+        }
+        startDialogue(npc) { chatNpc(quiz, "Please enter the answer to the question.") }
+        val answer = countDialog("Enter amount:")
+        if (answer != challenge.answer) {
+            startDialogue(npc) { chatNpc(sad, "That isn't right, keep trying.") }
+            return
+        }
+        if (!holdsClue(player, step) || invDel(inv, scroll).failure) return
+        startDialogue(npc) {
+            chatNpc(happy, "Spot on!")
+            access.completeStep(step)
         }
     }
 
@@ -328,10 +378,13 @@ constructor(
     }
 
     fun emoted(player: Player, seq: Int) {
-        val step =
-            TrailTier.entries
-                .mapNotNull { currentStep(player, it) as? TrailStep.Emote }
-                .firstOrNull { it.seq == seq } ?: return
+        val steps = TrailTier.entries.mapNotNull { currentStep(player, it) as? TrailStep.Emote }
+        val second = steps.firstOrNull { it.seq2 == seq && uris[player]?.isSlotAssigned == true }
+        if (second != null) {
+            if (holdsClue(player, second)) VarPlayerIntMapSetter.set(player, second.tier.auxVarp, SECOND_EMOTE_DONE)
+            return
+        }
+        val step = steps.firstOrNull { it.seq == seq } ?: return
         if (!holdsClue(player, step) || !step.covers(player.coords, step.coord, TrailSteps.EMOTE_RADIUS)) return
         if (uris[player]?.isSlotAssigned == true) return
         val uri = Npc(step.tier.uri, besideTile(player.coords))
@@ -345,7 +398,8 @@ constructor(
     private suspend fun ProtectedAccess.talkToUri(uri: Npc) {
         val step = TrailTier.entries.firstNotNullOfOrNull { currentStep(player, it) as? TrailStep.Emote }
         val owned = uris[player] === uri
-        if (!owned || step == null || !wearsOutfit(player, step.outfits)) {
+        val secondDone = step?.seq2 == null || player.vars[step.tier.auxVarp] == SECOND_EMOTE_DONE
+        if (!owned || step == null || !wearsOutfit(player, step.outfits) || !secondDone) {
             startDialogue(uri) { chatNpc(neutral, "I do not believe we have any business, Comrade.") }
             return
         }
@@ -423,12 +477,12 @@ constructor(
             return
         }
         if (invDel(inv, tier.scrollBox).failure) return
-        invAdd(inv, tier.dropObj)
+        invAdd(inv, tier.dropObj ?: objName(TrailSteps.clueObj(pickStep(tier, null))))
     }
 
     private fun ProtectedAccess.holdsTierClue(tier: TrailTier): Boolean {
         val objs = (tier.clueObj?.let { setOf(it.asRSCM(RSCMType.OBJ)) } ?: TrailSteps.STEP_OBJS.getValue(tier).values.toSet()) +
-            tier.dropObj.asRSCM(RSCMType.OBJ)
+            listOfNotNull(tier.dropObj?.asRSCM(RSCMType.OBJ))
         return objs.any { playerContainsObj(objName(it)) }
     }
 
@@ -492,7 +546,7 @@ constructor(
 
     private fun removeClues(player: Player, tier: TrailTier) {
         val objs = (tier.clueObj?.let { setOf(it.asRSCM(RSCMType.OBJ)) } ?: TrailSteps.STEP_OBJS.getValue(tier).values.toSet()) +
-            tier.dropObj.asRSCM(RSCMType.OBJ)
+            listOfNotNull(tier.dropObj?.asRSCM(RSCMType.OBJ)) + challenges().map { it.obj }
         for (slot in player.inv.indices) {
             if (player.inv[slot]?.id in objs) player.inv[slot] = null
         }
@@ -527,7 +581,23 @@ constructor(
     fun searchStep(player: Player, loc: Int, coords: CoordGrid): TrailStep? =
         TrailTier.entries.firstNotNullOfOrNull { tier ->
             (currentStep(player, tier) as? TrailStep.Search)?.takeIf { step ->
-                step.locs.any { it.first == loc && it.second == coords } && holdsClue(player, step)
+                step.locs.any { it.first == loc && it.second == coords } &&
+                    holdsClue(player, step) &&
+                    (step.key == null || player.inv.count(objName(step.key)) > 0)
+            }
+        }
+
+    fun dropKey(key: String, coords: CoordGrid, player: Player) {
+        objRepo.add(key, coords, KEY_DROP_DURATION, receiver = player)
+    }
+
+    /** The key a kill of [npcType] drops for [player]'s key step, if they do not hold it yet. */
+    fun keyDrop(player: Player, npcType: Int): String? =
+        TrailTier.entries.firstNotNullOfOrNull { tier ->
+            val step = currentStep(player, tier) as? TrailStep.Search ?: return@firstNotNullOfOrNull null
+            val key = step.key ?: return@firstNotNullOfOrNull null
+            objName(key).takeIf {
+                npcType in step.keyNpcs && holdsClue(player, step) && player.inv.count(it) == 0
             }
         }
 
@@ -560,6 +630,8 @@ constructor(
         const val HOT_COLD_SPOT_VARP = "varp.trail_beginner_hot_cold_spot"
         const val HOT_COLD_LAST_VARP = "varp.trail_beginner_hot_cold_last"
         const val URI_LIFETIME = 100
+        const val SECOND_EMOTE_DONE = 1
+        const val KEY_DROP_DURATION = 200
         const val LIST_CHUNK = 12
         const val BLOCKED_FLAGS = CollisionFlag.BLOCK_WALK or CollisionFlag.BLOCK_PLAYERS
         val ADJACENT_OFFSETS =
@@ -584,6 +656,8 @@ constructor(
                     TrailBeginnerCasketRow.all().map { CasketRow(it.obj, it.min, it.max, it.weight, it.noted) },
                 TrailTier.Easy to
                     TrailEasyCasketRow.all().map { CasketRow(it.obj, it.min, it.max, it.weight, it.noted) },
+                TrailTier.Medium to
+                    TrailMediumCasketRow.all().map { CasketRow(it.obj, it.min, it.max, it.weight, it.noted) },
             )
         }
 
@@ -607,7 +681,7 @@ constructor(
         fun tierOf(obj: Int): TrailTier? =
             TrailTier.entries.firstOrNull { tier ->
                 tier.clueObj?.asRSCM(RSCMType.OBJ) == obj ||
-                    tier.dropObj.asRSCM(RSCMType.OBJ) == obj ||
+                    tier.dropObj?.asRSCM(RSCMType.OBJ) == obj ||
                     obj in TrailSteps.STEP_OBJS.getValue(tier).values
             }
 

@@ -35,6 +35,18 @@ object TrailDataTables {
             2228 to "interface.trail_map18",
             2232 to "interface.trail_map09",
             2234 to "interface.trail_clue_easy_map006",
+            2235 to "interface.trail_map03",
+            2236 to "interface.trail_map07",
+            2237 to "interface.trail_map10",
+            2238 to "interface.trail_map15",
+            2239 to "interface.trail_map16",
+            2240 to "interface.trail_map17",
+            2241 to "interface.trail_clue_medium_map008",
+            2242 to "interface.trail_clue_medium_map009",
+            2243 to "interface.trail_clue_medium_map010",
+            2244 to "interface.trail_clue_medium_map011",
+            2245 to "interface.trail_clue_medium_map012",
+            2246 to "interface.trail_map04",
         )
 
     private val EMOTES =

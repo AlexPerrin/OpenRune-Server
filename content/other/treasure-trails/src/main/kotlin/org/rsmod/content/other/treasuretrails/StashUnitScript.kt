@@ -2,6 +2,7 @@ package org.rsmod.content.other.treasuretrails
 
 import dev.openrune.ServerCacheManager
 import dev.openrune.rscm.RSCM
+import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import org.rsmod.api.player.output.mes
 import org.rsmod.api.player.protect.ProtectedAccess
@@ -17,7 +18,7 @@ import org.rsmod.plugin.scripts.ScriptContext
 /**
  * STASH units (OSRS Wiki: STASH) for the emote steps of the tiers this module runs, from the
  * `hidey_hole_loc` and outfit of Jagex's emote clue rows. Build (op1) needs the tier's Construction
- * level, a hammer, a saw, 2 planks and 10 nails of one metal, and sets the loc's multiloc varbit
+ * level, a hammer, a saw, 2 of the tier's planks and 10 nails of one metal, and sets the loc's multiloc varbit
  * (`hh_constructed_*`), which RuneLite's Clue Scroll plugin checks (clientscript 1479). Search (op2)
  * stores the outfit or takes it back, with the messages the plugin tracks.
  *
@@ -38,16 +39,18 @@ class StashUnitScript : PluginScript() {
             mes("You need a Construction level of ${unit.tier.stashLevel} to build this STASH unit.")
             return
         }
+        val plank = unit.tier.stashPlank
         val nails = NAILS.firstOrNull { inv.count(it) >= NAILS_NEEDED }
-        if (HAMMER !in inv || SAW !in inv || inv.count(PLANK) < PLANKS_NEEDED || nails == null) {
-            mes("You need a hammer, a saw, $PLANKS_NEEDED planks and $NAILS_NEEDED nails to build this.")
+        if (HAMMER !in inv || SAW !in inv || inv.count(plank) < PLANKS_NEEDED || nails == null) {
+            val planks = ServerCacheManager.getItem(plank.asRSCM(RSCMType.OBJ))?.name?.lowercase() ?: "plank"
+            mes("You need a hammer, a saw, $PLANKS_NEEDED ${planks}s and $NAILS_NEEDED nails to build this.")
             return
         }
         anim(BUILD_ANIM)
         delay(BUILD_TICKS)
-        if (invDel(inv, PLANK, PLANKS_NEEDED).failure) return
+        if (invDel(inv, plank, PLANKS_NEEDED).failure) return
         if (invDel(inv, nails, NAILS_NEEDED).failure) return
-        statAdvance(CONSTRUCTION, XP)
+        statAdvance(CONSTRUCTION, unit.tier.stashXp)
         VarPlayerIntMapSetter.set(player, unit.varbit, 1)
     }
 
@@ -80,10 +83,8 @@ class StashUnitScript : PluginScript() {
         const val CONSTRUCTION = "stat.construction"
         const val HAMMER = "obj.hammer"
         const val SAW = "obj.poh_saw"
-        const val PLANK = "obj.woodplank"
         const val PLANKS_NEEDED = 2
         const val NAILS_NEEDED = 10
-        const val XP = 150.0
         const val BUILD_ANIM = "seq.human_poh_build"
         const val BUILD_TICKS = 3
         val NAILS =

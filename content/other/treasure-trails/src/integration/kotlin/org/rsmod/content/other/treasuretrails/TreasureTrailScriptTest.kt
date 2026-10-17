@@ -89,6 +89,57 @@ class TreasureTrailScriptTest {
     }
 
     @Test
+    fun `medium casket rolls follow the wiki table`() {
+        val table = CASKETS.getValue(TrailTier.Medium)
+        assertEquals(23181180, table.sumOf { it.weight })
+        assertEquals(192, table.size)
+    }
+
+    @Test
+    fun `medium steps come from jagex's clue tables`() {
+        val steps = TrailSteps.ALL.getValue(TrailTier.Medium)
+        val counts = steps.groupingBy { it::class.simpleName }.eachCount()
+        println("medium steps by kind: $counts")
+        val talks = steps.filterIsInstance<TrailStep.Talk>()
+        assertEquals(44, talks.count { it.challenge != null })
+        val baraek = talks.single { "A BAKER" in it.text!! }
+        assertEquals(5, baraek.challenge?.answer)
+        assertTrue(TreasureTrailScript.objName(baraek.challenge!!.obj).endsWith("_challenge"))
+        assertEquals(44, steps.count { it is TrailStep.Dig && it.map == null })
+        assertEquals(12, steps.count { (it as? TrailStep.Dig)?.map != null || (it as? TrailStep.Search)?.map != null })
+        assertEquals(25, steps.count { it is TrailStep.Emote && it.seq2 != null })
+        assertEquals(11, steps.count { it is TrailStep.Search && it.key != null })
+        assertEquals(6, steps.count { it is TrailStep.Music })
+        val objs = steps.map { TrailSteps.clueObj(it) }
+        assertEquals(objs.size, objs.toSet().size)
+        assertTrue(UNITS.count { it.tier == TrailTier.Medium } > 20)
+    }
+
+    @Test
+    fun GameTestState.`a key step's npc drops its key once, and only on that step`() =
+        runInjectedGameTest(TreasureTrailScript::class, null, TreasureTrailScript::class) { script ->
+            prepare()
+            val medium = TrailTier.Medium
+            val step = TrailSteps.ALL.getValue(medium).filterIsInstance<TrailStep.Search>().first { it.key != null }
+            val npc = step.keyNpcs.first()
+            assertNull(script.keyDrop(player, npc))
+            script.giveClue(Cheat(player, "clue", listOf("medium", "${step.row}", "2")))
+            val key = TreasureTrailScript.objName(checkNotNull(step.key))
+            assertEquals(key, script.keyDrop(player, npc))
+            assertNull(script.keyDrop(player, -1))
+            player.inv[5] = InvObj(checkNotNull(step.key), 1)
+            assertNull(script.keyDrop(player, npc))
+        }
+
+    @Test
+    fun `coordinate clue text is what the plugin parses`() {
+        assertEquals(
+            "00 degrees 05 minutes south<br>01 degrees 13 minutes east",
+            TrailSteps.coordinateText("00.05S 01.13E"),
+        )
+    }
+
+    @Test
     fun GameTestState.`a three step beginner trail ends in one casket`() =
         runInjectedGameTest(TreasureTrailScript::class, null, TreasureTrailScript::class) { script ->
             prepare()
@@ -138,7 +189,7 @@ class TreasureTrailScriptTest {
     fun GameTestState.`a fresh dropped easy scroll starts a trail on read`() =
         runInjectedGameTest(TreasureTrailScript::class, null, TreasureTrailScript::class) { script ->
             prepare()
-            val drop = easy.dropObj.asRSCM(RSCMType.OBJ)
+            val drop = checkNotNull(easy.dropObj).asRSCM(RSCMType.OBJ)
             player.inv[3] = InvObj(drop, 1)
             val step = script.stepForRead(player, easy, drop)
             assertEquals(TrailSteps.clueObj(step), player.inv[3]?.id)

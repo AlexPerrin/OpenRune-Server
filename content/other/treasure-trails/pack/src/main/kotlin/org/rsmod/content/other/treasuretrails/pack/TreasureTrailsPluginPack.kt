@@ -11,5 +11,6 @@ class TreasureTrailsPluginPack : PluginPack() {
             TrailDataTables.emotes(),
             BeginnerCasketTable.rewards(),
             EasyCasketTable.rewards(),
+            MediumCasketTable.rewards(),
         )
 }
