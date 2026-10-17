@@ -22,7 +22,7 @@ import org.rsmod.game.type.uncert
  * - a buy offer priced at or above the guide fills at the guide price; the overpayment comes back
  *   as coins in the slot's collection inv;
  * - a sell offer priced at or below the guide fills at the guide price, less the 2% tax (floored,
- *   capped at 5M per item, nothing below 50 gp);
+ *   capped at 5M per item, nothing below 50 gp, none on `enum.ge_tax_exempt` items);
  * - fills come in up to [FILL_STEPS] parts ([FILL_DELAY] ticks after Confirm, then every
  *   [FILL_INTERVAL] ticks), each one sent as a partial update;
  * - buys count against the item's 4-hour buy limit (`enum.ge_buy_limits`, from the wiki); an offer
@@ -72,6 +72,7 @@ object GrandExchange {
     var clock: () -> Int = { (System.currentTimeMillis() / 60_000L).toInt() }
 
     private val buyLimitsEnum: Int by lazy { "enum.ge_buy_limits".asRSCM(RSCMType.ENUM) }
+    private val taxExemptEnum: Int by lazy { "enum.ge_tax_exempt".asRSCM(RSCMType.ENUM) }
     private val newOfferPriceVarp: Int by lazy {
         "varp.ge_newoffer_price".asRSCM(RSCMType.VARP)
     }
@@ -178,6 +179,12 @@ object GrandExchange {
     fun taxPerItem(price: Int): Int =
         if (price < TAX_MIN_PRICE) 0 else minOf(price / 50, TAX_CAP) // 2%, floored
 
+    /** Items the wiki lists as exempt from the tax (`enum.ge_tax_exempt`). */
+    fun taxExempt(item: Int): Boolean =
+        ServerCacheManager.getEnum(taxExemptEnum)?.values?.containsKey(item) == true
+
+    fun taxPerItem(item: Int, price: Int): Int = if (taxExempt(item)) 0 else taxPerItem(price)
+
     /** Held count of [item] including its noted form. */
     fun heldCount(inv: Inventory, item: Int): Int {
         val base = type(item) ?: return 0
@@ -271,7 +278,7 @@ object GrandExchange {
     /** Adds a finished offer with at least one item traded to the front of the history. */
     fun recordHistory(player: Player, offer: Offer) {
         if (offer.done <= 0) return
-        val tax = if (offer.sell) offer.done * taxPerItem(offer.gold / offer.done) else 0
+        val tax = if (offer.sell) offer.done * taxPerItem(offer.item, offer.gold / offer.done) else 0
         val entries =
             listOf(Trade(offer.item, offer.sell, offer.done, offer.gold, tax)) +
                 history(player).take(HISTORY_SIZE - 1)
@@ -334,7 +341,7 @@ object GrandExchange {
         val inv = collectionInv(player, offer.slot)
         val gold = amount * guide
         if (offer.sell) {
-            addTo(inv, 1, coinsId, gold - amount * taxPerItem(guide))
+            addTo(inv, 1, coinsId, gold - amount * taxPerItem(offer.item, guide))
         } else {
             addTo(inv, 0, offer.item, amount)
             val refund = amount * (offer.price - guide)

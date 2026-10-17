@@ -260,3 +260,4 @@ ge_history39_tax = 63955
 
 [gamevals.enum]
 ge_buy_limits = 64441
+ge_tax_exempt = 64442

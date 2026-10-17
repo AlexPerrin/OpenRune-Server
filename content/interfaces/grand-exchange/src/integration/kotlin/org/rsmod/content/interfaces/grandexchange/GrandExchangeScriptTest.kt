@@ -134,7 +134,7 @@ class GrandExchangeScriptTest {
             assertEquals(0, GrandExchange.heldCount(player.inv, lobster.id))
             assertEquals(GrandExchange.STATE_OPEN or GrandExchange.SELL_BIT, GrandExchange.offer(player, 0).status)
             fillAll(player)
-            val net = 5 * guide - 5 * GrandExchange.taxPerItem(guide)
+            val net = 5 * guide - 5 * GrandExchange.taxPerItem(lobster.id, guide)
             assertEquals(InvObj(id("obj.coins"), net), GrandExchange.collectionInv(player, 0)[1])
             assertNull(GrandExchange.collectionInv(player, 0)[0])
             with(script) { player.withProtectedAccess { collectAll(toBank = true) } }
@@ -248,6 +248,12 @@ class GrandExchangeScriptTest {
         assertEquals(0, GrandExchange.taxPerItem(49))
         assertEquals(1, GrandExchange.taxPerItem(50))
         assertEquals(GrandExchange.TAX_CAP, GrandExchange.taxPerItem(Int.MAX_VALUE))
+        val lobster = "obj.lobster".asRSCM(RSCMType.OBJ)
+        val coal = "obj.coal".asRSCM(RSCMType.OBJ)
+        assertTrue(GrandExchange.taxExempt(lobster))
+        assertEquals(0, GrandExchange.taxPerItem(lobster, 1000))
+        assertFalse(GrandExchange.taxExempt(coal))
+        assertEquals(20, GrandExchange.taxPerItem(coal, 1000))
     }
 
     @Test
@@ -384,7 +390,7 @@ class GrandExchangeScriptTest {
             fillAll(player)
             val history = GrandExchange.history(player)
             assertEquals(2, history.size)
-            assertEquals(GrandExchange.Trade(lobster.id, true, 3, 3 * guide, 3 * GrandExchange.taxPerItem(guide)), history[0])
+            assertEquals(GrandExchange.Trade(lobster.id, true, 3, 3 * guide, 3 * GrandExchange.taxPerItem(lobster.id, guide)), history[0])
             assertEquals(GrandExchange.Trade(lobster.id, false, 3, 3 * guide, 0), history[1])
 
             repeat(GrandExchange.HISTORY_SIZE) {
