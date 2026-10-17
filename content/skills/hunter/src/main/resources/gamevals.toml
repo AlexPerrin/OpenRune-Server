@@ -7,6 +7,8 @@ herbiboar_legs = 56006
 herbiboar_spots = 56007
 herbiboar_tunnels = 56008
 herbiboar_herbs = 56009
+hunter_rumour_hunters = 56010
+hunter_rumours = 56011
 
 [gamevals.dbrow]
 impling_type_baby = 60152
@@ -127,6 +129,16 @@ herbiboar_herb_tarromin = 60267
 herbiboar_herb_harralander = 60268
 herbiboar_herb_marentill = 60269
 herbiboar_herb_guam = 60270
+hunter_rumour_hunter_gilman = 60271
+hunter_rumour_hunter_cervus = 60272
+hunter_rumour_hunter_ornus = 60273
+hunter_rumour_hunter_aco = 60274
+hunter_rumour_hunter_teco = 60275
+hunter_rumour_hunter_wolf = 60276
+hunter_rumour_tropical_wagtail = 60277
+hunter_rumour_grey_chinchompa = 60278
+hunter_rumour_carnivorous_chinchompa = 60279
+hunter_rumour_herbiboar = 60280
 
 [gamevals.timer]
 hunter_traps = 436

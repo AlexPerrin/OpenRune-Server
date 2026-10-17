@@ -39,7 +39,11 @@ import org.rsmod.plugin.scripts.ScriptContext
  */
 class HerbiboarScript
 @Inject
-constructor(private val objRepo: ObjRepository, private val random: GameRandom) : PluginScript() {
+constructor(
+    private val objRepo: ObjRepository,
+    private val random: GameRandom,
+    private val rumours: HunterRumours,
+) : PluginScript() {
     private val legs: List<Leg> by lazy { loadLegs() }
     private val spotGroups: Map<Int, Int> by lazy {
         HerbiboarSpotsRow.all().associate { it.loc.id to it.group }
@@ -131,6 +135,7 @@ constructor(private val objRepo: ObjRepository, private val random: GameRandom) 
         if (count > 1) statAdvance(HERBLORE, HERB_XP * (count - 1))
         VarPlayerIntMapSetter.set(player, HARVESTED, vars[HARVESTED] + 1)
         mes("You harvest herbs from the herbiboar, whereupon it escapes.")
+        rumours.onCatch(player, HERBIBOAR)
     }
 
     private fun ProtectedAccess.toggleWarning() {
