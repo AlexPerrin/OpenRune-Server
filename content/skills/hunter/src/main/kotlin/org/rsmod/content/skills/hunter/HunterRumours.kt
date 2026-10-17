@@ -25,7 +25,8 @@ import org.rsmod.game.entity.Player
  * - Turning in takes the part and gives (Hunter level + 5) * modifier XP and the tier's loot sack.
  *
  * Deviation: only creatures this server can catch are assigned (wagtail, grey and carnivorous
- * chinchompas, herbiboar).
+ * chinchompas, herbiboar, and the net-caught sapphire glacialis, snowy knight, black warlock,
+ * sunlight and moonlight moths).
  */
 @Singleton
 class HunterRumours @Inject constructor(private val objRepo: ObjRepository, private val random: GameRandom) {
@@ -101,7 +102,7 @@ class HunterRumours @Inject constructor(private val objRepo: ObjRepository, priv
         const val PITY = "varp.hunter_rumour_pity"
         const val COMPLETED = "varp.hunter_rumours_completed"
         const val FOUND_MESSAGE =
-            "<col=0dc10d>You find a rare piece of the creature! You should take it back to the Hunter Guild.</col>"
+            "<col=229628>You find a rare piece of the creature! You should take it back to the Hunter Guild.</col>"
         const val NO_RUMOUR_MESSAGE = "You don't have a rumour to investigate at the moment."
 
         /** Wiki: (Hunter level + 5) * modifier (50 novice/adept, 55 expert, 60 master). */

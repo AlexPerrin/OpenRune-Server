@@ -54,7 +54,9 @@ object HunterRumourHuntersTable {
  * [CREATURE] is the creature npc a catch reports; [RATE] and [PITY] are the rare-part chance (1 in
  * RATE) and the pity threshold; [HUNTERS] has bit n set when hunter n (see
  * [HunterRumourHuntersTable]) gives this rumour. [PART_TEXT] is the "bring back some of its ..."
- * wording (a guess except grey chinchompa "fur", from the wiki's whistle example).
+ * wording (a guess except grey chinchompa "fur", from the wiki's whistle example). Butterflies and
+ * moths: 1/40, pity 80 (wiki, since the 2024 change); moths only from the level they can be caught
+ * barehanded (75 sunlight, 85 moonlight, wiki), which is the [LEVEL] here.
  */
 object HunterRumoursTable {
     const val INDEX = 0
@@ -102,6 +104,11 @@ object HunterRumoursTable {
                 GILMAN or CERVUS or ORNUS or ACO or TECO or WOLF,
             ),
             Rumour("herbiboar", "herbiboar", "npc.fossil_herbiboar_visible", 80, "obj.hg_herbytuft", "fur", 7, 14, GILMAN or TECO or WOLF),
+            Rumour("sapphire_glacialis", "sapphire glacialis", "npc.butterfly_glacialis", 25, "obj.hg_butterflywing_blue", "wings", 40, 80, GILMAN),
+            Rumour("snowy_knight", "snowy knight", "npc.butterfly_snowy", 35, "obj.hg_butterflywing_white", "wings", 40, 80, GILMAN or ORNUS),
+            Rumour("black_warlock", "black warlock", "npc.butterfly_warlock", 45, "obj.hg_butterflywing_black", "wings", 40, 80, GILMAN or CERVUS),
+            Rumour("sunlight_moth", "sunlight moth", "npc.moth_sunlight", 75, "obj.hg_mothwing_sun", "wings", 40, 80, GILMAN or CERVUS or TECO),
+            Rumour("moonlight_moth", "moonlight moth", "npc.moth_moonlight", 85, "obj.hg_mothwing_moon", "wings", 40, 80, GILMAN or ACO or WOLF),
         )
 
     fun hunterRumours() =
