@@ -33,6 +33,8 @@ object TrailDataTables {
             2231 to "interface.trail_map06",
             2233 to "interface.trail_map11",
             2228 to "interface.trail_map18",
+            2232 to "interface.trail_map09",
+            2234 to "interface.trail_clue_easy_map006",
         )
 
     private val EMOTES =

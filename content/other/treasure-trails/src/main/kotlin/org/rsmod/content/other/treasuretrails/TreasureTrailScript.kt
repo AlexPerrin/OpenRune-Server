@@ -114,7 +114,7 @@ constructor(
 
     private fun ScriptContext.registerLocSteps() {
         val searches = TrailSteps.ALL.values.flatten().filterIsInstance<TrailStep.Search>()
-        for ((loc, op) in searches.flatMap { it.locs }.map { it.first }.toSet().mapNotNull { loc -> TrailSteps.searchOp(loc)?.let { loc to it } }) {
+        for ((loc, op) in searches.flatMap { it.locs }.map { it.first }.toSet().mapNotNull { loc -> TrailSteps.stepOp(loc)?.let { loc to it } }) {
             locOverrides.register(loc, op) { player, bound -> searchStep(player, loc, bound.coords) != null }
             onProtectedEvent<LocOverrideEvents.Op>(LocOverrideEvents.key(loc, op)) {
                 val step = searchStep(player, loc, it.loc.coords) ?: return@onProtectedEvent

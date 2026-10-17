@@ -144,7 +144,7 @@ object TrailSteps {
                         val loc = CluehelperTargetLocRow.getRow(it.id)
                         listOfNotNull(loc.loc.id to loc.coord, loc.fallbackLoc?.let { f -> f.id to loc.coord })
                     }
-                val searchable = locs.filter { searchOp(it.first) != null }
+                val searchable = locs.mapNotNull { (loc, coord) -> searchTarget(loc)?.let { it to coord } }.distinct()
                 if (searchable.isEmpty()) return null
                 TrailStep.Search(r.rowId, tier, r.clueText, searchable)
             }
@@ -156,9 +156,30 @@ object TrailSteps {
         }
     }
 
-    fun searchOp(loc: Int): InteractionOp? {
+    fun searchOp(loc: Int): InteractionOp? = op(loc, "Search")
+
+    /** The op that completes a search step on [loc]: Search, else Open (the Edgeville coffin). */
+    fun stepOp(loc: Int): InteractionOp? = searchOp(loc) ?: op(loc, "Open")
+
+    /**
+     * The loc a search step is done on: [loc] itself if it has Search, else its open variant
+     * (closed drawers, chests and wardrobes are opened first; the variant is named `<loc>open`,
+     * `<loc>_open` or with `closed` -> `open`), else [loc] if it only opens.
+     */
+    fun searchTarget(loc: Int): Int? {
+        if (searchOp(loc) != null) return loc
+        val name = dev.openrune.rscm.RSCM.getReverseMapping(RSCMType.LOC, loc)
+        val opened =
+            listOf("${name}open", "${name}_open", name.replace("closed", "open"))
+                .filter { it != name }
+                .mapNotNull { runCatching { it.asRSCM(RSCMType.LOC) }.getOrNull() }
+                .firstOrNull { searchOp(it) != null }
+        return opened ?: loc.takeIf { op(it, "Open") != null }
+    }
+
+    private fun op(loc: Int, name: String): InteractionOp? {
         val type = ServerCacheManager.getObject(loc) ?: return null
-        return InteractionOp.entries.firstOrNull { type.actions.getOpOrNull(it.slot - 1) == "Search" }
+        return InteractionOp.entries.firstOrNull { type.actions.getOpOrNull(it.slot - 1) == name }
     }
 
     private fun charlieTasks(tier: TrailTier): List<CharlieTask> =

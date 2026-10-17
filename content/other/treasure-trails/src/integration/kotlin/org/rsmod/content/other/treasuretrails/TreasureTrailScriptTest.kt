@@ -78,7 +78,10 @@ class TreasureTrailScriptTest {
         assertEquals(objs.size, objs.toSet().size)
         val counts = steps.groupingBy { it::class.simpleName }.eachCount()
         println("easy steps by kind: $counts")
-        assertTrue(steps.any { it is TrailStep.Search })
+        assertEquals(71, counts["Search"])
+        assertEquals(15, counts["Dig"])
+        val drawers = steps.filterIsInstance<TrailStep.Search>().first { "Falador's chain mail shop" in it.text!! }
+        assertEquals(listOf("loc.drawers1open".asRSCM(RSCMType.LOC)), drawers.locs.map { it.first })
         val music = steps.filterIsInstance<TrailStep.Music>()
         assertEquals(6, music.size)
         assertTrue(music.all { Regex("<col=ffffff>[A-Za-z !&',.]+</col>").containsMatchIn(it.text!!) })
