@@ -6,6 +6,7 @@ dependencies {
     implementation(projects.api.combat.combatManager)
     implementation(projects.api.player)
     implementation(projects.api.pluginCommons)
+    implementation(projects.content.interfaces.achievementDiary)
     implementation(projects.api.script)
     implementation(projects.api.spells)
     implementation(projects.api.spellsRunes)

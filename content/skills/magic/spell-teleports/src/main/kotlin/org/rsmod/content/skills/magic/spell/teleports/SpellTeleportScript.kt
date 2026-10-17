@@ -23,6 +23,7 @@ import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.script.onIfOverlayButton
 import org.rsmod.api.script.onPlayerQueueWithArgs
 import org.rsmod.api.spells.MagicSpellRegistry
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import org.rsmod.content.quest.manager.QuestRequirements
 import org.rsmod.game.inv.isType
 import org.rsmod.map.CoordGrid
@@ -95,6 +96,7 @@ constructor(
             return
         }
         telejump(CoordGrid(task.destination))
+        DiaryHooks.spellTeleport(player, task.teleport.name.lowercase())
         val endAnim = task.teleport.style.endAnim
         if (endAnim != null) anim(endAnim) else resetAnim()
         statAdvance("stat.magic", spell.castXp)

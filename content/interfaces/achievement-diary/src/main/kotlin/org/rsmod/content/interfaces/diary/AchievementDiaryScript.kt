@@ -5,12 +5,17 @@ import dev.openrune.definition.type.FontType
 import dev.openrune.definition.type.widget.IfEvent
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.types.aconverted.interf.IfButtonOp
+import org.rsmod.api.player.events.skilling.SkillingActionCompleteEvent
+import org.rsmod.api.player.events.skilling.SkillingActionContext
+import org.rsmod.api.player.events.skilling.SkillingProductSource
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.player.ui.ifSetEvents
 import org.rsmod.api.player.vars.VarPlayerIntMapSetter
+import org.rsmod.api.script.onEvent
 import org.rsmod.api.script.onIfClose
 import org.rsmod.api.script.onIfOpen
 import org.rsmod.api.script.onIfOverlayButton
+import org.rsmod.api.script.onPlayerLogin
 import org.rsmod.api.table.AchievementDiariesRow
 import org.rsmod.api.table.AchievementDiaryTasksRow
 import org.rsmod.plugin.scripts.PluginScript
@@ -21,8 +26,8 @@ import org.rsmod.plugin.scripts.ScriptContext
  * builds one entry per enum 595 area) opens the journal scroll (741) with the area's tasks per
  * tier. RuneLite's Diary Requirements plugin reads 741: the title must start with "Achievement
  * Diary", the first line names the diary ("Lumbridge & Draynor Tasks"), and it matches task lines
- * (joined across wrapped lines) against its own task texts. No task progress is tracked yet, so no
- * line is struck through.
+ * (joined across wrapped lines) against its own task texts. Done tasks ([DiaryTasks], Lumbridge &
+ * Draynor and Varrock only) are struck through line by line.
  *
  * As captured (rsprox, opening every diary from the tab): the rows get OP1 and OP2 (the client's
  * "Wiki"); opening sets `pagepos` to the line count and `busy`, runs script 6844, writes the title
@@ -36,6 +41,15 @@ class AchievementDiaryScript : PluginScript() {
     private val font: FontType by lazy { ServerCacheManager.getFont("font.p12_full".asRSCM())!! }
 
     override fun ScriptContext.startup() {
+        onPlayerLogin { DiaryTasks.sync(player) }
+        onEvent<SkillingActionCompleteEvent> {
+            val product = context as? SkillingActionContext.Product ?: return@onEvent
+            when (val source = product.source) {
+                is SkillingProductSource.Mining -> DiaryHooks.oreMined(player, product.item, source.rock.coords)
+                is SkillingProductSource.Woodcutting -> DiaryHooks.logsCut(player, product.item, source.tree.coords)
+                else -> Unit
+            }
+        }
         onIfOpen("interface.area_task") {
             player.ifSetEvents(TASKBOX, 0 until AREAS, IfEvent.Op1, IfEvent.Op2)
         }
@@ -51,7 +65,8 @@ class AchievementDiaryScript : PluginScript() {
             mes("That diary's journal isn't available yet.")
             return
         }
-        val shown = journalLines(diary).take(MAX_LINES)
+        val tracked = TRACKED_AREAS[diary.area]
+        val shown = journalLines(diary, doneTasks(tracked), tierComplete(tracked)).take(MAX_LINES)
         VarPlayerIntMapSetter.set(player, "varp.pagepos", shown.size)
         VarPlayerIntMapSetter.set(player, "varbit.busy", 1)
         runClientScript(JOURNAL_RESET)
@@ -59,6 +74,17 @@ class AchievementDiaryScript : PluginScript() {
         shown.forEachIndexed { index, line -> ifSetText("component.journalscroll:qj${index + 1}", line) }
         ifOpenMainModal(JOURNAL)
         runClientScript(JOURNAL_SCROLL_SETUP, 1, shown.size)
+    }
+
+    private fun ProtectedAccess.doneTasks(tracked: DiaryTasks.Area?): (Int, Int) -> Boolean {
+        tracked ?: return { _, _ -> false }
+        val done = DiaryTasks.Tier.entries.map { DiaryTasks.doneTasks(player, tracked, it) }
+        return { tier, task -> task in done[tier] }
+    }
+
+    private fun ProtectedAccess.tierComplete(tracked: DiaryTasks.Area?): (Int) -> Boolean {
+        tracked ?: return { false }
+        return { tier -> DiaryTasks.isTierComplete(player, tracked, DiaryTasks.Tier.entries[tier]) }
     }
 
     fun journalLines(
@@ -144,7 +170,21 @@ class AchievementDiaryScript : PluginScript() {
         val TIER_NAMES = listOf("Easy", "Medium", "Hard", "Elite")
         val TAG = Regex("<[^>]*>")
         val COLOUR_TAG = Regex("<col=[0-9a-f]{6}>")
+        val TRACKED_AREAS = mapOf(6 to DiaryTasks.Area.Lumbridge, 8 to DiaryTasks.Area.Varrock)
         val ELITE_STR = listOf("<str>", " ")
-        val LAYOUTS = mapOf(6 to JournalLayout(eliteBefore = ELITE_STR), 8 to JournalLayout(eliteBefore = ELITE_STR))
+
+        /** By enum 595 index; the rest use the default layout. */
+        val LAYOUTS =
+            mapOf(
+                0 to JournalLayout(afterHeader = "", before = listOf("<col=000000>"), after = listOf("")),
+                1 to JournalLayout(after = listOf(" ", " "), eliteAfter = listOf(" ")),
+                3 to JournalLayout(eliteBefore = ELITE_STR),
+                5 to JournalLayout(eliteBefore = ELITE_STR),
+                6 to JournalLayout(eliteBefore = ELITE_STR),
+                7 to JournalLayout(eliteBefore = ELITE_STR),
+                8 to JournalLayout(eliteBefore = ELITE_STR),
+                11 to
+                    JournalLayout(afterHeader = "", before = listOf(""), after = listOf(""), openSuffix = "</col>"),
+            )
     }
 }

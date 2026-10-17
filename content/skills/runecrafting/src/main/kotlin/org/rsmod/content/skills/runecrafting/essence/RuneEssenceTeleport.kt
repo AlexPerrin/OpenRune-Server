@@ -4,6 +4,7 @@ import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.player.output.soundSynth
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.script.onOpLoc1
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import org.rsmod.game.entity.Npc
 import org.rsmod.map.CoordGrid
 import org.rsmod.plugin.scripts.PluginScript
@@ -64,6 +65,7 @@ suspend fun Dialogue.teleportToRuneEssenceMine() {
     player.soundSynth("synth.curse_hit", delay = 15)
     delay(1)
     access.telejump(dest)
+    DiaryHooks.essenceMineTeleport(player, npc.type.internalName)
 }
 
 suspend fun Dialogue.teleportToMainLand() {

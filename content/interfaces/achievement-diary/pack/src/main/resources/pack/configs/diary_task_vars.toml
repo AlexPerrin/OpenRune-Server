@@ -1,0 +1,53 @@
+[[varp]]
+isServerOnly = true
+id = "varp.diary_tasks_lumbridge_easy"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.diary_tasks_lumbridge_medium"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.diary_tasks_lumbridge_hard"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.diary_tasks_lumbridge_elite"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.diary_tasks_varrock_easy"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.diary_tasks_varrock_medium"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.diary_tasks_varrock_hard"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.diary_tasks_varrock_elite"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.diary_progress_lumbridge"
+scope = "Perm"
+transmit = "Never"

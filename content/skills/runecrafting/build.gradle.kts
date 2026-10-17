@@ -9,6 +9,7 @@ dependencies {
     implementation(projects.api.invtx)
     implementation(projects.api.player)
     implementation(projects.api.pluginCommons)
+    implementation(projects.content.interfaces.achievementDiary)
     implementation(projects.api.registry)
     implementation(projects.api.script)
     implementation(projects.api.scriptAdvanced)

@@ -11,6 +11,7 @@ import org.rsmod.api.script.onPlayerQueueWithArgs
 import org.rsmod.api.stats.xpmod.XpModifiers
 import org.rsmod.api.table.FiremakingColoredLogsRow
 import org.rsmod.api.table.cooking.CookingFoodsRow
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import org.rsmod.content.quest.manager.QuestRequirements
 import org.rsmod.content.skills.Material
 import org.rsmod.content.skills.SkillMultiConfig
@@ -219,6 +220,8 @@ class CookingEvents @Inject constructor(
             val xpModifier = xpMods.get(player, "stat.cooking")
             statAdvance("stat.cooking", food.xp.toDouble() * xpModifier)
             mes("You successfully cook the ${food.raw.name}.")
+            val lumbridgeRange = surface is CookingSurface.Range && surface.rangeType == RangeType.LUMBRIDGE
+            DiaryHooks.cooked(player, food.cooked.internalName, lumbridgeRange)
         }
     }
 
