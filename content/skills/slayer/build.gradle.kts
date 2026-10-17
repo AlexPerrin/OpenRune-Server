@@ -1,6 +1,6 @@
 plugins {
     id("base-conventions")
-
+    id("integration-test-suite")
 }
 
 dependencies {
@@ -22,4 +22,11 @@ dependencies {
     implementation(projects.engine.game)
     implementation(projects.api.invtx)
     implementation(projects.content.skills.utils)
+}
+
+testing.suites.named<JvmTestSuite>("integration") {
+    dependencies {
+        implementation(projects.api.generated)
+        implementation(projects.api.player)
+    }
 }

@@ -124,20 +124,26 @@ object SlayerTaskManager {
 
         val master = getCurrentAssignedMaster(player) ?: return clearAssignedTask(player)
 
+        // As in OSRS, the completion message counts the streak ("N Wilderness
+        // tasks" for Krystilia), which is what RuneLite-style chat parsers read as the streak.
+        var shownTasks = totalTasksDone
+        var wildernessTask = false
         val pointsToAdd =
             if (MortimerAssignment.isMortimer(master)) {
                 MortimerAssignment.onTaskComplete(player)
             } else {
                 val streak =
                     if (isWildernessMaster(master)) {
-                        val next = player.vars["varbit.slayer_wildy_streak"] + 1
-                        VarPlayerIntMapSetter.set(player, "varbit.slayer_wildy_streak", next)
+                        val next = player.vars[VARBIT_WILDY_STREAK] + 1
+                        VarPlayerIntMapSetter.set(player, VARBIT_WILDY_STREAK, next)
+                        wildernessTask = true
                         next
                     } else {
-                        val next = player.vars["varbit.slayer_streak"] + 1
-                        VarPlayerIntMapSetter.set(player, "varbit.slayer_streak", next)
+                        val next = player.vars[VARBIT_STREAK] + 1
+                        VarPlayerIntMapSetter.set(player, VARBIT_STREAK, next)
                         next
                     }
+                shownTasks = streak
 
                 val basePoints = master.pointsPerTask
                 val multiplier = streakPointMultiplier(streak)
@@ -158,7 +164,8 @@ object SlayerTaskManager {
         }
 
         player.mes(
-            "You've completed $totalTasksDone task${if (totalTasksDone == 1) "" else "s"} and " +
+            "You've completed $shownTasks ${if (wildernessTask) "Wilderness " else ""}" +
+                "task${if (shownTasks == 1) "" else "s"} and " +
                 "received $pointsToAdd points, giving you a total of " +
                 "${player.vars["varbit.slayer_points"]}; return to a Slayer master.",
         )
@@ -277,12 +284,12 @@ object SlayerTaskManager {
         )
     }
 
-    fun slayerStreak(access: ProtectedAccess): Int = access.vars["varbit.slayer_streak"]
+    fun slayerStreak(access: ProtectedAccess): Int = access.vars[VARBIT_STREAK]
 
-    fun slayerWildyStreak(access: ProtectedAccess): Int = access.vars["varbit.slayer_wildy_streak"]
+    fun slayerWildyStreak(access: ProtectedAccess): Int = access.vars[VARBIT_WILDY_STREAK]
 
     fun setSlayerStreak(access: ProtectedAccess, value: Int) {
-        VarPlayerIntMapSetter.set(access.player, "varbit.slayer_streak", value)
+        VarPlayerIntMapSetter.set(access.player, VARBIT_STREAK, value)
     }
 
     fun rollAssignment(
@@ -636,7 +643,7 @@ object SlayerTaskManager {
         recordLastAssignment(player, master.masterId, task.task.id, assignedKonarArea, amount)
 
         if (master.masterId == TURAEL_MASTER_ID) {
-            VarPlayerIntMapSetter.set(player, "varbit.slayer_streak", 0)
+            VarPlayerIntMapSetter.set(player, VARBIT_STREAK, 0)
         }
     }
 
@@ -706,6 +713,11 @@ object SlayerTaskManager {
     private const val VARP_LAST_MASTER = "varp.slayer_last_master"
     private const val VARP_LAST_AREA = "varp.slayer_last_area"
     private const val VARBIT_TOTAL_TASKS_DONE = "varbit.slayer_total_tasks_done"
+
+    // The streaks live in the client-visible OSRS varbits, which RuneLite's
+    // Slayer plugin shows in its task tooltip (it was the server-only slayer_streak/_wildy_streak).
+    private const val VARBIT_STREAK = "varbit.slayer_tasks_completed"
+    private const val VARBIT_WILDY_STREAK = "varbit.slayer_wilderness_tasks_completed"
 
     const val BLOCKED_PREVIOUS_TASK_MESSAGE = "You could not be reassigned your previous Slayer task because you have blocked that task."
 

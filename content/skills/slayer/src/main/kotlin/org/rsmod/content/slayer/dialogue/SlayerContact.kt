@@ -6,13 +6,13 @@ import org.rsmod.content.slayer.core.MortimerAssignment
 import org.rsmod.content.slayer.core.MortimerModifiers
 import org.rsmod.content.slayer.core.SlayerTaskManager
 import org.rsmod.content.slayer.dialogue.GemContactDialogue.contact
+import org.rsmod.content.slayer.dialogue.KonarSlayerDialogueHelpers
 import org.rsmod.content.slayer.dialogue.SlayerMasterDialogue.chatMaster
 import org.rsmod.content.slayer.dialogue.StandardSlayerDialogue.openContact
 import org.rsmod.content.slayer.dialogue.masters.KonarDialogue.gemContact
 import org.rsmod.content.slayer.dialogue.masters.KonarDialogue.npcContactMenu
 import org.rsmod.content.slayer.dialogue.masters.KrystiliaDialogue.npcContactMenu as krystiliaNpcContactMenu
 import org.rsmod.content.slayer.dialogue.masters.MortimerDialogue.npcContactMenu as mortimerNpcContactMenu
-import org.rsmod.content.slayer.dialogue.KonarSlayerDialogueHelpers
 import org.rsmod.game.entity.Player
 import org.rsmod.map.zone.ZoneKey
 
@@ -54,18 +54,20 @@ object SlayerContact {
         }
 
         val count = vars["varp.slayer_count"]
+        // OSRS wording ("...; only N more to go."), which RuneLite's slayer
+        // gem regex (and plugins derived from it) parse; Konar's check also says "kill ... in ...".
         val master = SlayerTaskManager.getCurrentAssignedMaster(player)
         if (master?.masterId == SlayerMasters.TASK_KONAR) {
             val monster = KonarSlayerDialogueHelpers.monsterName(task)
             val area = KonarSlayerDialogueHelpers.currentArea(player)
                 ?.let { KonarSlayerDialogueHelpers.areaShortName(it) }
             if (area != null) {
-                mes("You're assigned to bring balance to $monster in $area; you have $count to go.")
+                mes("You're assigned to kill $monster in $area; only $count more to go.")
             } else {
-                mes("You're assigned to bring balance to $monster; you have $count to go.")
+                mes("You're assigned to kill $monster; only $count more to go.")
             }
         } else {
-            mes("You're assigned to kill ${task.nameUppercase}; you have $count to go.")
+            mes("You're assigned to kill ${task.nameUppercase}; only $count more to go.")
         }
 
         if (MortimerAssignment.isMortimer(master)) {
