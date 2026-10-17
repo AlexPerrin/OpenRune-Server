@@ -159,7 +159,8 @@ constructor(
             invAdd(inv, drop.obj, random.of(drop.min, drop.max))
         }
         statAdvance(HUNTER, creature.xp)
-        mes("You've caught ${creature.article} ${creature.name}.")
+        val caught = "You've caught ${creature.article} ${creature.name}"
+        mes(if (creature.npc == JERBOA) "$caught... or maybe not." else "$caught.")
         rumours.onCatch(player, creature.npc)
         return true
     }
@@ -356,6 +357,7 @@ constructor(
     companion object {
         const val HUNTER = "stat.hunter"
         const val TIMER = "timer.hunter_traps"
+        const val JERBOA = "npc.varlamore_hunterjerboa01"
         const val LAY_SEQ = "seq.hunting_setting_trap_small"
         const val LAY_TICKS = 3
         const val ATTEMPT_TICKS = 3

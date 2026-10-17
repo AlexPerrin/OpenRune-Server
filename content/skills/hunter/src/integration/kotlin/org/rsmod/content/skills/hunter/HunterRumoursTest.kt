@@ -39,7 +39,8 @@ class HunterRumoursTest {
             val cervus = rumours.hunters.first { it.name == "Cervus" }
             assertNull(rumours.assign(player, ornus))
             val first = checkNotNull(rumours.assign(player, gilman))
-            val novice53 = setOf("tropical wagtail", "sapphire glacialis", "snowy knight", "black warlock", "grey chinchompa")
+            val novice53 =
+                setOf("tropical wagtail", "sapphire glacialis", "snowy knight", "embertailed jerboa", "black warlock", "grey chinchompa")
             assertTrue(first.name in novice53, first.name)
             val grey = rumours.rumours.first { it.name == "grey chinchompa" }
             rumours.assign(player, gilman, grey)
@@ -94,7 +95,7 @@ class HunterRumoursTest {
         runInjectedGameTest(HunterRumours::class) { rumours ->
             prepare(level = 99)
             val wolf = rumours.hunters.first { it.name == "Wolf" }
-            val red = rumours.rumours.first { it.name == "carnivorous chinchompa" }
+            val red = rumours.rumours.first { it.name == "red chinchompa" }
             rumours.assign(player, wolf, red)
             assertFalse(rumours.turnIn(player, wolf), "no part yet")
             fillInventory()
@@ -107,6 +108,24 @@ class HunterRumoursTest {
             assertFalse(rumours.turnIn(player, wolf))
             assertEquals(1, player.inv.count("obj.hg_lootsack_t3"))
             assertNull(rumours.rumourOf(player, wolf))
+        }
+
+    @Test
+    fun GameTestState.`with back-to-back off the rumour just handed in is not offered again`() =
+        runInjectedGameTest(HunterRumours::class) { rumours ->
+            prepare(level = 99)
+            val wolf = rumours.hunters.first { it.name == "Wolf" }
+            val red = rumours.rumours.first { it.name == "red chinchompa" }
+            org.rsmod.api.player.vars.VarPlayerIntMapSetter.set(player, HunterRumours.BACK_TO_BACK, HunterRumours.BACK_TO_BACK_OFF)
+            rumours.assign(player, wolf, red)
+            player.inv[0] = InvObj(RED_PART.asRSCM(RSCMType.OBJ), 1)
+            assertTrue(rumours.turnIn(player, wolf))
+            repeat(20) {
+                val next = checkNotNull(rumours.assign(player, wolf))
+                assertTrue(next != red, next.name)
+            }
+            org.rsmod.api.player.vars.VarPlayerIntMapSetter.set(player, HunterRumours.BACK_TO_BACK, 0)
+            assertEquals(red, rumours.assign(player, wolf, red))
         }
 
     private fun GameTestScope.fillInventory() {

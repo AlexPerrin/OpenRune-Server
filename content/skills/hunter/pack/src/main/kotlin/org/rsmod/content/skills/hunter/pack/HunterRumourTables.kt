@@ -56,7 +56,9 @@ object HunterRumourHuntersTable {
  * [HunterRumourHuntersTable]) gives this rumour. [PART_TEXT] is the "bring back some of its ..."
  * wording (a guess except grey chinchompa "fur", from the wiki's whistle example). Butterflies and
  * moths: 1/40, pity 80 (wiki, since the 2024 change); moths only from the level they can be caught
- * barehanded (75 sunlight, 85 moonlight, wiki), which is the [LEVEL] here.
+ * barehanded (75 sunlight, 85 moonlight, wiki), which is the [LEVEL] here. [NAME] is the wiki's
+ * rumour name (the carnivorous chinchompa is the "red chinchompa"), which the dialogues say and the
+ * Hunter Rumours plugin looks for.
  */
 object HunterRumoursTable {
     const val INDEX = 0
@@ -94,7 +96,7 @@ object HunterRumoursTable {
             Rumour("grey_chinchompa", "grey chinchompa", "npc.hunting_chinchompa", 53, "obj.hg_chinchompatuft", "fur", 50, 100, GILMAN or CERVUS or ACO or TECO),
             Rumour(
                 "carnivorous_chinchompa",
-                "carnivorous chinchompa",
+                "red chinchompa",
                 "npc.hunting_chinchompa_big",
                 63,
                 "obj.hg_chinchompatuft_red",
@@ -108,6 +110,7 @@ object HunterRumoursTable {
             Rumour("snowy_knight", "snowy knight", "npc.butterfly_snowy", 35, "obj.hg_butterflywing_white", "wings", 40, 80, GILMAN or ORNUS),
             Rumour("black_warlock", "black warlock", "npc.butterfly_warlock", 45, "obj.hg_butterflywing_black", "wings", 40, 80, GILMAN or CERVUS),
             Rumour("sunlight_moth", "sunlight moth", "npc.moth_sunlight", 75, "obj.hg_mothwing_sun", "wings", 40, 80, GILMAN or CERVUS or TECO),
+            Rumour("embertailed_jerboa", "embertailed jerboa", "npc.varlamore_hunterjerboa01", 39, "obj.hg_jerboatail_large", "tail", 50, 100, GILMAN or ORNUS),
             Rumour("moonlight_moth", "moonlight moth", "npc.moth_moonlight", 85, "obj.hg_mothwing_moon", "wings", 40, 80, GILMAN or ACO or WOLF),
         )
 
