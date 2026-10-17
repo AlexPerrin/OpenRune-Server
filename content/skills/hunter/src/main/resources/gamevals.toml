@@ -1,5 +1,6 @@
 [gamevals.dbtable]
 impling_types = 60000
+birdhouse_types = 60001
 
 [gamevals.dbrow]
 impling_type_baby = 60124
@@ -13,3 +14,12 @@ impling_type_magpie = 60131
 impling_type_ninja = 60132
 impling_type_dragon = 60133
 impling_type_lucky = 60134
+birdhouse_type_normal = 60140
+birdhouse_type_oak = 60141
+birdhouse_type_willow = 60142
+birdhouse_type_teak = 60143
+birdhouse_type_maple = 60144
+birdhouse_type_mahogany = 60145
+birdhouse_type_yew = 60146
+birdhouse_type_magic = 60147
+birdhouse_type_redwood = 60148
