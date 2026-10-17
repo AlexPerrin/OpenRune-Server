@@ -43,6 +43,7 @@ hunter_trap_creature_ferret = 60179
 hunter_trap_creature_chinchompa = 60180
 hunter_trap_creature_chinchompa_big = 60181
 hunter_trap_creature_chinchompa_black = 60182
+hunter_trap_creature_jerboa = 60183
 herbiboar_leg_0 = 60184
 herbiboar_leg_1 = 60185
 herbiboar_leg_2 = 60186
@@ -152,6 +153,7 @@ hunter_rumour_snowy_knight = 60289
 hunter_rumour_black_warlock = 60290
 hunter_rumour_sunlight_moth = 60291
 hunter_rumour_moonlight_moth = 60292
+hunter_rumour_embertailed_jerboa = 60293
 
 [gamevals.timer]
 hunter_traps = 436

@@ -23,6 +23,8 @@ import org.rsmod.game.entity.Player
  *   pity threshold. No part while any rare part is held. A full inventory drops a rolled part and
  *   destroys a pity part (wiki).
  * - Turning in takes the part and gives (Hunter level + 5) * modifier XP and the tier's loot sack.
+ * - With back-to-back rumours off (Verity's Rumour-settings; `hunter_rumour_back_to_back` = 1) the
+ *   rumour last handed in (`hunter_rumour_last`) is not offered again.
  *
  * Deviation: only creatures this server can catch are assigned (wagtail, grey and carnivorous
  * chinchompas, herbiboar, and the net-caught sapphire glacialis, snowy knight, black warlock,
@@ -48,9 +50,11 @@ class HunterRumours @Inject constructor(private val objRepo: ObjRepository, priv
         val level = player.statBase(HUNTER)
         if (level < hunter.level) return null
         val taken = hunters.filter { it != hunter }.mapNotNull { rumourOf(player, it)?.index }.toSet()
+        val repeat = if (player.vars[BACK_TO_BACK] == BACK_TO_BACK_OFF) player.vars[LAST] else -1
         val options =
             rumours.filter {
-                it.hunters and (1 shl hunter.index) != 0 && level >= it.level && it.index !in taken
+                it.hunters and (1 shl hunter.index) != 0 && level >= it.level && it.index !in taken &&
+                    it.index != repeat
             }
         val rumour = forced?.takeIf { it in options } ?: options.randomOrNull() ?: return null
         VarPlayerIntMapSetter.set(player, hunterVarp(hunter), rumour.index)
@@ -58,6 +62,15 @@ class HunterRumours @Inject constructor(private val objRepo: ObjRepository, priv
         VarPlayerIntMapSetter.set(player, PITY, 0)
         return rumour
     }
+
+    /** Makes [hunter] the current hunter again, for their unfinished rumour. */
+    fun resume(player: Player, hunter: HunterRumourHuntersRow) {
+        if (rumourOf(player, hunter) == null) return
+        VarPlayerIntMapSetter.set(player, CURRENT, hunter.index + 1)
+    }
+
+    fun hasPart(player: Player, hunter: HunterRumourHuntersRow): Boolean =
+        rumourOf(player, hunter)?.let { it.part.internalName in player.inv } ?: false
 
     /** Called for every successful catch of [creature] (a creature npc's internal name). */
     fun onCatch(player: Player, creature: String) {
@@ -81,6 +94,7 @@ class HunterRumours @Inject constructor(private val objRepo: ObjRepository, priv
         VarPlayerIntMapSetter.set(player, hunterVarp(hunter), 0)
         if (player.vars[CURRENT] == hunter.index + 1) VarPlayerIntMapSetter.set(player, CURRENT, 0)
         VarPlayerIntMapSetter.set(player, COMPLETED, player.vars[COMPLETED] + 1)
+        VarPlayerIntMapSetter.set(player, LAST, rumour.index)
         player.statAdvance(HUNTER, turnInXp(player.statBase(HUNTER), hunter.modifier).toDouble())
         player.invAddOrDrop(objRepo, hunter.lootSack.internalName)
         return true
@@ -101,6 +115,10 @@ class HunterRumours @Inject constructor(private val objRepo: ObjRepository, priv
         const val CURRENT = "varp.hunter_rumour_current"
         const val PITY = "varp.hunter_rumour_pity"
         const val COMPLETED = "varp.hunter_rumours_completed"
+        const val UNLOCKED = "varp.hunter_rumour_unlocked"
+        const val BACK_TO_BACK = "varp.hunter_rumour_back_to_back"
+        const val BACK_TO_BACK_OFF = 1
+        const val LAST = "varp.hunter_rumour_last"
         const val FOUND_MESSAGE =
             "<col=229628>You find a rare piece of the creature! You should take it back to the Hunter Guild.</col>"
         const val NO_RUMOUR_MESSAGE = "You don't have a rumour to investigate at the moment."

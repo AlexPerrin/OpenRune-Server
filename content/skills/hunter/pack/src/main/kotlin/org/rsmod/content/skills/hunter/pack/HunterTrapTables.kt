@@ -116,6 +116,7 @@ object HunterTrapCreaturesTable {
             bird("cerulean_twitch", "cerulean twitch", "npc.hunting_bird_polar", 11, 646, "polar", "obj.hunting_polar_feather"),
             bird("tropical_wagtail", "tropical wagtail", "npc.multicoloured_bird", 19, 950, "coloured", "obj.hunting_stripy_bird_feather"),
             boxed("ferret", "ferret", "npc.hunting_ferret", 27, 1150, "obj.hunting_ferret"),
+            boxed("jerboa", "embertailed jerboa", "npc.varlamore_hunterjerboa01", 39, 1370, "obj.hunting_jerboa_tail"),
             boxed("chinchompa", "chinchompa", "npc.hunting_chinchompa", 53, 1984, "obj.chinchompa_captured"),
             boxed("chinchompa_big", "carnivorous chinchompa", "npc.hunting_chinchompa_big", 63, 2650, "obj.chinchompa_big_captured"),
             boxed("chinchompa_black", "black chinchompa", "npc.hunting_chinchompa_black", 73, 3150, "obj.chinchompa_black"),
