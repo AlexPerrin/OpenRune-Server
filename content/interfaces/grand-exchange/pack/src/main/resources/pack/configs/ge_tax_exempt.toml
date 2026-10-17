@@ -1,0 +1,61 @@
+# Grand Exchange items exempt from the 2% tax.
+# Source: Old School RuneScape Wiki, "Grand Exchange", section "Exempt from tax"
+# (https://oldschool.runescape.wiki/w/Grand_Exchange#Exempt_from_tax, as of 17 October 2026),
+# by the wiki's contributors, licensed CC BY-NC-SA 3.0 (https://creativecommons.org/licenses/by-nc-sa/3.0/).
+# Changes: names matched to tradeable unnoted obj symbols; "Energy potion" taken as all four doses.
+# This file is under CC BY-NC-SA 3.0, not the project licence.
+[[enum]]
+isServerOnly = true
+id = "enum.ge_tax_exempt"
+keyType = "OBJ"
+valueType = "INT"
+
+[enum.values]
+"obj.pestle_and_mortar" = 1
+"obj.shrimp" = 1
+"obj.salmon" = 1
+"obj.herring" = 1
+"obj.pike" = 1
+"obj.mackerel" = 1
+"obj.tuna" = 1
+"obj.bass" = 1
+"obj.lobster" = 1
+"obj.mindrune" = 1
+"obj.bronze_dart" = 1
+"obj.iron_dart" = 1
+"obj.steel_dart" = 1
+"obj.bronze_arrow" = 1
+"obj.iron_arrow" = 1
+"obj.steel_arrow" = 1
+"obj.spade" = 1
+"obj.needle" = 1
+"obj.shears" = 1
+"obj.chisel" = 1
+"obj.glassblowingpipe" = 1
+"obj.cake" = 1
+"obj.cooked_chicken" = 1
+"obj.cooked_meat" = 1
+"obj.bread" = 1
+"obj.meat_pie" = 1
+"obj.hammer" = 1
+"obj.ring_of_dueling_8" = 1
+"obj.4dose1energy" = 1
+"obj.3dose1energy" = 1
+"obj.2dose1energy" = 1
+"obj.1dose1energy" = 1
+"obj.necklace_of_minigames_8" = 1
+"obj.gardening_trowel" = 1
+"obj.secateurs" = 1
+"obj.watering_can_0" = 1
+"obj.rake" = 1
+"obj.dibber" = 1
+"obj.poh_tablet_varrockteleport" = 1
+"obj.poh_tablet_lumbridgeteleport" = 1
+"obj.poh_tablet_faladorteleport" = 1
+"obj.poh_tablet_camelotteleport" = 1
+"obj.poh_tablet_ardougneteleport" = 1
+"obj.poh_tablet_teleporttohouse" = 1
+"obj.poh_saw" = 1
+"obj.osrs_bond" = 1
+"obj.poh_tablet_kourendteleport" = 1
+"obj.poh_tablet_fortisteleport" = 1
