@@ -59,6 +59,11 @@ object GrandExchange {
     /** How often a limit-blocked offer looks again (100 ticks = 1 minute). */
     const val LIMIT_RECHECK = 100
 
+    const val HISTORY_SIZE = 40
+
+    /** Bit set in `ge_historyN_obj` for a sale (the low bits hold obj + 1). */
+    private const val HISTORY_SOLD_BIT = 1 shl 30
+
     const val LIMIT_WINDOW_MINUTES = 240
     const val LIMIT_TRACKERS = 16
     const val LOGOUT_VARP = "varp.ge_logout_minute"
@@ -245,6 +250,41 @@ object GrandExchange {
         set(player, limitVarp(index, "bought"), count)
     }
 
+    data class Trade(val item: Int, val sold: Boolean, val count: Int, val gold: Int, val tax: Int)
+
+    private fun historyVarp(index: Int, field: String) = "varp.ge_history${index}_$field"
+
+    /** The trade history, newest first. */
+    fun history(player: Player): List<Trade> =
+        (0 until HISTORY_SIZE).mapNotNull { i ->
+            val obj = player.vars[historyVarp(i, "obj")]
+            if (obj == 0) return@mapNotNull null
+            Trade(
+                item = (obj and HISTORY_SOLD_BIT.inv()) - 1,
+                sold = obj and HISTORY_SOLD_BIT != 0,
+                count = player.vars[historyVarp(i, "count")],
+                gold = player.vars[historyVarp(i, "gold")],
+                tax = player.vars[historyVarp(i, "tax")],
+            )
+        }
+
+    /** Adds a finished offer with at least one item traded to the front of the history. */
+    fun recordHistory(player: Player, offer: Offer) {
+        if (offer.done <= 0) return
+        val tax = if (offer.sell) offer.done * taxPerItem(offer.gold / offer.done) else 0
+        val entries =
+            listOf(Trade(offer.item, offer.sell, offer.done, offer.gold, tax)) +
+                history(player).take(HISTORY_SIZE - 1)
+        for (i in 0 until HISTORY_SIZE) {
+            val trade = entries.getOrNull(i)
+            val obj = trade?.let { (it.item + 1) or (if (it.sold) HISTORY_SOLD_BIT else 0) } ?: 0
+            set(player, historyVarp(i, "obj"), obj)
+            set(player, historyVarp(i, "count"), trade?.count ?: 0)
+            set(player, historyVarp(i, "gold"), trade?.gold ?: 0)
+            set(player, historyVarp(i, "tax"), trade?.tax ?: 0)
+        }
+    }
+
     fun stepSize(count: Int): Int = ((count + FILL_STEPS - 1) / FILL_STEPS).coerceAtLeast(1)
 
     sealed interface StepResult {
@@ -304,7 +344,9 @@ object GrandExchange {
         val done = offer.done + amount
         val finished = done >= offer.count
         val status = if (finished) finishedStatus(offer.sell) else offer.status
-        store(player, offer.copy(done = done, gold = offer.gold + gold, status = status))
+        val updated = offer.copy(done = done, gold = offer.gold + gold, status = status)
+        store(player, updated)
+        if (finished) recordHistory(player, updated)
         if (!announce) return StepResult.Filled
         sendSlot(player, offer.slot)
         val verb = if (offer.sell) "selling" else "buying"
@@ -345,8 +387,10 @@ object GrandExchange {
         } else {
             addTo(inv, 1, coinsId, (offer.count - offer.done) * offer.price)
         }
-        store(player, offer.copy(status = finishedStatus(offer.sell)))
+        val aborted = offer.copy(status = finishedStatus(offer.sell))
+        store(player, aborted)
         sendSlot(player, slot)
+        recordHistory(player, aborted)
         return true
     }
 
