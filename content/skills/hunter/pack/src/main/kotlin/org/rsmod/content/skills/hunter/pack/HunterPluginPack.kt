@@ -4,5 +4,5 @@ import dev.openrune.definition.dbtables.DBTable
 import dev.openrune.pack.PluginPack
 
 class HunterPluginPack : PluginPack() {
-    override fun dbTables(): List<DBTable> = listOf(ImplingTypesTable.implingTypes())
+    override fun dbTables(): List<DBTable> = listOf(ImplingTypesTable.implingTypes(), BirdHouseTypesTable.birdHouseTypes())
 }
