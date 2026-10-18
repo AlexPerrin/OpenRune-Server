@@ -1,14 +1,18 @@
 package org.rsmod.api.registry.zone
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
+import jakarta.inject.Inject
 import net.rsprot.protocol.message.ZoneProt
+import org.rsmod.game.MapClock
 import org.rsmod.game.loc.LocInfo
 import org.rsmod.game.obj.Obj
 import org.rsmod.game.proj.ProjAnim
 import org.rsmod.map.CoordGrid
 import org.rsmod.map.zone.ZoneKey
 
-public class ZoneUpdateMap {
+public class ZoneUpdateMap @Inject constructor(private val mapClock: MapClock) {
+    public constructor() : this(MapClock())
+
     public val updatedZones: Int2ObjectOpenHashMap<ZoneUpdateList> = Int2ObjectOpenHashMap()
 
     public fun clear() {
@@ -41,9 +45,9 @@ public class ZoneUpdateMap {
 
     private fun Obj.resolveObjAddProt(): ZoneProt =
         if (isPublic) {
-            ZoneUpdateTransformer.toPublicObjAddProt(this)
+            ZoneUpdateTransformer.toPublicObjAddProt(this, mapClock.cycle)
         } else {
-            ZoneUpdateTransformer.toPrivateObjAddProt(this)
+            ZoneUpdateTransformer.toPrivateObjAddProt(this, mapClock.cycle)
         }
 
     public fun objDel(obj: Obj) {
@@ -68,7 +72,7 @@ public class ZoneUpdateMap {
 
     public fun objReveal(obj: Obj) {
         val updates = obj.coords.getOrPutUpdateList()
-        val prot = ZoneUpdateTransformer.toObjRevealProt(obj)
+        val prot = ZoneUpdateTransformer.toObjRevealProt(obj, mapClock.cycle)
         updates += prot
     }
 

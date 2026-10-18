@@ -60,24 +60,51 @@ public object ZoneUpdateTransformer {
         return LocAnim(seq, zoneGrid.x, zoneGrid.z, loc.shapeId, loc.angleId)
     }
 
-    public fun toPersistentObjAdd(obj: Obj, observerId: Long?): ZoneProt? =
+    public fun toPersistentObjAdd(obj: Obj, observerId: Long?, cycle: Int): ZoneProt? =
         if (obj.isVisibleTo(observerId)) {
-            val zoneGrid = ZoneGrid.from(obj.coords)
-            ObjAdd(obj.type, obj.count, zoneGrid.x, zoneGrid.z, OpFlags.ALL_SHOWN)
+            obj.toObjAdd(cycle, obj.ownershipFor(observerId))
         } else {
             null
         }
 
-    public fun toPublicObjAddProt(obj: Obj): ZoneProt {
-        val zoneGrid = ZoneGrid.from(obj.coords)
-        return ObjAdd(obj.type, obj.count, zoneGrid.x, zoneGrid.z, OpFlags.ALL_SHOWN)
+    public fun toPublicObjAddProt(obj: Obj, cycle: Int): ZoneProt =
+        obj.toObjAdd(cycle, OWNERSHIP_NONE)
+
+    public fun toPrivateObjAddProt(obj: Obj, cycle: Int): ZoneProt =
+        ObjAddPrivate(obj.copy(), obj.toObjAdd(cycle, OWNERSHIP_SELF))
+
+    /**
+     * OBJ_ADD with the obj's remaining public and despawn cycles and its ownership as seen by the
+     * receiving player (0 none, 1 self, 2 other player; rsprot's `ObjAdd` table). Zeros mean "no
+     * timer", as for permanent spawns.
+     */
+    private fun Obj.toObjAdd(cycle: Int, ownership: Int): ObjAdd {
+        val zoneGrid = ZoneGrid.from(coords)
+        val neverPublic = isPrivate && revealCycle == Obj.NEVER
+        val untilPublic = if (isPrivate && !neverPublic) remaining(revealCycle, cycle) else 0
+        val untilDespawn = if (despawnCycle == Obj.NEVER) 0 else remaining(despawnCycle, cycle)
+        return ObjAdd(
+            type,
+            count,
+            zoneGrid.x,
+            zoneGrid.z,
+            OpFlags.ALL_SHOWN,
+            timeUntilPublic = untilPublic,
+            timeUntilDespawn = untilDespawn,
+            ownershipType = ownership,
+            neverBecomesPublic = neverPublic,
+        )
     }
 
-    public fun toPrivateObjAddProt(obj: Obj): ZoneProt {
-        val zoneGrid = ZoneGrid.from(obj.coords)
-        val prot = ObjAdd(obj.type, obj.count, zoneGrid.x, zoneGrid.z, OpFlags.ALL_SHOWN)
-        return ObjAddPrivate(obj.copy(), prot)
-    }
+    private fun remaining(target: Int, cycle: Int): Int = (target - cycle).coerceIn(0, MAX_TIMER)
+
+    private fun Obj.ownershipFor(observerId: Long?): Int =
+        when {
+            isPrivate -> OWNERSHIP_SELF
+            nullableOwnerId == null -> OWNERSHIP_NONE
+            nullableOwnerId == observerId -> OWNERSHIP_SELF
+            else -> OWNERSHIP_OTHER
+        }
 
     public fun toPublicObjDelProt(obj: Obj): ZoneProt {
         val zoneGrid = ZoneGrid.from(obj.coords)
@@ -96,10 +123,9 @@ public object ZoneUpdateTransformer {
         return ObjCountPrivate(obj.copy(), prot)
     }
 
-    public fun toObjRevealProt(obj: Obj): ZoneProt {
-        val zoneGrid = ZoneGrid.from(obj.coords)
-        val prot = ObjAdd(obj.type, obj.count, zoneGrid.x, zoneGrid.z, OpFlags.ALL_SHOWN)
-        return ObjReveal(obj.copy(), prot)
+    public fun toObjRevealProt(obj: Obj, cycle: Int): ZoneProt {
+        val ownership = if (obj.nullableOwnerId == null) OWNERSHIP_NONE else OWNERSHIP_OTHER
+        return ObjReveal(obj.copy(), obj.toObjAdd(cycle, ownership))
     }
 
     public fun toSoundAreaProt(
@@ -138,7 +164,16 @@ public object ZoneUpdateTransformer {
         )
     }
 
-    private fun Obj.copy(): Obj = Obj(coords, entity, creationCycle, receiverId)
+    private fun Obj.copy(): Obj =
+        Obj(coords, entity, creationCycle, receiverId, ownerId).also {
+            it.despawnCycle = despawnCycle
+            it.revealCycle = revealCycle
+        }
+
+    private const val OWNERSHIP_NONE = 0
+    private const val OWNERSHIP_SELF = 1
+    private const val OWNERSHIP_OTHER = 2
+    private const val MAX_TIMER = 0xFFFF
 
     public interface PartialFollowsZoneProt : ZoneProt {
         public val backing: ZoneProt

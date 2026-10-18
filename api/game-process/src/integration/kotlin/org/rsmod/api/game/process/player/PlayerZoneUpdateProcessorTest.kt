@@ -29,6 +29,7 @@ import org.rsmod.api.testing.factory.stackable1
 import org.rsmod.api.testing.factory.standard1
 import org.rsmod.api.testing.scope.BasicGameTestScope
 import org.rsmod.api.utils.zone.SharedZoneEnclosedBuffers
+import org.rsmod.game.MapClock
 import org.rsmod.game.loc.LocEntity
 import org.rsmod.game.loc.LocInfo
 import org.rsmod.game.loc.LocZoneKey
@@ -277,7 +278,7 @@ class PlayerZoneUpdateProcessorTest {
         val sharedEnclosed = SharedZoneEnclosedBuffers(zoneUpdates, enclosedCache)
         val locRegistry = LocRegistry(locZones, normalLocReg, regionLocReg)
         val processor =
-            PlayerZoneUpdateProcessor(zoneUpdates, locRegistry, objRegistry, sharedEnclosed)
+            PlayerZoneUpdateProcessor(zoneUpdates, locRegistry, objRegistry, sharedEnclosed, MapClock())
         return ZoneProcessParams(
             collision,
             locZones,

@@ -31,6 +31,7 @@ constructor(private val mapClock: MapClock, private val registry: ObjRegistry) {
 
     private fun register(obj: Obj, duration: Int, reveal: Int): ObjRegistryResult.Add {
         require(obj.count > 0) { "Obj must have a `count` higher than 0: $obj" }
+        obj.assignCycles(duration, reveal)
         val register = registry.add(obj)
         when (register) {
             // TODO: Check how the duration is supposed to be calculated. Does it take the
@@ -135,10 +136,21 @@ constructor(private val mapClock: MapClock, private val registry: ObjRegistry) {
         addDurations.add(objDuration)
     }
 
+    private fun Obj.assignCycles(duration: Int, reveal: Int) {
+        despawnCycle = if (duration == Int.MAX_VALUE) Obj.NEVER else mapClock + duration
+        revealCycle =
+            if (!isPrivate || reveal == Int.MAX_VALUE || reveal >= duration) {
+                Obj.NEVER
+            } else {
+                mapClock + reveal
+            }
+    }
+
     private fun updateDurations(obj: Obj, newDuration: Int, newReveal: Int) {
         if (newDuration == Int.MAX_VALUE) {
             return
         }
+        obj.assignCycles(newDuration, newReveal)
         val oldDuration = addDurations.firstOrNull { it.obj === obj } ?: return
         oldDuration.triggerCycle = mapClock + newDuration
         oldDuration.revealCycle = mapClock + newReveal

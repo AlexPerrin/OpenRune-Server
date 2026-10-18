@@ -80,6 +80,12 @@ public class Obj(
     public val nullableReceiverId: Long?
         get() = if (receiverId == NULL_OBSERVER_ID) null else receiverId
 
+    /** The map clock cycle at which the obj is removed, or [NEVER] (it stays until taken). */
+    public var despawnCycle: Int = NEVER
+
+    /** The map clock cycle at which a private obj turns public, or [NEVER]. */
+    public var revealCycle: Int = NEVER
+
     /**
      * Provides a nullable representation of the [ownerId] to distinguish between the original owner
      * of the obj as opposed to the [receiverId].
@@ -131,6 +137,8 @@ public class Obj(
 
     public companion object {
         public const val NULL_OBSERVER_ID: Long = Long.MIN_VALUE
+
+        public const val NEVER: Int = -1
 
         // TODO: Need to investigate certain interactions when it comes to ironman in pvp.
         //  - Can they pick up any of their death pile loot if the killer does not take it and

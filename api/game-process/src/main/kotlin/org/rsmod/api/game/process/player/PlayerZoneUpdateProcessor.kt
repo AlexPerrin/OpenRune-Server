@@ -14,6 +14,7 @@ import org.rsmod.api.registry.zone.ZoneUpdateMap
 import org.rsmod.api.registry.zone.ZoneUpdateTransformer
 import org.rsmod.api.utils.map.BuildAreaUtils
 import org.rsmod.api.utils.zone.SharedZoneEnclosedBuffers
+import org.rsmod.game.MapClock
 import org.rsmod.game.entity.Player
 import org.rsmod.game.loc.LocInfo
 import org.rsmod.game.obj.Obj
@@ -27,6 +28,7 @@ constructor(
     private val locReg: LocRegistry,
     private val objReg: ObjRegistry,
     private val enclosedBuffers: SharedZoneEnclosedBuffers,
+    private val mapClock: MapClock,
 ) {
     public fun computeEnclosedBuffers() {
         enclosedBuffers.computeSharedBuffers()
@@ -128,7 +130,8 @@ constructor(
     ) {
         val updates = ArrayList<ZoneProt>()
         for (obj in objs) {
-            val prot = ZoneUpdateTransformer.toPersistentObjAdd(obj, observerId) ?: continue
+            val prot = ZoneUpdateTransformer.toPersistentObjAdd(obj, observerId, mapClock.cycle)
+                    ?: continue
             updates += prot
         }
         if (updates.isNotEmpty()) {
