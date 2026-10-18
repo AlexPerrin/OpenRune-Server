@@ -42,7 +42,7 @@ constructor(
 
     override fun ScriptContext.startup() {
         onOpNpc1(FLUFFS) { handle(it.npc) }
-        onOpNpc3(FLUFFS) { handle(it.npc) }
+        onOpNpc3(FLUFFS) { stroke(it.npc) }
         onOpNpc4(FLUFFS) { talkTo(it.npc) }
         onOpNpcU(FLUFFS) { useItem(it.npc, it.objType, it.invSlot) }
     }
@@ -86,6 +86,27 @@ constructor(
                 else -> "The cat seems afraid to leave. In the distance you can hear kittens mewing..."
             }
         )
+    }
+
+    /*
+     * Stroke (op 3). The wiki transcript gives only the line before the milk ("Perhaps the cat wants
+     * something?"); using it for every stage before the kitten is returned is a guess.
+     */
+    private suspend fun ProtectedAccess.stroke(npc: Npc) {
+        approach(npc)
+        if (gertrudesCat.stage(player) >= STAGE_KITTEN_RETURNED) {
+            npc.say("Purr...")
+            soundSynth(PURR_SOUND)
+            mes("Fluffs purrs contentedly.")
+            return
+        }
+        npc.anim("seq.cat_archback")
+        npc.say("Hisss!")
+        soundSynth(HISS_SOUND)
+        delay(1)
+        say("Ouch!")
+        delay(1)
+        mes("Perhaps the cat wants something?")
     }
 
     private suspend fun ProtectedAccess.useItem(npc: Npc, objType: ItemServerType, slot: Int) {
@@ -198,6 +219,12 @@ constructor(
         val HOME_TILE = CoordGrid(3309, 3510, 1)
 
         const val KITTEN_VISIBLE_TICKS = 20
-        const val FLUFFS_AWAY_TICKS = 100
+
+        /*
+         * Fluffs is one shared npc and the cache has no multinpc for her (3497 has no multivarbit or
+         * transforms), so the "ran off home" hide is seen by everyone. Kept short so another player
+         * on the quest is not blocked for long; OSRS's own respawn delay is unknown (guess).
+         */
+        const val FLUFFS_AWAY_TICKS = 10
     }
 }
