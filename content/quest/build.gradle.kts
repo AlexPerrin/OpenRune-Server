@@ -12,6 +12,7 @@ dependencies {
     implementation(projects.content.other.sawmill)
     implementation(projects.api.pluginCommons)
     implementation(projects.api.attr)
+    implementation(projects.api.death)
     implementation(projects.api.serverConfig)
     implementation(libs.rsprot.api)
 }
