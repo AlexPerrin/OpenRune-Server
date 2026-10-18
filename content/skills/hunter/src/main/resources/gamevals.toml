@@ -17,6 +17,8 @@ herbiboar_herbs = 56009
 hunter_butterflies = 56012
 
 # rumours
+hunter_rumour_hunters = 56010
+hunter_rumours = 56011
 
 [gamevals.dbrow]
 # implings
@@ -136,6 +138,22 @@ hunter_butterfly_moonlight_moth = 60286
 hunter_butterfly_moonlight_moth_low_wander = 60287
 
 # rumours
+hunter_rumour_hunter_gilman = 60271
+hunter_rumour_hunter_cervus = 60272
+hunter_rumour_hunter_ornus = 60273
+hunter_rumour_hunter_aco = 60274
+hunter_rumour_hunter_teco = 60275
+hunter_rumour_hunter_wolf = 60276
+hunter_rumour_tropical_wagtail = 60277
+hunter_rumour_grey_chinchompa = 60278
+hunter_rumour_carnivorous_chinchompa = 60279
+hunter_rumour_herbiboar = 60280
+hunter_rumour_sapphire_glacialis = 60288
+hunter_rumour_snowy_knight = 60289
+hunter_rumour_black_warlock = 60290
+hunter_rumour_sunlight_moth = 60291
+hunter_rumour_moonlight_moth = 60292
+hunter_rumour_embertailed_jerboa = 60293
 
 [gamevals.timer]
 # implings

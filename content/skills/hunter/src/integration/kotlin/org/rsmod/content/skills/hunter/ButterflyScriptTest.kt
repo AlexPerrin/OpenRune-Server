@@ -110,6 +110,19 @@ class ButterflyScriptTest {
             assertTrue(npc.isSlotAssigned && npc.isVisible)
         }
 
+    @Test
+    fun GameTestState.`a magic net catch counts for the rumour`() =
+        runInjectedGameTest(ButterflyScript::class, null, ButterflyScript::class) { script ->
+            val snowy = row("dbrow.hunter_butterfly_snowy_knight")
+            val npc = prepare(snowy, net = MAGIC_NET, jars = 0, level = 99)
+            val rumours = script.rumours
+            val ornus = rumours.hunters.first { it.name == "Ornus" }
+            val rumour = rumours.rumours.first { it.name == "snowy knight" }
+            rumours.assign(player, ornus, rumour)
+            catch(script, npc, snowy)
+            assertEquals(1, player.vars[HunterRumours.PITY])
+        }
+
     private fun GameTestScope.catch(script: ButterflyScript, npc: Npc, row: HunterButterfliesRow) {
         with(script) { player.withProtectedAccess { catch(npc, row) } }
         advance(ticks = 3)

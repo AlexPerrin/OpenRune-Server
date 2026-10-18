@@ -68,6 +68,7 @@ constructor(
     private val collision: CollisionFlagMap,
     private val random: GameRandom,
     private val clock: MapClock,
+    private val rumours: HunterRumours,
 ) : PluginScript() {
     private val traps = HashMap<CoordGrid, Trap>()
     private val kinds: List<TrapKind> by lazy { loadKinds() }
@@ -164,6 +165,7 @@ constructor(
         statAdvance(HUNTER, creature.xp)
         val caught = "You've caught ${creature.article} ${creature.name}"
         mes(if (creature.npc == JERBOA) "$caught... or maybe not." else "$caught.")
+        rumours.onCatch(player, creature.npc)
         return true
     }
 

@@ -20,14 +20,16 @@ import org.rsmod.plugin.scripts.ScriptContext
  * Butterfly netting (OSRS Wiki: Butterfly (Hunter) and the creature pages): Catch with a wielded
  * butterfly net or magic butterfly net, or barehanded. A butterfly jar in the inventory keeps the
  * catch; without one the butterfly is released at once and its effect applies. Either way the
- * catch gives the wiki's Hunter XP. Jarred butterflies have a Release op (effect, empty jar back).
+ * catch gives the wiki's Hunter XP and counts for Hunters' Rumours (wiki: the wing comes without a
+ * jar too). Jarred butterflies have a Release op (effect, empty jar back).
  *
  * Below the level (or 10 levels above it barehanded) every swing fails, as Jagex's "Did you know"
  * tip says for most Hunter creatures (no message; guess for butterflies). Guesses: one swing per
  * click (2 ticks), the impling net animation for barehanded catches too, the messages, the respawn
  * (7 ticks, the wiki's 4.2 s at the Great Conch).
  */
-class ButterflyScript @Inject constructor(private val npcRepo: NpcRepository) : PluginScript() {
+class ButterflyScript @Inject constructor(private val npcRepo: NpcRepository, val rumours: HunterRumours) :
+    PluginScript() {
     override fun ScriptContext.startup() {
         val rows = HunterButterfliesRow.all()
         for (row in rows) onOpNpc1(row.npc) { catch(it.npc, row) }
@@ -50,6 +52,7 @@ class ButterflyScript @Inject constructor(private val npcRepo: NpcRepository) : 
             if (row.creature.internalName == SUNLIGHT_MOTH) restoreRunEnergy(SUNLIGHT_RUN_PERCENT)
             mes("You catch the ${row.kind} and release it.")
         }
+        rumours.onCatch(player, row.creature.internalName)
     }
 
     private fun ProtectedAccess.rollCatch(row: HunterButterfliesRow): Boolean {
