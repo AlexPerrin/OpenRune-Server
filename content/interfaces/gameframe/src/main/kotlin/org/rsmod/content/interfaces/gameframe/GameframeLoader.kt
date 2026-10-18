@@ -30,7 +30,29 @@ internal class GameframeLoader {
             mapped[gameframe.topLevel.asRSCM(RSCMType.INTERFACE)] = gameframe
         }
 
+        // Spike: the mobile toplevel (toplevel_osm, 601) is not a dbtable row; build it from the
+        // cache's mobile pane-redirect enum (1745), the same way the other rows use their enums.
+        val mobile =
+            Gameframe(
+                topLevel = MOBILE_TOPLEVEL,
+                overlays = overlays,
+                mappings =
+                    // Raw ints: enum 1745 has placeholder values (600:65535) that the component
+                    // codec rejects; those targets do not exist on the mobile toplevel.
+                    enum("enum.mobile_pane_redirect", IntCodec, IntCodec)
+                        .filter { (it.value and 0xFFFF) != 0xFFFF }
+                        .associate { Component(it.key) to Component(it.value) },
+                clientMode = 1,
+                resizable = true,
+                isDefault = false,
+                stoneArrangement = false,
+            )
+        mapped[MOBILE_TOPLEVEL.asRSCM(RSCMType.INTERFACE)] = mobile
         return mapped
+    }
+
+    companion object {
+        const val MOBILE_TOPLEVEL: String = "interface.toplevel_osm"
     }
 
     private fun loadGameframe(row: GameframeRow): Gameframe {
