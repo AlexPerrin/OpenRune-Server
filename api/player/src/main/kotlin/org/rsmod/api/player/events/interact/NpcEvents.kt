@@ -5,6 +5,7 @@ import dev.openrune.types.ItemServerType
 import dev.openrune.types.NpcServerType
 import org.rsmod.events.EventBus
 import org.rsmod.game.entity.Npc
+import org.rsmod.game.interact.InteractionOp
 
 public sealed class NpcEvents {
     public sealed class Op(public val npc: Npc, public val type: NpcServerType) :
@@ -32,6 +33,17 @@ public sealed class NpcEvents {
     public class Ap4(npc: Npc, type: NpcServerType = npc.visType) : Ap(npc, type)
 
     public class Ap5(npc: Npc, type: NpcServerType = npc.visType) : Ap(npc, type)
+}
+
+/** An npc op taken over through [org.rsmod.api.player.interact.NpcOpOverrides]. */
+public class NpcOverrideEvents {
+    public class Op(public val npc: Npc, public val type: NpcServerType, public val op: InteractionOp) :
+        OpEvent(key(type.id, op))
+
+    public companion object {
+        public fun key(npcType: Int, op: InteractionOp): Long =
+            EventBus.composeLongKey(npcType, op.slot)
+    }
 }
 
 public sealed class NpcContentEvents {
