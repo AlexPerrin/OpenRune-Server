@@ -38,14 +38,14 @@ class CoalBagScript : PluginScript() {
         val toDeposit = minOf(coalInInv, freeSpace)
         if (invDel(inv, "obj.coal", toDeposit).success) {
             CoalBag.addStored(player, toDeposit)
-            mes("You fill the coal bag with $toDeposit coal.")
+            mes(contentsMessage(CoalBag.storedAmount(player)))
         }
     }
 
     private fun ProtectedAccess.emptyBag() {
         val current = CoalBag.storedAmount(player)
         if (current <= 0) {
-            mes("Your coal bag is empty.")
+            mes(contentsMessage(0))
             return
         }
 
@@ -56,18 +56,21 @@ class CoalBagScript : PluginScript() {
         }
 
         CoalBag.removeStored(player, added)
-        mes("You empty $added coal from the coal bag.")
+        val left = CoalBag.storedAmount(player)
+        mes(if (left <= 0) "The coal bag is now empty." else contentsMessage(left, still = true))
     }
 
     private fun ProtectedAccess.checkBag() {
-        val current = CoalBag.storedAmount(player)
-        if (current <= 0) {
-            mes("Your coal bag is empty.")
-            return
-        }
+        mes(contentsMessage(CoalBag.storedAmount(player)))
+    }
 
-        val capacity = CoalBag.capacity(player)
-        mes("Your coal bag contains $current of $capacity coal.")
+    private fun contentsMessage(count: Int, still: Boolean = false): String {
+        val contains = if (still) "still contains" else "contains"
+        return when {
+            count <= 0 -> "The coal bag is empty."
+            count == 1 -> "The coal bag $contains one piece of coal."
+            else -> "The coal bag $contains $count pieces of coal."
+        }
     }
 
     private fun ProtectedAccess.openBag() {
