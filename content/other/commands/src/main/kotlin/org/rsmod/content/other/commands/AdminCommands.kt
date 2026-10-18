@@ -154,9 +154,14 @@ constructor(
         }
 
         onCommand("invadd", "Spawn obj into inv", ::invAdd)
-        onCommand("item", "Spawn obj into inv (ex: ::item 995 100 or ::item coins 100)", ::invAdd)
+        onCommand(
+            "item",
+            "Spawn obj into inv (ex: ::item 995 100 or ::item coins 100)",
+            ::invAdd,
+            aliases = listOf("give"),
+        )
 
-        onCommand("invclear", "Remove all objs from inv", ::invClear)
+        onCommand("invclear", "Remove all objs from inv", ::invClear, aliases = listOf("empty"))
         onCommand("varp", "Set varp value", ::setVarp) {
             invalidArgs = "Use as ::varp debugNameOrId value (ex: option_run 1)"
         }
@@ -610,18 +615,29 @@ constructor(
 
     private fun npcAdd(cheat: Cheat) =
         with(cheat) {
-            val typeId = "npc.${args[1]}".asRSCM()
-
+            val duration = args.getOrNull(0)?.toIntOrNull()
+            val nameArg = if (duration != null) args.getOrNull(1) else args.getOrNull(0)
+            if (nameArg == null) {
+                player.mes("Use as ::npc duration npcDebugNameOrId (ex: 100 prison_pete)")
+                return
+            }
+            val typeId =
+                nameArg.toIntOrNull()
+                    ?: RSCM.getRSCMOrNull("npc.$nameArg", RSCMType.NPC)
+                    ?: run {
+                        player.mes("No npc called `$nameArg`.")
+                        return
+                    }
             val type = ServerCacheManager.getNpc(typeId)
             if (type == null) {
                 player.mes("That npc does not exist: $typeId")
                 return
             }
-            val duration = args[0].toInt()
+            val cycles = duration ?: 500
             val npc = Npc(type, player.coords)
             npc.mode = NpcMode.None
-            npcRepo.add(npc, duration)
-            player.mes("Spawned npc `${args[1]}` (duration: $duration cycles)")
+            npcRepo.add(npc, cycles)
+            player.mes("Spawned npc `$nameArg` (id $typeId, duration: $cycles cycles)")
         }
 
     private fun npcGrid(cheat: Cheat) =
@@ -692,7 +708,7 @@ constructor(
 
     private fun setVarp(cheat: Cheat) =
         with(cheat) {
-            val typeId = "varp.${args[0]}".asRSCM()
+            val typeId = args[0].toIntOrNull() ?: "varp.${args[0]}".asRSCM()
 
             val type = ServerCacheManager.getVarp(typeId)
             if (type == null) {
@@ -707,7 +723,7 @@ constructor(
 
     private fun setVarBit(cheat: Cheat) =
         with(cheat) {
-            val typeId = "varbit.${args[0]}".asRSCM()
+            val typeId = args[0].toIntOrNull() ?: "varbit.${args[0]}".asRSCM()
 
             val type = ServerCacheManager.getVarbit(typeId)
             if (type == null) {
@@ -721,7 +737,7 @@ constructor(
 
     private fun getVarp(cheat: Cheat) =
         with(cheat) {
-            val typeId = "varp.${args[0]}".asRSCM()
+            val typeId = args[0].toIntOrNull() ?: "varp.${args[0]}".asRSCM()
 
             val type = ServerCacheManager.getVarp(typeId)
             if (type == null) {
@@ -733,7 +749,7 @@ constructor(
 
     private fun getVarBit(cheat: Cheat) =
         with(cheat) {
-            val typeId = "varbit.${args[0]}".asRSCM()
+            val typeId = args[0].toIntOrNull() ?: "varbit.${args[0]}".asRSCM()
 
             val type = ServerCacheManager.getVarbit(typeId)
             if (type == null) {
@@ -953,8 +969,12 @@ constructor(
 
     private fun bank(cheat: Cheat) =
         with(cheat) {
-            protectedAccess.launch(player) {
-                ifOpenMainSidePair(main = "interface.bankmain", side = "interface.bankside", transparency = -2)
+            val launched =
+                protectedAccess.launch(player) {
+                    ifOpenMainSidePair(main = "interface.bankmain", side = "interface.bankside", transparency = -2)
+                }
+            if (!launched) {
+                player.mes("You can't open the bank while busy; close interfaces and try ::openbank again.")
             }
         }
 
