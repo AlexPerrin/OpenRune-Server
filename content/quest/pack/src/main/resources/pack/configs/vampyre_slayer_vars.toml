@@ -1,0 +1,19 @@
+[[varbit]]
+isServerOnly = true
+id = "varbit.vampyre_slayer_progress"
+varp = "varp.vampire"
+startBit = 0
+endBit = 1
+
+[[varp]]
+isServerOnly = true
+id = "varp.vampyre_slayer_state"
+scope = "Perm"
+transmit = "Never"
+
+[[varbit]]
+isServerOnly = true
+id = "varbit.vampyre_asked_harlow"
+varp = "varp.vampyre_slayer_state"
+startBit = 0
+endBit = 0

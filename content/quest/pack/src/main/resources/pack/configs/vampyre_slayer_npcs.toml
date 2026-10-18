@@ -1,0 +1,9 @@
+[[npc]]
+isServerOnly = true
+id = "npc.count_draynor"
+inherit = "npc.count_draynor"
+wanderRange = 0
+# OSRS Wiki, Count Draynor: he recovers about twenty times as fast as ordinary monsters (100).
+regenRate = 5
+[npc.params]
+"param.attack_anim"="seq.human_unarmedpunch"
