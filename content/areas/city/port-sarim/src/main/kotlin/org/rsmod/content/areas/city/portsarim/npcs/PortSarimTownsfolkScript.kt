@@ -165,7 +165,7 @@ class PortSarimTownsfolkScript : PluginScript() {
     }
 
     private suspend fun Dialogue.sleepingGuard() {
-        chatNpc(mesanim("mesanim.sleep"), "Guh... mwww... zzzzz...")
+        chatNpc(bored, "Guh... mwww... zzzzz...")
         chatPlayer(neutral, "Maybe I should let him sleep.")
     }
 
