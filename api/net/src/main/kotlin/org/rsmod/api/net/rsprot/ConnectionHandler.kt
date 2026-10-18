@@ -51,6 +51,7 @@ private constructor(
 
     private companion object {
         private const val PASSWORD_HASH_TIMING_INFO_MS = 50L
+        private val TOKEN_USERNAME = Regex("[a-z0-9_]{1,12}")
     }
 
     override fun onLogin(
@@ -85,7 +86,7 @@ private constructor(
     ) {
         val password = auth.password.asCharArray()
         try {
-            passLogin(responseHandler, block, auth, password)
+            passLogin(responseHandler, block, auth.otpAuthentication, block.username, password)
         } finally {
             // `password` char array is already cleared during `computePasswordHash`, but that is
             // an implementation detail in the password hashing interface; we ensure to clear it
@@ -98,7 +99,8 @@ private constructor(
     private fun passLogin(
         responseHandler: GameLoginResponseHandler<Player>,
         block: LoginBlock<AuthenticationType>,
-        auth: AuthenticationType.PasswordAuthentication,
+        otpAuthentication: OtpAuthenticationType,
+        username: String,
         password: CharArray,
     ) {
         // This may be filtered earlier at the protocol layer (e.g., rsprot), but we defensively
@@ -118,8 +120,7 @@ private constructor(
             responseHandler.writeFailedResponse(LoginResponse.LoginServerOffline)
             return
         }
-        val loadAuth = auth.otpAuthentication.toAccountLoadAuth()
-        val username = block.username
+        val loadAuth = otpAuthentication.toAccountLoadAuth()
 
         val responseHook =
             AccountLoadResponseHook(
@@ -188,14 +189,35 @@ private constructor(
         }
     }
 
-    // TODO: Token authentication handling.
+    // Spike: Android token logins (auth type 7, LOCAL_AUTH builds) carry no username; map them to
+    // one fixed local account through the password path. Not for production use.
     private fun tokenLogin(
         responseHandler: GameLoginResponseHandler<Player>,
         block: LoginBlock<AuthenticationType>,
-        @Suppress("unused") auth: AuthenticationType.TokenAuthentication,
+        auth: AuthenticationType.TokenAuthentication,
     ) {
-        logger.warn { "Unhandled login authentication for: $block" }
-        responseHandler.writeFailedResponse(LoginResponse.InvalidLoginPacket)
+        val username = tokenUsername(auth.token.asString())
+            ?: System.getenv("SPIKE_TOKEN_USERNAME")
+            ?: "tester"
+        val password = (System.getenv("SPIKE_TOKEN_PASSWORD") ?: "android-local").toCharArray()
+        logger.info { "Token login (${block.header.clientType}) mapped to local account '$username'" }
+        try {
+            passLogin(responseHandler, block, auth.otpAuthentication, username, password)
+        } finally {
+            password.fill('\u0000')
+        }
+    }
+
+    /**
+     * osrs-plugins-reverse: the LOCAL_AUTH sidecar's tokens for a chosen account are
+     * `lu-<hex username>-<random>` (`/local-auth/user?name=...`); others carry no account.
+     */
+    private fun tokenUsername(token: String): String? {
+        if (!token.startsWith("lu-")) return null
+        val hex = token.removePrefix("lu-").substringBefore('-')
+        if (hex.isEmpty() || hex.length % 2 != 0) return null
+        val name = runCatching { hex.chunked(2).map { it.toInt(16).toChar() }.joinToString("") }.getOrNull()
+        return name?.takeIf { TOKEN_USERNAME.matches(it) }
     }
 
     private fun OtpAuthenticationType.toAccountLoadAuth(): AccountLoadAuth =
