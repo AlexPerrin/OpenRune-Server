@@ -20,7 +20,8 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   `scripts/build-integration.sh [remote]` (both on `local/integration-tools`). Recorded conflict
   resolutions (git rerere) are in `scripts/integration-rr-cache/`; an unrecorded conflict stops the
   build. To record one: resolve, `git add`, `git commit`, copy `.git/rr-cache/*` there, commit.
-- `fix/NN-*`, `content/*`: one fix or feature each, off main, upstream ids. Real dependencies only:
+- `fix/NN-*`, `content/*`: one fix or feature each, off main. New changes are `content/<slug>` or
+  `fix/<slug>` (no numbers), one change per PR (docs/workflow.md "Changes for upstream"). Real dependencies only:
   fix/69 on fix/07, local/skip-cs2-packs on fix/11, content/looting-bag on fix/71,
   content/pirates-treasure on fin/quest-test-fixture, local/test-commands on local/android.
 - `local/*`: never upstream. android (our RSProt build, Android client type, mobile toplevel),
@@ -29,8 +30,10 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   scrolls; ids renumbered, varp names unchanged), integration-tools.
 
 ## Ids and saved data
-- Upstream ids: allocate after `openrune/upstream/id-allocation.json` (name by name, per row) and
-  after main's own ids; record new rows there.
+- New gamevals follow upstream's procedure (docs/workflow.md "Gameval ids" in osrs-plugins-reverse):
+  write `name = -1`, run `python3 tools/scripts/fix_gameval_conflicts.py` on the branch, commit what it
+  assigns; after `build-integration.sh`, run it with `--check` on the integration tree.
+  `openrune/upstream/id-allocation.json` is the record of the 2026-10-18 renumbering; no new rows.
 - Saves are keyed by **name** (`main.character_varps.varp = 'varp.sheep'`, `inventory_objs.obj =
   'obj.coins'`). Renumbering ids needs no data migration; renaming a varp, moving a varbit to other
   bits, or renaming an inv does. Unknown varp names are skipped on load and dropped on the next save.
