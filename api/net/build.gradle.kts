@@ -47,4 +47,5 @@ dependencies {
     implementation(projects.engine.routefinder)
     implementation(projects.engine.plugin)
     implementation(projects.server.services)
+    testImplementation(libs.mockk)
 }

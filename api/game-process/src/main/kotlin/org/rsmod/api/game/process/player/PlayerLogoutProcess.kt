@@ -173,9 +173,11 @@ constructor(
         /**
          * The grace period (in server cycles) during which a disconnected player is allowed to
          * remain in the world before their logout is queued. This gives them a chance to reconnect
-         * in time, based on this constant.
+         * in time, based on this constant. 100 cycles (60 seconds) follows the wiki's "60 second
+         * timer before the game forcibly logs you out after an unexpected disconnection" (stated for
+         * combat; applied to every disconnect here).
          */
-        private const val RECONNECT_GRACE_PERIOD: Int = 16
+        private const val RECONNECT_GRACE_PERIOD: Int = 100
 
         /**
          * A hard cap period (in server cycles) after which the logout block no longer applies. This
