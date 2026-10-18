@@ -190,6 +190,10 @@ constructor(
             objExamine(inv, slot)
             return
         }
+        // Op 1 is "View"/"Configure" (looting bag, rune pouches): the client switches the panel.
+        if (op == IfButtonOp.Op1) {
+            return
+        }
         val count =
             when (op) {
                 IfButtonOp.Op2 -> resolveLeftClickQty()
