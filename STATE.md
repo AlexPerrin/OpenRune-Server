@@ -25,8 +25,8 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   content/pirates-treasure on fin/quest-test-fixture, local/test-commands on local/android.
 - `local/*`: never upstream. android (our RSProt build, Android client type, mobile toplevel),
   local-auth (token logins, shared RSA key), test-commands, world-settings (members, Lumbridge
-  start, 1x XP, no clans), skip-cs2-packs, integration-tools.
-- Not in integration: Treasure Trails (upstream writes its own clue scrolls; our branch keeps old ids).
+  start, 1x XP, no clans), skip-cs2-packs, treasure-trails (ours while upstream writes its own clue
+  scrolls; ids renumbered, varp names unchanged), integration-tools.
 
 ## Ids and saved data
 - Upstream ids: allocate after `openrune/upstream/id-allocation.json` (name by name, per row) and
@@ -63,9 +63,9 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
 - Account data: tools/openrune-sql.sh for reads; writes only through the orchestrator.
 
 ## Next tasks
-1. First integration build (uncached) + tests + boot-check, then the orchestrator's deploy of
-   `integration` (optional cleanup: `delete from main.character_varps where varp like 'varp.trail\_%'`).
+1. First integration build (uncached) + tests + boot-check, a dry run on a copy of the live DB, then
+   the orchestrator's deploy of `integration`. No data migration is needed (saves are by name).
 2. QA gates for the new branches (fix/06-76, content/reconnect-login, dragon-specials,
    pirates-treasure, looting-bag, fletching), each with an accuracy spec.
 3. Doric / Sheep Shearer completeQuest fix onto their fin branches.
-4. Treasure Trails: renumber ids or wait for upstream's clue scrolls.
+4. Treasure Trails: drop local/treasure-trails once upstream's clue scrolls land (keep the varp names).
