@@ -45,23 +45,36 @@ public class HeldUInteractions @Inject constructor(private val eventBus: EventBu
         access.opHeldU(selectedItemServerType, selectedSlot, targetItemServerType, targetSlot)
     }
 
+    /**
+     * Picks the script for [selectedItemServerType] used on [targetItemServerType]. Scripts for the
+     * pair (type or content group, in either order) win over "used on anything" defaults, so a
+     * default can never shadow a pair registered the other way round. Of the defaults, the
+     * target's comes first (like RuneScript's `[opheldu,<target obj>]` trigger, which gets the
+     * used obj as `last_useitem`), then the selected obj's.
+     */
     private suspend fun ProtectedAccess.opHeldU(
         selectedItemServerType: ItemServerType,
         selectedSlot: Int,
         targetItemServerType: ItemServerType,
         targetSlot: Int,
     ) {
-        val firstCombination =
-            opTrigger(selectedItemServerType, selectedSlot, targetItemServerType, targetSlot)
-        if (firstCombination != null) {
-            eventBus.publish(this, firstCombination)
-            return
-        }
-
-        val secondCombination =
-            opTrigger(targetItemServerType, targetSlot, selectedItemServerType, selectedSlot)
-        if (secondCombination != null) {
-            eventBus.publish(this, secondCombination)
+        val trigger =
+            pairTrigger(selectedItemServerType, selectedSlot, targetItemServerType, targetSlot)
+                ?: pairTrigger(targetItemServerType, targetSlot, selectedItemServerType, selectedSlot)
+                ?: defaultTrigger(
+                    targetItemServerType,
+                    targetSlot,
+                    selectedItemServerType,
+                    selectedSlot,
+                )
+                ?: defaultTrigger(
+                    selectedItemServerType,
+                    selectedSlot,
+                    targetItemServerType,
+                    targetSlot,
+                )
+        if (trigger != null) {
+            eventBus.publish(this, trigger)
             return
         }
 
@@ -72,7 +85,7 @@ public class HeldUInteractions @Inject constructor(private val eventBus: EventBu
         }
     }
 
-    private fun opTrigger(
+    private fun pairTrigger(
         first: ItemServerType,
         firstSlot: Int,
         second: ItemServerType,
@@ -93,6 +106,15 @@ public class HeldUInteractions @Inject constructor(private val eventBus: EventBu
             return contentScript
         }
 
+        return null
+    }
+
+    private fun defaultTrigger(
+        first: ItemServerType,
+        firstSlot: Int,
+        second: ItemServerType,
+        secondSlot: Int,
+    ): SuspendEvent<ProtectedAccess>? {
         val defaultTypeScript = HeldUDefaultEvents.Type(first, firstSlot, second, secondSlot)
         if (eventBus.contains(defaultTypeScript::class.java, defaultTypeScript.id)) {
             return defaultTypeScript
