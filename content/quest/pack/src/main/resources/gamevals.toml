@@ -73,7 +73,7 @@ misthalin_puzzle_state = 63702
 cooks_assistant_ingredients = 63705
 gertrudes_cat_state = 63711
 daddyshome_state = 64064
-pirates_treasure_state = 64053
+pirates_treasure_state = 64083
 
 [gamevals.varbit]
 restless_ghost_progress = 63702
