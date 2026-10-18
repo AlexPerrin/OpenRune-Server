@@ -36,6 +36,11 @@ while read -r branch; do
         echo "merged $branch"
         continue
     fi
+    if ! git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+        echo "build-integration: merging $branch failed before any conflict (untracked files in" >&2
+        echo "the way, or a missing branch?); run the merge by hand to see why." >&2
+        exit 1
+    fi
     unresolved=$(git diff --name-only --diff-filter=U)
     if [ -n "$unresolved" ]; then
         echo "build-integration: UNRECORDED CONFLICT merging $branch in:" >&2
