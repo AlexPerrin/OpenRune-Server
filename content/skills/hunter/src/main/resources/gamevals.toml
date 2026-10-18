@@ -4,6 +4,8 @@
 # bird houses
 
 # traps
+hunter_traps = 56004
+hunter_trap_creatures = 56005
 
 # herbiboar
 
@@ -17,6 +19,18 @@
 # bird houses
 
 # traps
+hunter_trap_bird_snare = 60172
+hunter_trap_box_trap = 60173
+hunter_trap_creature_crimson_swift = 60174
+hunter_trap_creature_golden_warbler = 60175
+hunter_trap_creature_copper_longtail = 60176
+hunter_trap_creature_cerulean_twitch = 60177
+hunter_trap_creature_tropical_wagtail = 60178
+hunter_trap_creature_ferret = 60179
+hunter_trap_creature_chinchompa = 60180
+hunter_trap_creature_chinchompa_big = 60181
+hunter_trap_creature_chinchompa_black = 60182
+hunter_trap_creature_jerboa = 60183
 
 # herbiboar
 
@@ -30,6 +44,7 @@
 # bird houses
 
 # traps
+hunter_traps = 436
 
 # herbiboar
 
