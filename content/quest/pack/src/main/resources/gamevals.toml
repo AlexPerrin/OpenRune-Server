@@ -92,6 +92,7 @@ daddyshome_crate_opened = 64064
 sheep_shearer_progress = 63740
 sheep_shearer_saw_thing = 63741
 romeo_juliet_progress = 63742
+doric_quest_progress = 63743
 
 [gamevals.models]
 misthalin_gem_diamond = 32333
