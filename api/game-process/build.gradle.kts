@@ -13,6 +13,7 @@ dependencies {
     implementation(libs.fastutil)
     implementation(libs.guice)
     implementation(libs.rsprot.api)
+    implementation(libs.rsprot.android)
     implementation(projects.api.account)
     implementation(projects.api.attr)
     implementation(projects.api.config)

@@ -4,6 +4,8 @@ import it.unimi.dsi.fastutil.ints.IntArrayList
 import it.unimi.dsi.fastutil.ints.IntList
 import jakarta.inject.Inject
 import java.util.ArrayList
+import net.rsprot.protocol.android.AndroidUpdateZonePartialEnclosed
+import net.rsprot.protocol.android.AndroidZoneProts
 import net.rsprot.protocol.common.client.OldSchoolClientType
 import net.rsprot.protocol.game.outgoing.zone.header.UpdateZoneFullFollows
 import net.rsprot.protocol.game.outgoing.zone.header.UpdateZonePartialEnclosed
@@ -169,6 +171,10 @@ constructor(
         if (updates.isEmpty()) {
             return
         }
+        if (mobileClient) {
+            sendAndroidEnclosed(buildArea, zoneBase, updates)
+            return
+        }
         val buffer = enclosedBuffers.computeBufferForClient(OldSchoolClientType.DESKTOP, updates)
         val deltaX = zoneBase.x - buildArea.x
         val deltaZ = zoneBase.z - buildArea.z
@@ -181,12 +187,38 @@ constructor(
         zone: ZoneKey,
         zoneBase: CoordGrid,
     ) {
+        if (mobileClient) {
+            val zoneUpdates = updates[zone] ?: return
+            val shared =
+                ZoneUpdateTransformer.collectEnclosedProtList(zoneUpdates).filterNot {
+                    it is ZoneUpdateTransformer.PartialFollowsZoneProt
+                }
+            if (shared.isNotEmpty()) {
+                sendAndroidEnclosed(buildArea, zoneBase, shared)
+            }
+            return
+        }
         val enclosed = enclosedBuffers[zone] ?: return
         val buffer = enclosed[OldSchoolClientType.DESKTOP] ?: return
         val deltaX = zoneBase.x - buildArea.x
         val deltaZ = zoneBase.z - buildArea.z
         val prot = UpdateZonePartialEnclosed(deltaX, deltaZ, zoneBase.level, buffer)
         client.write(prot)
+    }
+
+    /** Spike: Android has its own zone-prot indices inside UPDATE_ZONE_PARTIAL_ENCLOSED. */
+    private fun Player.sendAndroidEnclosed(
+        buildArea: CoordGrid,
+        zoneBase: CoordGrid,
+        updates: List<ZoneProt>,
+    ) {
+        val payload = AndroidZoneProts.encode(updates)
+        if (payload.isEmpty()) {
+            return
+        }
+        val deltaX = zoneBase.x - buildArea.x
+        val deltaZ = zoneBase.z - buildArea.z
+        client.write(AndroidUpdateZonePartialEnclosed(deltaX, deltaZ, zoneBase.level, payload))
     }
 
     private fun Iterable<ZoneProt>.toPlayerSpecificEnclosed(observerId: Long?): List<ZoneProt> {
