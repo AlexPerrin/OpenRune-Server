@@ -144,7 +144,7 @@ class ItemServerCodec(
             playerCostDerivedConst = customData.playerCostDerivedConst
             stockMarketBuyLimit = customData.stockMarketBuyLimit
             stockMarketRecalcUsers = customData.stockMarketRecalcUsers
-            stockmarket = customData.tradeable
+            tradeable = customData.tradeable
             respawnRate = customData.respawnRate
             dummyitem = customData.dummyitem
             contentGroup = customData.contentGroup

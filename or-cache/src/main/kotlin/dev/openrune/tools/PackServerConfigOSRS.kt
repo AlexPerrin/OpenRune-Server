@@ -44,6 +44,11 @@ data class PackType(
     val kType: KType,
     /** Config archive this type writes (and, for merged types, reads its base definitions from). */
     val archive: Int,
+    /**
+     * Part of the incremental fingerprint: bump it when the codec packs the same inputs
+     * differently, or an existing cache keeps the old output.
+     */
+    val codecVersion: Int,
     val pack: PackServerConfig.(Cache, Map<String, List<Definition>>, String) -> Unit,
 )
 
@@ -143,6 +148,7 @@ class PackServerConfig(
             loadBaseInto = { c, dest -> OsrsCacheProvider.ItemDecoder(dev.openrune.revision.first).load(c, dest) },
             codec = { base, overlay -> ItemServerCodec(rev,base, overlay) },
             create = { ItemServerType(it) },
+            codecVersion = 2,
         )
 
         registerMergedBaseAndTomlPackType<VarpServerType, VarpType>(
@@ -348,7 +354,10 @@ class PackServerConfig(
                     ),
                 ),
                 extraDeps = sharedInputs,
-                extraFingerprints = mapOf("base-archive" to "${baseArchive?.crc}:${baseArchive?.revision}"),
+                extraFingerprints = mapOf(
+                    "base-archive" to "${baseArchive?.crc}:${baseArchive?.revision}",
+                    "codec-version" to packType.codecVersion.toString(),
+                ),
             ) { packCache, _ ->
                 ensureManagers()
                 packType.pack(this, packCache, parsed, packType.table)
@@ -394,8 +403,9 @@ class PackServerConfig(
             crossinline loadBaseInto: (Cache, MutableMap<Int, B>) -> Unit,
             crossinline codec: (Map<Int, B>, Map<Int, T>) -> OpcodeDefinitionCodec<T>,
             noinline create: (Int) -> T,
+            codecVersion: Int = 1,
         ) {
-            registerPackType<T>(table, decoder.getArchive(0), tomlMapper) { cache, parsed, _ ->
+            registerPackType<T>(table, decoder.getArchive(0), tomlMapper, codecVersion) { cache, parsed, _ ->
                 val base = mutableMapOf<Int, B>().apply { loadBaseInto(cache, this) }
                 val overlay = parsedById<T>(parsed, table)
                 val ids = (base.keys + overlay.keys).distinct().sorted()
@@ -431,9 +441,10 @@ class PackServerConfig(
             table: String,
             archive: Int,
             tomlMapper: TomlMapper = tomlMapperDefault,
+            codecVersion: Int = 1,
             noinline pack: PackServerConfig.(Cache, Map<String, List<Definition>>, String) -> Unit,
         ) {
-            packTypes[table] = PackType(table, tomlMapper, typeOf<List<T>>(), archive, pack)
+            packTypes[table] = PackType(table, tomlMapper, typeOf<List<T>>(), archive, codecVersion, pack)
         }
     }
 }
