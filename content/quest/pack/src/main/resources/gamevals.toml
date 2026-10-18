@@ -74,6 +74,7 @@ cooks_assistant_ingredients = 63705
 gertrudes_cat_state = 63711
 daddyshome_state = 64064
 sheep_shearer_state = 63740
+vampyre_slayer_state = 63745
 
 [gamevals.varbit]
 restless_ghost_progress = 63702
@@ -93,6 +94,8 @@ sheep_shearer_progress = 63740
 sheep_shearer_saw_thing = 63741
 romeo_juliet_progress = 63742
 doric_quest_progress = 63743
+vampyre_slayer_progress = 63745
+vampyre_asked_harlow = 63746
 
 [gamevals.models]
 misthalin_gem_diamond = 32333

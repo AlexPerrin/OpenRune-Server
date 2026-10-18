@@ -1,0 +1,7 @@
+[[npc]]
+isServerOnly = true
+id = "npc.count_draynor"
+inherit = "npc.count_draynor"
+wanderRange = 0
+[npc.params]
+"param.attack_anim"="seq.human_unarmedpunch"
