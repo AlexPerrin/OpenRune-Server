@@ -62,10 +62,27 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
 - The desktop client is F2P-looking unless jav_config param 3 is "true".
 - Account data: tools/openrune-sql.sh for reads; writes only through the orchestrator.
 
+## Cutover status (2026-10-18, end of the twenty-second server dev)
+- Pushed to the fork: local/* (7 incl. treasure-trails), fix/* (21), content/* (5), docs.
+- **Not pushed yet** (in scratchpad/sd22/or, a clone of re/upstream-pr/or):
+  - content/pirates-treasure ca5b0d335: state varp 64053 -> 64083 (64053 is fin/farming's
+    farming_growth_offset; buildCache failed on the duplicate).
+  - local/integration-tools 4154e7edd: build-integration.sh stops on a merge that fails without
+    a conflict; the recorded resolution for that varp line.
+- `build-integration.sh .` there: integration 99d201e3e, all 60 branches, no unrecorded conflicts, no
+  duplicate gameval ids (checked by a scan of every gamevals.toml).
+- The uncached integration build, tests and boot-check have **not** passed yet (the only run stopped
+  at the varp collision). The fin/* commits in integration.txt are the PR agent's and may still move.
+
 ## Next tasks
-1. First integration build (uncached) + tests + boot-check, a dry run on a copy of the live DB, then
-   the orchestrator's deploy of `integration`. No data migration is needed (saves are by name).
-2. QA gates for the new branches (fix/06-76, content/reconnect-login, dragon-specials,
-   pirates-treasure, looting-bag, fletching), each with an accuracy spec.
-3. Doric / Sheep Shearer completeQuest fix onto their fin branches.
-4. Treasure Trails: drop local/treasure-trails once upstream's clue scrolls land (keep the varp names).
+1. Push the two branches above; rebuild integration from the fork (`build-integration.sh origin`);
+   uncached `buildCache`, the three fix scripts, `assemble`, `test`, `integration` (1 worker),
+   image, boot-check.
+2. Dry run: boot that image on a copy of the live DB (pg_dump approved for this, delete the dump
+   after), log the tester in and out headlessly (`tools/multiclient/desktop_login.py`, password
+   android-local), compare inventories, bank, GE offer and quest varps before/after. No data
+   migration is expected (saves are by name).
+3. Cutover: the orchestrator deploys the pinned integration commit; then the client QA pass.
+4. QA gates (accuracy spec + checklist) for the new branches: fix/06-76, content/reconnect-login,
+   dragon-specials, pirates-treasure, looting-bag, fletching.
+5. Treasure Trails: drop local/treasure-trails once upstream's clue scrolls land (keep varp names).
