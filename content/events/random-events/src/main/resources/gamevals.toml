@@ -1,3 +1,15 @@
 [gamevals.timer]
 random_event = 65534
 random_event_genie = 65533
+
+[gamevals.dbtable]
+random_event_zones = 65501
+
+[gamevals.dbrow]
+random_event_zone_godwars_dungeon = 63889
+random_event_zone_ancient_cavern = 63892
+random_event_zone_waterbirth_dungeon = 63886
+random_event_zone_tapoyauik = 63887
+random_event_zone_charred_island_dungeon = 63891
+random_event_zone_ferox_enclave = 63890
+random_event_zone_grand_exchange = 63888

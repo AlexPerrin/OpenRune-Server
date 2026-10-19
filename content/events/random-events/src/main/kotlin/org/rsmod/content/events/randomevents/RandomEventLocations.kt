@@ -1,6 +1,7 @@
 package org.rsmod.content.events.randomevents
 
 import dev.openrune.ServerCacheManager
+import dev.openrune.rscm.RSCM
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import jakarta.inject.Inject
@@ -8,6 +9,7 @@ import jakarta.inject.Singleton
 import org.rsmod.api.area.checker.AreaChecker
 import org.rsmod.api.registry.region.RegionRegistry
 import org.rsmod.api.repo.loc.LocRepository
+import org.rsmod.api.table.RandomEventZonesRow
 import org.rsmod.map.CoordGrid
 import org.rsmod.map.zone.ZoneKey
 
@@ -22,14 +24,9 @@ constructor(private val locRepo: LocRepository, private val areas: AreaChecker) 
         if (RegionRegistry.inWorkingArea(coords)) {
             return true
         }
-        if (coords.inGrandExchange()) {
-            return true
-        }
-        if (NO_EVENT_AREAS.any { areas.inArea(it, coords) }) {
-            return true
-        }
-        if (BANKS_WITH_EVENTS.any { areas.inArea(it, coords) }) {
-            return false
+        val zone = zones.firstOrNull { it.contains(coords) }
+        if (zone != null) {
+            return !zone.allowed
         }
         return isInBank(coords)
     }
@@ -59,27 +56,31 @@ constructor(private val locRepo: LocRepository, private val areas: AreaChecker) 
         return false
     }
 
-    private fun CoordGrid.inGrandExchange(): Boolean =
-        level == 0 &&
-            chebyshevDistance(GRAND_EXCHANGE_CENTRE) <= GRAND_EXCHANGE_RADIUS
+    private val zones by lazy {
+        RandomEventZonesRow.all().map { row ->
+            val area = row.area?.let { RSCM.getReverseMapping(RSCMType.AREA, it.id) }
+            Zone(area, row.centre, row.radius ?: 0, row.allowed ?: false)
+        }
+    }
+
+    private inner class Zone(
+        val area: String?,
+        val centre: CoordGrid?,
+        val radius: Int,
+        val allowed: Boolean,
+    ) {
+        fun contains(coords: CoordGrid): Boolean =
+            when {
+                area != null -> areas.inArea(area, coords)
+                centre != null ->
+                    coords.level == centre.level && coords.chebyshevDistance(centre) <= radius
+                else -> false
+            }
+    }
 
     companion object {
         const val BANK_BOOTH_RADIUS = 7
         const val BANK_CHEST_RADIUS = 2
         private const val ZONE_SHIFT = 3
-
-        val GRAND_EXCHANGE_CENTRE = CoordGrid(3165, 3490, 0)
-        const val GRAND_EXCHANGE_RADIUS = 13
-
-        val NO_EVENT_AREAS =
-            listOf(
-                "area.godwars_dungeon",
-                "area.ancient_cavern",
-                "area.waterbirth_dungeon",
-                "area.tapoyauik",
-                "area.charred_island_dungeon",
-            )
-
-        val BANKS_WITH_EVENTS = listOf("area.ferox_enclave")
     }
 }
