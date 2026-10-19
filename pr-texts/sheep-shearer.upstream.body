@@ -33,6 +33,7 @@ Nothing was checked in game from this exact branch; an earlier version of the sc
 - "Interacted with the Thing" is taken to mean a shearing attempt (Shear, or shears used on it); Talk-to doesn't unlock Fred's option.
 - "You don't have enough room for the reward." is a guess.
 - Chathead expressions are best guesses.
+- Shearing The Thing plays only the generic `human_shearing` animation and the message. In OSRS the penguins "squeak and run away" (wiki Sheep Shearer, Obtaining the wool) and walk away without giving wool (wiki Sheep (penguins)). Here The Thing doesn't move, and there is no face, delay or sound as `Sheep.shearSheep` has.
 
 **Release note.** Sheep Shearer is playable, with the progress values Quest Helper reads.
 

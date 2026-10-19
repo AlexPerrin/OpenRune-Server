@@ -40,6 +40,7 @@ reachable for this pass; the citations are the audit's, checked against the code
 | 16 | "Fred! Fred! I've seen The Thing!" during the quest | after interacting with The Thing (Transcript, After interacting with The Thing) | gated on server varbit `sheep_shearer_saw_thing` | matches |
 | 17 | After the quest | kill / lost, plus the Thing option only if the player has interacted with it (Transcript:Fred the Farmer) | flag set on any shear attempt, kept at completion; else `choice2` | matches (D5 fixed; "interacted" read as a shear attempt, caveat) |
 | 18 | Reward does not fit (coins at the stack limit) | OSRS never loses the hand-in; message not documented | `setQuestStage` returns false (#339): the balls taken are given back, the quest stays open, "You don't have enough room for the reward." | matches in effect; message unsourced (caveat) |
+| 19 | The Thing reacting to a shear attempt | the penguins "squeak and run away" (Sheep Shearer, Obtaining the wool); "walking away and doesn't provide any wool" (Sheep (penguins)) | generic `seq.human_shearing` and the message; The Thing doesn't move, no sound, no face or delay (unlike `Sheep.shearSheep`) | diverges (cosmetic; caveat) |
 
 ## Unsourced / guesses (PR caveats)
 - Journal texts (reworked 14 January 2026; the current text is not in the sources).
@@ -49,7 +50,7 @@ reachable for this pass; the citations are the audit's, checked against the code
 - Chathead expressions.
 
 ## Scope gaps
-- Shearing animation and timing on The Thing use the generic `human_shearing` seq.
+- Shearing animation and timing on The Thing use the generic `human_shearing` seq; The Thing doesn't run away or squeak (row 19). Both are a PR caveat.
 
 ## Tests (AGENTS.md: item-moving paths only)
 `SheepShearerInteractionTest`: accept (varp 1, shears given), accept while holding shears (no second
