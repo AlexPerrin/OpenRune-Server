@@ -19,7 +19,6 @@ class CoalBagScript : PluginScript() {
 
         onOpHeld2("obj.coal_bag") { openBag() }
         onOpHeld2("obj.coal_bag_open") { closeBag() }
-
     }
 
     private fun ProtectedAccess.fillBag() {
