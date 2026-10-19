@@ -37,6 +37,10 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   none of their files): fix/18 adds `gameplay.idle-logout` (default true) and drops IdleHandlerTest (#348);
   fix/57 moves the stone-arrangement attr to the Temp varbit `gameframe_stone_before_fullscreen` 65447 on
   varp `gameframe_state` 65471, picked with sheep-shearer's 65472/65449 taken (#362).
+- Audited rewrites (sd23, 2026-10-19, each one commit on main 731fd392a, waiting for QA and then the user's
+  approval upstream): `acc/cannon` 0d0190f3c (replaces #354; timer mcannon_fire 65535), `acc/genie` 7a2316ea9
+  (fork #18, replaces #355; timers 65534/65533), `fix/rune-pouch-accuracy` bee197ba9 (fork #17, follow-up to
+  merged #356). #357 (plank sack) merged as is; its sourced gaps are backlog items.
 - `local/*`: never upstream. android (our RSProt build, Android client type, mobile toplevel),
   local-auth (token logins, shared RSA key), test-commands, world-settings (members, Lumbridge
   start, 1x XP, no clans), skip-cs2-packs, treasure-trails (ours while upstream writes its own clue
