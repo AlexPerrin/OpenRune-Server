@@ -29,14 +29,21 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
 - `content/sheep-shearer` (sd23, replaces #366's branch, Sheep Shearer only; ids from
   fix_gameval_conflicts.py) takes `fin/sheep-shearer`'s place in integration.txt; it needs the
   recorded resolution of its gamevals.toml lines next to content/pirates-treasure's (rr-cache
-  666570cd...). #367/#368 still stack on #366's old commit f69c8ed4c (with Romeo & Juliet).
+  666570cd...).
+- Unstacked #367/#368 (sd24, each one commit on upstream main 829b9477d, no fixture, no tests; they replace the
+  PR contents only after the user's OK): `content/goblin-diplomacy-829` 4f5e59627 (quest only; deletes #328's
+  GoblinGenerals/Grubfoot; cache varbits only), `content/witchs-potion-829` 4dc1ac9c7 (varbit
+  `witchs_potion_progress` 65449, the same id as sheep_shearer_progress: integration's --check reassigns the
+  later one; internal gate PASS, upstream waits on the RSProx comparison), and the ladder split out as
+  `fix/goblin-village-lookout-ladder` 475eefb76 (new PR). Specs accuracy/{goblin-diplomacy,witchs-potion,
+  goblin-village-lookout-ladder}.md.
 - `fix/edgeville-general-store-stock` (sd24, off main bcdb03292, data only; the toml test was dropped after the upstream gate): rebuilds upstream's truncated
   `generalshop2.toml` (size 0 -> AIOOBE on Trade) to the wiki stock, size 40; #351 (fix/55) depends on it
   and waits until it merges upstream. Spec accuracy/edgeville-general-store-stock.md.
-- Review commits (sd24, on the fork heads, not rebased; these branches are 7 commits behind main, which touches
-  none of their files): fix/18 adds `gameplay.idle-logout` (default true) and drops IdleHandlerTest (#348);
-  fix/57 moves the stone-arrangement attr to the Temp varbit `gameframe_stone_before_fullscreen` 65447 on
-  varp `gameframe_state` 65471, picked with sheep-shearer's 65472/65449 taken (#362).
+- Review commits (sd24, on the fork heads, not rebased): fix/18 adds `gameplay.idle-logout` (default true) and
+  drops IdleHandlerTest (#348). fix/57 (#362) keeps the stone arrangement in the Temp varbit
+  `gameframe_stone_before_fullscreen` 65447 on varp `gameframe_state` 65471; merge e551ba7ce brings in main
+  829b9477d and uses #315's `Gameframe.isGameplay`, so the PR is now only the stone restore.
 - Audited rewrites (sd23, 2026-10-19, each one commit on main 731fd392a, waiting for QA and then the user's
   approval upstream): `acc/cannon` 0d0190f3c (replaces #354; timer mcannon_fire 65535), `acc/genie` 7a2316ea9
   (fork #18, replaces #355; timers 65534/65533), `fix/rune-pouch-accuracy` bee197ba9 (fork #17, follow-up to
