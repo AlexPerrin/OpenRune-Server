@@ -20,9 +20,19 @@ On `main`, Hetty only has her after-quest lines and no rat drops a rat's tail, s
 
 ## How it was tested
 
-On upstream `main` 829b9477d + this branch (dev build, Docker, upstream's `./gradlew`): `freshCache` + `mergePluginGamevals`, `buildCache` (packs `witchs_potion_vars.toml`), compile, `:content:quest:test` pass, `spotlessCheck` pass, `installDist`, and the server boots to "Server ready" (the startup check against the quest dbrow passes). `tools/scripts/fix_gameval_conflicts.py --check`: no conflicts.
+On upstream `main` 829b9477d + this branch (Docker `eclipse-temurin:21`, upstream's `./gradlew`, a clean run per step): `freshCache` + `mergePluginGamevals`, `buildCache` (packs `witchs_potion_vars.toml`), `installDist`, `spotlessCheck`, `assemble`, `test` (764 tests, 0 failures), `integration` (79 tests, 0 failures), and the server boots to "Server ready" (the startup check against the quest dbrow passes) with no error in the log. `tools/scripts/fix_gameval_conflicts.py --check`: no conflicts.
 
-Not yet checked in game from this exact branch; an earlier version of the same script runs on our own test server.
+Played end to end in game (desktop RuneLite, fresh account). Cheats: `::tele` for travel (to Hetty's house, and into the neighbouring house where the indoor rats spawn), and `::item` for the eye of newt, onion and burnt meat, whose shop and cooking aren't part of this PR. The rat's tail came from killing a rat.
+- Before the quest, a Lumbridge rat dropped only bones.
+- Hetty: the opening, the witch branch, the offer and "Start the Witch's Potion quest?"; No gives the decline lines and varp 67 stays 0; Yes gives the start lines and varp 67 = 1.
+- The cauldron at stage 1 gives "As nice as that looks, I think I'll give it a miss for now.".
+- With nothing, "I'm afraid I don't have any of them yet." and Hetty's reminder; with only the tail, the matching partial line.
+- A Rimmington rat dropped a rat's tail next to its bones.
+- With all four: the hand-in lines and the one message box; the four items left the inventory and varp 67 = 2. Talking again: "Well are you going to drink the potion or not?" / "Yes, I will.".
+- The cauldron: the drinking message box, the quest complete scroll, varp 67 = 3, 1 quest point and the Magic XP.
+- After the quest: Hetty's "How's your magic coming along?" lines, and a rat dropped only bones.
+
+Every line shown matched the wiki transcript word for word. Not tried in game: the tail at stage 2, the other 13 partial lines (built from the same four parts), and the other rat types.
 
 No unit tests: the earlier version's dialogue tests needed a separate test fixture, and as with #366 they are left out. The one item move, the hand-in, is a single `invTransaction` deleting exactly one of each ingredient.
 
@@ -41,6 +51,8 @@ No unit tests: the earlier version's dialogue tests needed a separate test fixtu
 The rat list is a list of npc symbols in the hook: the cache has no category for "rats that drop a rat's tail".
 
 Data sources: OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): Witch's Potion, Transcript:Witch's Potion, Transcript:Hetty, Rat's tail (Item sources; "100% chance to drop once you begin the quest"), Rat, Dungeon rat, Giant rat; the dialogue follows the transcripts. Quest Helper `WitchsPotion` (BSD): varp 67 step values, cauldron loc 2024. Cache: npc names and ids, the quest dbrow.
+
+Ids: varbit 65449 is also taken by `sheep_shearer_progress` in #366. Whichever of the two merges second needs `tools/scripts/fix_gameval_conflicts.py` re-run (or upstream's CI reassignment).
 
 Guesses:
 - The tail also drops at stage 2 (ingredients given, potion not drunk): the wiki says only "during the quest".
