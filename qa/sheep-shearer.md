@@ -2,14 +2,14 @@
 - Branch: `content/sheep-shearer`
 - Commit: `19aefd90a8b7fa462c3560c60c25d9a2dc7058e6`
 ## Internal gate: **PASS**
-## Upstream gate: **FAIL**
+## Upstream gate: **PASS**
 
 Run by sq24 (companion to sd23) on 2026-10-18 in its own clone `re/agents/sq24/or`, detached at the commit.
 The branch is two commits (35900b277 `QuestTalkFixture`, 19aefd90a the quest) on c2492318d, which is
 current `upstream/main` (re-fetched after the run), so the branch tree is upstream `main` + the branch.
 The dev's run (sd23 scratchpad `gate/sheep-shearer-19aefd90a.logs/`) was read as evidence only.
 
-## What must change (upstream gate)
+## Upstream gate, first run: FAIL (fixed in docs 4a35daadc; see "Upstream re-run" at the end)
 The PR's Caveats miss two gaps against the sources. Add them to `pr-texts/sheep-shearer.upstream.body`
 (and to `accuracy/sheep-shearer.md` as rows), or implement them; either is a new commit or text change,
 and the upstream gate is re-run:
@@ -129,3 +129,22 @@ walk away), which is for the upstream caveats.
 **Upstream verdict: FAIL.** Only the caveats need changing; the code doesn't have to. If the fix is a
 PR-text change only, with the commit still 19aefd90a, the internal PASS stands. The upstream gate is
 re-run on the new text.
+
+## Upstream re-run (docs 4a35daadc, commit still 19aefd90a)
+Re-run by sq24 on 2026-10-18. The code commit didn't change, so the internal PASS and the build-test
+results above still stand. sd23's fix only changes text: `pr-texts/sheep-shearer.upstream.body` has one
+new Caveats line, and `accuracy/sheep-shearer.md` has row 19 and an updated scope-gap line. Diff checked
+against 28f1fe5e7:
+- First-run item 1 (The Thing doesn't walk away or squeak) is covered by the new caveat, which quotes
+  both wiki sources, and by spec row 19.
+- First-run item 2 (generic animation and timing; no face, delay or sound like `Sheep.shearSheep`) is
+  covered by the same caveat line and by the spec's scope-gap line.
+- The new caveat's claims are true of 19aefd90a: `shearTheThing()` only calls `anim("seq.human_shearing")`
+  and `mes(...)`. It doesn't move the npc, and it has no `faceEntitySquare`, `delay` or `soundSynth`.
+- The rest of the PR text is unchanged, and every earlier claim is still true at the same commit.
+- `upstream/main` is still c2492318d (re-fetched). The open PRs matching "sheep" are still only #366,
+  #367 and #368 (all ours; the #367/#368 follow-up above still applies).
+- Minor, not blocking: spec row 17 says the flag is "set on any shear attempt", but the code sets it only
+  when shears are held. The PR text says it correctly ("A shearing attempt while holding shears").
+
+**Upstream verdict (re-run): PASS** at 19aefd90a, with the PR text in docs 4a35daadc.
