@@ -1,0 +1,46 @@
+Replaces the earlier Sheep Shearer and Romeo & Juliet version of this PR: as asked, Romeo & Juliet is out, and is left to #299. Content area from #353.
+
+**Depends:** the first commit, `QuestTalkFixture` (a headless test fixture for dialogue-driven quest tests, test sources only). Our other quest PRs use it too. It is included so this branch builds and tests on its own; if you'd rather review it separately, I'll open it as its own PR and this one waits for it.
+
+**Problem.** Sheep Shearer (Fred the Farmer, north-west of Lumbridge) had no quest script: Fred, The Thing and the hand-in were missing, and varp 179, which the client and Quest Helper read, was never set.
+
+**Change.**
+- Progress is on varp 179 (`varp.sheep`), as in OSRS: 0 not started, 1 started, 1 + the balls of wool handed in, 21 complete. At startup the script checks 21 against the cache dbrow's end state. Rewards: 1 QP, 150 Crafting XP, 60 coins.
+- Fred's dialogue follows the wiki transcript: the three opening options, the offer and start prompt, shears from Fred if the player has none, the spinning help with the spinning wheel map icon box (obj 7670 `crafting_icon_dummy`), the remaining count with the three help options, and the reply about unspun wool.
+- Hand-ins: partial deliveries ("You give Fred n balls of wool." / "I need n more before I can pay you."). The last delivery goes straight to "That's the last of them." with no give box. Only unnoted balls of wool count.
+- Carrying 20 balls of wool when first asking for the quest: the "In fact Fred, funnily enough..." exchange comes right after "...the small matter of The Thing.", takes 20 balls and completes the quest, with no exposition about The Thing, no start prompt and no hand-in lines.
+- If the reward can't be given (`setQuestStage` returns false, #339; e.g. coins already at the stack limit), the balls taken are given back and the player is told "You don't have enough room for the reward.". On the hand-in path the quest stays at its stage; on the first-talk path it stays unstarted.
+- The Thing (npc 731): Shear (op1) and using shears on it give "The... whatever it is... manages to get away from you!". Talk-to (op3) gives the player's line "That's a sheep...I think. I can't talk to sheep.". A shearing attempt while holding shears sets a server varbit, which unlocks "Fred! Fred! I've seen The Thing!" during and after the quest. After the quest, if the player hasn't tried to shear it, Fred offers only kill / lost.
+- New server-only gamevals, assigned by `tools/scripts/fix_gameval_conflicts.py` from `-1`: varp `sheep_shearer_state`; varbits `sheep_shearer_progress` (bits 0-4 of `varp.sheep`) and `sheep_shearer_saw_thing`.
+
+**Tests.** `SheepShearerInteractionTest` covers the paths that move items, following AGENTS.md:
+- accept: varp 1, Fred hands over shears;
+- accept while already holding shears: no second pair;
+- partial then final hand-in: varp 6 → 21, rewards given once, spare balls kept;
+- 20 balls on the first talk: the quest completes before The Thing and the prompt, and 1 spare ball is kept;
+- a full coin stack on the hand-in path and on the first-talk path: the wool is returned, no QP, the stage unchanged (1 and 0).
+
+On this branch (Docker `eclipse-temurin:21`, upstream's `./gradlew`, 4 GB container, no build or configuration cache; a clean `freshCache` of main restored first, then `:or-cache:buildCache :or-cache:mergePluginGamevals`, then each task as a separate run, then `run` to "Server ready"): buildCache pass, `spotlessCheck` pass, `assemble` pass, `test` pass (6/6 in `SheepShearerInteractionTest`), `integration` pass, boot pass (Server ready in 11.42s). `tools/scripts/fix_gameval_conflicts.py --check` reports no conflicts.
+
+Nothing was checked in game from this exact branch; an earlier version of the script (older dialogue, ids before the renumbering) runs on our own test server.
+
+**Data sources.** OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): Sheep Shearer, Transcript:Sheep Shearer, Transcript:Fred the Farmer, Transcript:Sheep (penguins); the dialogue follows the transcripts. Step values: Quest Helper `SheepShearer` (BSD; varp 179, steps 1-20). Cache: npc 731 ops (Shear, Talk-to), obj 7670, the `quest_sheepshearer` dbrow.
+
+**Caveats.**
+- The journal texts (reworked in OSRS on 14 January 2026) are best guesses.
+- Shearing The Thing without shears uses OpenRune's sheep message "You need a set of shears to do this."; the OSRS line isn't documented.
+- "How do I shear sheep, again?" without shears hands over a new pair (the transcript shows Fred's line there but no give box).
+- "Interacted with the Thing" is taken to mean a shearing attempt (Shear, or shears used on it); Talk-to doesn't unlock Fred's option.
+- "You don't have enough room for the reward." is a guess.
+- Chathead expressions are best guesses.
+
+**Release note.** Sheep Shearer is playable, with the progress values Quest Helper reads.
+
+**Checklist**
+- [x] The change compiles (`./gradlew build`).
+- [x] Tests related to the change pass (`./gradlew assemble test integration`, `spotlessCheck`).
+- [x] No documentation change needed.
+- [x] No unrelated formatting or dependency changes.
+- [x] Manual testing notes are under Tests above.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

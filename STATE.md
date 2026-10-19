@@ -23,11 +23,18 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
 - `fix/NN-*`, `content/*`: one fix or feature each, off main. New changes are `content/<slug>` or
   `fix/<slug>` (no numbers), one change per PR (docs/workflow.md "Changes for upstream"). Real dependencies only:
   fix/69 on fix/07, local/skip-cs2-packs on fix/11, content/looting-bag on fix/71,
-  content/pirates-treasure on fin/quest-test-fixture, local/test-commands on local/android.
+  content/pirates-treasure on fin/quest-test-fixture, content/sheep-shearer carries the same
+  QuestTalkFixture commit (35900b277), local/test-commands on local/android.
+- `content/sheep-shearer` (sd23, replaces #366's branch, Sheep Shearer only; ids from
+  fix_gameval_conflicts.py) takes `fin/sheep-shearer`'s place in integration.txt; it needs the
+  recorded resolution of its gamevals.toml lines next to content/pirates-treasure's (rr-cache
+  666570cd...). #367/#368 still stack on #366's old commit f69c8ed4c (with Romeo & Juliet).
 - `local/*`: never upstream. android (our RSProt build, Android client type, mobile toplevel),
   local-auth (token logins, shared RSA key), test-commands, world-settings (members, Lumbridge
   start, 1x XP, no clans), skip-cs2-packs, treasure-trails (ours while upstream writes its own clue
-  scrolls; ids renumbered, varp names unchanged), integration-tools.
+  scrolls; ids renumbered, varp names unchanged; dbrow trail_emote_seq_14 63892, off fix/25's
+  60920), romeo-juliet (= fin/romeo-juliet; ours until upstream #299 merges, then drop it, since both
+  bind Romeo, Juliet and the Apothecary), integration-tools.
 
 ## Ids and saved data
 - New gamevals follow upstream's procedure (docs/workflow.md "Gameval ids" in osrs-plugins-reverse):
@@ -89,3 +96,4 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
 4. QA gates (accuracy spec + checklist) for the new branches: fix/06-76, content/reconnect-login,
    dragon-specials, pirates-treasure, looting-bag, fletching.
 5. Treasure Trails: drop local/treasure-trails once upstream's clue scrolls land (keep varp names).
+6. Romeo & Juliet: drop local/romeo-juliet when #299 merges (check the varp 144 saves carry over).
