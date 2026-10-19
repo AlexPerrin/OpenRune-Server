@@ -8,6 +8,19 @@ Re-run by sq24 on 2026-10-19 at 068aabee2, one commit (`feat: Genie random event
 which was re-fetched and is still the tip. Fork PR AlexPerrin/OpenRune-Server#18. Spec and PR text (upstream's
 template, #369) at fork docs 0c19c7bb3. The verdicts at 7a2316ea9 and f076deed8 below are void.
 
+## Upstream re-check at 068aabee2, texts at c38c52ff4: FAIL (PR text only)
+sd23's text fix: the "game data in the cache" box is unticked with a note, "Builds and the server boots" is
+ticked, and the counts are 764 + 87. The ticks and counts are right now. One claim in the new note is not:
+- **Wrong claim:** "I found no upstream pattern for a list of area ids or a radius in the cache (no dbtable/pack
+  config for area lists)." Upstream `main` has one: `or-cache/src/main/kotlin/dev/openrune/impl/Music.kt`
+  defines the server-only `dbtable.music_classic` with `column("area", 0, VarType.AREA)`, one area per row.
+  Coordinates live in dbtables too: `VarType.COORDGRID` in `ShootingStarsTable`, `StrongholdFloorsTable` and
+  `InstanceSettingsTable`. A radius is an ordinary `VarType.INT` column.
+- **Fix (text):** drop the "no upstream pattern" sentence. Say the lists could move to a server-only dbtable
+  (an `AREA` column as in `music_classic`; a `COORDGRID` + `INT` row for the Grand Exchange box) and offer to
+  do it. Or move them, which is a code change and a re-gate.
+Everything else in the text is unchanged from the run below and passes.
+
 ## Upstream gate at 068aabee2: FAIL. What must change (PR text only)
 1. **The checklist's "game data in the cache, not Kotlin maps" is ticked, but it isn't true of the commit.**
    - `RandomEventLocations` holds the no-event places as Kotlin data: `NO_EVENT_AREAS` (five area symbols),
