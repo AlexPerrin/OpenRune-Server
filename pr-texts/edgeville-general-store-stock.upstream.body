@@ -1,0 +1,30 @@
+**Problem.** `.data/raw-cache/server/shops/generalshop2.toml` (the Edgeville General Store, from 6299e4114 "Mapped some osrs shops") is cut off at the top: the header fields (`sellMultiplier`, `buyMultiplier`, `delta`, `size`, `protect`, `runWeight`, `restock`, `allStock`, `placeholders`) and the first nine stock entries are missing, and the chisel entry lost its `[[inventory.stock]]` line, so its `obj`/`count`/`restockCycles` land on the inventory table. Packed, `inv.generalshop2` has size 0 and four stock entries; `Inventory.create` allocates `size` slots and writes every stock entry into them, so opening the shop throws `ArrayIndexOutOfBoundsException`. Nothing on `main` opens `generalshop2` yet (the Edgeville shopkeepers still open Lumbridge's `generalshop5`; #351 changes that and waits for this PR).
+
+**Change.**
+- `generalshop2.toml` rebuilt from the wiki's Edgeville General Store stock table, in its order: pot 5 (10 ticks), jug 2 (100), empty jug pack 5 (20), shears 2 (100), bucket 3 (10), empty bucket pack 15 (10), bowl 2 (50), cake tin 2 (50), tinderbox 2 (100), chisel 2 (100), hammer 5 (100), knife 1 (2), newcomer map 5 (100), security book 5 (100). Obj names are the ones `generalshop5.toml` uses for the same items. The five entries that survived the truncation already had these values.
+- Header as in the other general store tomls: Shared, stack Always, 1300 / 400 / 30 (the wiki's 130% / 40% / 3%), `restock = true`, `protect`, `runWeight`, `allStock`, `placeholders` false.
+- `size = 40`, as in the general stores #341 rewrote from live captures (Falador, Karamja, Nardah, Miscellania): general stores hold the items players sell to them beyond their base stock. The older raw-cache tomls use size = stock count (Lumbridge 15); either covers the stock.
+
+**Tests.** `ShopInventoryTomlTest` (or-cache, unit) reads every `[[inventory]]` in `.data/raw-cache/server/shops/*.toml` and in the content packs' `pack/configs/*.toml`, and checks that no stock key sits on the inventory table, every stock entry has `obj` and `count`, and an inventory with stock has a `size` at least its stock count. It's a structural check of the toml (the crash above), not a wiki comparison. On `main` it fails on `generalshop2` only; with this change it passes. Of the 395 shop tomls and 6 pack inventories, `generalshop2` is the only one it flags.
+
+On this branch (Docker `eclipse-temurin:21`, upstream's `./gradlew`, 4 GB container, no build or configuration cache; clean `freshCache` + `mergePluginGamevals`, then `buildCache`, then each task as a separate run, then the server to "Server ready"): buildCache pass, `spotlessCheck` pass, `assemble` pass, `test` pass, `integration` pass, boot pass (Server ready in 17.83s). In the built server cache, `inv.generalshop2` has size 40, stack Always, scope Shared and the 14 stock entries above. `tools/scripts/fix_gameval_conflicts.py --check` reports no conflicts.
+
+Nothing was checked in game from this exact branch.
+
+**Data sources.** OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): Edgeville General Store, Stock section (and Changes: knives added 19 January 2022). #341 for the 40-slot general store size.
+
+**Caveats.**
+- Size 40 is taken from #341's captures of other general stores, not a capture of Edgeville's.
+- As with every general store toml upstream, `allStock = false`: the store only buys items it stocks, while OSRS general stores buy any tradeable item. Unchanged here.
+- `sellMultiplier` / `buyMultiplier` / `delta` are kept for the toml format; prices come from the `shops.open` call.
+
+**Release note.** The Edgeville General Store's stock data is complete (14 items); opening it no longer fails.
+
+**Checklist**
+- [x] The change compiles (`./gradlew build`).
+- [x] Tests related to the change pass (`./gradlew assemble test integration`, `spotlessCheck`).
+- [x] No documentation change needed.
+- [x] No unrelated formatting or dependency changes.
+- [x] Manual testing notes are under Tests above.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

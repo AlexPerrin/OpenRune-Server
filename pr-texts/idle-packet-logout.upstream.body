@@ -1,0 +1,31 @@
+**Problem.** The client sends `IDLE` after five minutes without mouse or keyboard input (rsprot's
+`Idle` doc: 15,000 client cycles). On OSRS that logs the player out. OpenRune has no listener for
+it, so idle players stay logged in.
+
+**Change.**
+- `IdleHandler` sets `manualLogout`, the same flag as the logout button, so `PlayerLogoutProcess`
+  applies the same checks (combat etc.). Ignored while a logout is already pending.
+- Server-wide toggle `gameplay.idle-logout` in `game.yml` (`GameplayConfig.idleLogout`, next to
+  `level-up-popups`), default `true` as on live. With `false` the handler ignores `IDLE` and idle
+  players stay logged in. Documented in `game.example.yml`; an existing `game.yml` without the key
+  gets the default.
+
+**Tests.** None (removed `IdleHandlerTest` as asked in review).
+
+On this branch merged onto current `main` (c2492318d; `main` hasn't touched these files since the branch point) (Docker `eclipse-temurin:21`, upstream's `./gradlew`, 4 GB container, no build or configuration cache; clean `freshCache` + `mergePluginGamevals`, `buildCache`, then each task as a separate run, then the server to "Server ready"): buildCache pass, `spotlessCheck` pass, `assemble` pass, `test` pass, `integration` pass, boot pass.
+
+**Caveats.** If logout is blocked (in combat), the player gets the logout button's message, and the
+client won't send IDLE again until the next five idle minutes. We have not checked what live does
+in that case.
+
+**Release note.** Players are logged out after five idle minutes, as on OSRS; servers can turn this
+off with `gameplay.idle-logout: false`.
+
+**Checklist**
+- [x] The change compiles (`./gradlew build`).
+- [x] Tests related to the change pass (`./gradlew assemble test integration`, `spotlessCheck`).
+- [x] `game.example.yml` documents the new key.
+- [x] No unrelated formatting or dependency changes.
+- [x] Manual testing notes are under Tests above.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

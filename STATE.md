@@ -30,6 +30,13 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   fix_gameval_conflicts.py) takes `fin/sheep-shearer`'s place in integration.txt; it needs the
   recorded resolution of its gamevals.toml lines next to content/pirates-treasure's (rr-cache
   666570cd...). #367/#368 still stack on #366's old commit f69c8ed4c (with Romeo & Juliet).
+- `fix/edgeville-general-store-stock` (sd24, off main): rebuilds upstream's truncated
+  `generalshop2.toml` (size 0 -> AIOOBE on Trade) to the wiki stock, size 40; #351 (fix/55) depends on it
+  and waits until it merges upstream. Spec accuracy/edgeville-general-store-stock.md.
+- Review commits (sd24, on the fork heads, not rebased; these branches are 7 commits behind main, which touches
+  none of their files): fix/18 adds `gameplay.idle-logout` (default true) and drops IdleHandlerTest (#348);
+  fix/57 moves the stone-arrangement attr to the Temp varbit `gameframe_stone_before_fullscreen` 65447 on
+  varp `gameframe_state` 65471, picked with sheep-shearer's 65472/65449 taken (#362).
 - `local/*`: never upstream. android (our RSProt build, Android client type, mobile toplevel),
   local-auth (token logins, shared RSA key), test-commands, world-settings (members, Lumbridge
   start, 1x XP, no clans), skip-cs2-packs, treasure-trails (ours while upstream writes its own clue
