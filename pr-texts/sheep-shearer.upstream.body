@@ -22,7 +22,7 @@ Sheep Shearer (Fred the Farmer, north-west of Lumbridge) had no quest script: Fr
 ## How it was tested
 
 - Your in-game check of the quest on the previous commit (thanks).
-- On this branch: `freshCache` and `buildCache`, then `spotlessCheck`, `test` and `integration` of the changed modules (`content:quest`): RESULTS_PENDING. `tools/scripts/fix_gameval_conflicts.py --check`: no conflicts.
+- On this branch: `freshCache` and `buildCache`, then `spotlessCheck` and `test` of the changed modules (`content:quest`, `quest-pack`) pass (207 tests in `content:quest`, 0 failures). `tools/scripts/fix_gameval_conflicts.py --check`: no conflicts.
 - Not checked in game by us on this commit.
 
 ## Checklist
@@ -36,6 +36,8 @@ Sheep Shearer (Fred the Farmer, north-west of Lumbridge) had no quest script: Fr
 - [x] No unrelated or hand-edited generated changes
 
 ## Screenshots / notes for reviewers
+
+Current `main` (829b9477d) is merged in: the only conflict was `content/quest/pack/src/main/resources/gamevals.toml` (appended lines next to Doric, Knight's Sword and Waterfall), resolved by keeping both sides; `fix_gameval_conflicts.py --check` is clean.
 
 Data sources: OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): Sheep Shearer, Transcript:Sheep Shearer, Transcript:Fred the Farmer, Sheep (penguins). Step values: Quest Helper `SheepShearer` (BSD; varp 179, steps 1-20). Cache: npc 731 ops, obj 7670, the `quest_sheepshearer` dbrow.
 
