@@ -2,7 +2,7 @@
 - Branch: `fix/18-idle-packet-logout`
 - Commit: `cfe4a706f45ce87b8123d9dd6713b717657101f3`
 ## Internal gate: **PASS**
-## Upstream gate: **FAIL**
+## Upstream gate: **PASS**
 
 Run by sq25 (companion to sd24) on 2026-10-19. The commit is not pushed (the fork branch backs open upstream
 PR #348, whose head is still b484a4039); fetched from sd24's clone `re/agents/sd24/or` (worktree w18). Two
@@ -59,7 +59,7 @@ since 1be5dfb5f, up to today's 731fd392a.
 n/a: the protocol claim (IDLE after 15,000 cycles) is rsprot's documentation, checked in its sources, and the
 in-game run shows the client sending it.
 
-## Upstream gate details (FAIL)
+## Upstream gate, first run: FAIL (text fixed at docs b678f7eb7; see "Upstream re-run" at the end)
 Passes: scope (one fix: handler, listener registration, the config key and its `game.example.yml` entry);
 no other upstream PR for idle logout (`gh pr list --search idle`: only #348); `--check` clean; commit subjects
 `fix:`, authored as Alex Perrin with the Co-Authored-By line; no KDoc or explanatory code comments (the
@@ -85,3 +85,19 @@ Fails on the PR text (`pr-texts/idle-packet-logout.upstream.body`), text-only, n
    `idle-logout: false`: still logged in after 8).
 
 Re-check after the text change: pr-text-review only (same commit).
+
+## Upstream re-run: PASS (text at docs b678f7eb7, same commit)
+pr-text-review of `pr-texts/idle-packet-logout.upstream.body` and `.title` at b678f7eb7 (sd24's fix for the two
+items above; code unchanged at cfe4a706f), 2026-10-19:
+- Data sources present: OSRS Wiki "Idle", Logout timer (5 idle minutes, out of combat; matches my read of the page)
+  and rsprot's `Idle` doc (15,000 client cycles; matches its sources), with the wiki's licence line.
+- Results line: "gate run on upstream `main` bcdb03292 + this branch" is true of this record; "`main` touches none
+  of this branch's files up to 731fd392a" confirmed: `git diff --name-only 1be5dfb5f 731fd392a --` the branch's 4
+  files is empty. The step list (no build or configuration cache, test 708/0, integration 79/0, boot) matches
+  the internal gate table.
+- Tests: the in-game lines (default logged out after about 5-6 idle minutes; `false` with `idleLogout=false` in
+  the boot log, still logged in after 8) match the In-game section; "IDLE while logout is blocked by combat was
+  not tried" is true.
+- Unchanged claims re-checked: handler and toggle as in the diff; combat-blocked message from
+  `processManualLogout`; release note and checklist true. Every section present; subject `fix:`.
+- Caveats complete against the accuracy check (the combat-blocked case; the 6-hour logout is not claimed).

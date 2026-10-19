@@ -2,7 +2,7 @@
 - Branch: `fix/57-gameframe-fullscreen-map`
 - Commit: `d3a194b9e47b680569eb01ab4008551a054bdcce`
 ## Internal gate: **PASS**
-## Upstream gate: **FAIL**
+## Upstream gate: **PASS**
 
 Run by sq25 (companion to sd24) on 2026-10-19. The commit is not pushed (the fork branch backs open upstream
 PR #362, head still a01ebb28b); fetched from sd24's clone `re/agents/sd24/or` (worktree w57). Three commits on
@@ -67,7 +67,7 @@ Values: client varbit 4607 (`get_var`), toplevel from `list_interfaces`, the ser
 ### reverse
 n/a.
 
-## Upstream gate details (FAIL)
+## Upstream gate, first run: FAIL (text fixed at docs b678f7eb7; see "Upstream re-run" at the end)
 Passes: scope (one fix; gameframe script, its gamevals and a pack varp/varbit; nothing unrelated); no other
 upstream PR on the gameframe (`gh pr list --search gameframe`: only #362); `--check` clean as above; `fix:`
 subjects, authored as Alex Perrin, Co-Authored-By lines; nothing made public for a test, no test added (interface
@@ -98,3 +98,21 @@ Fails on the PR text (`pr-texts/gameframe-fullscreen-map.upstream.body`), text-o
    tried in game" as the remaining gap.
 
 Re-check after the text change: pr-text-review only (same commit).
+
+## Upstream re-run: PASS (text at docs b678f7eb7, same commit)
+pr-text-review of `pr-texts/gameframe-fullscreen-map.upstream.body` and `.title` at b678f7eb7 (sd24's fix for the
+three items above; code unchanged at d3a194b9e), 2026-10-19:
+- Data sources present ("None external", the flags from or-cache's `GameframeTable` rows 161/164/165): true.
+- Results paragraph: `main` 731fd392a + this branch, clean merge; "`main` touches no gameframe or world map file"
+  confirmed (`git diff --name-only 1be5dfb5f 731fd392a` over the branch's 3 files and `content/interfaces/worldmap`
+  is empty); buildCache packs `gameframe_vars.toml`, test 726/0, integration 79/0, boot; `--check` clean on the
+  branch, the merge with `main`, and with our other open PRs' ids (fork `integration` and the open-PR scan
+  above). It no longer claims "no build cache" (this run used the remote build cache for compiles; tests
+  uncached). Matches the internal gate table.
+- In-game lines match the In-game section (161 with 4607 = 0 -> map 165, 4607 = 1, 65447 = 1 -> close 161,
+  0, 0; logout with the map open -> 161, 4607 = 0; saved 165 with 4607 = 1 -> 164). The 4607 = 0 start state was
+  set with `::varbit` (a new account starts at 1, upstream's account default); the text states the state, not
+  how it was reached, which is fine.
+- Caveats now list the untried fixed-frame close, the only gap left; the rows-order note is true.
+- Unchanged claims (problem, change, ids, review answer, release note, checklist) re-checked against the diff.
+  Every section present; subject `fix:`.
