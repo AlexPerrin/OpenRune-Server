@@ -12,13 +12,13 @@ import org.rsmod.api.invtx.select
 import org.rsmod.api.player.events.interact.HeldUDefaultEvents
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.player.startInvTransmit
+import org.rsmod.api.player.vars.boolVarBit
 import org.rsmod.api.script.onIfModalButton
 import org.rsmod.api.script.onOpHeld1
 import org.rsmod.api.script.onOpHeld2
 import org.rsmod.api.script.onOpHeld3
 import org.rsmod.api.script.onOpHeld4
 import org.rsmod.api.script.onOpHeldU
-import org.rsmod.api.player.vars.boolVarBit
 import org.rsmod.game.entity.Player
 import org.rsmod.plugin.scripts.PluginScript
 import org.rsmod.plugin.scripts.ScriptContext

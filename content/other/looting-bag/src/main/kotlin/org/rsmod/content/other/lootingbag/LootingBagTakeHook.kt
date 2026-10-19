@@ -3,9 +3,9 @@ package org.rsmod.content.other.lootingbag
 import dev.openrune.types.ItemServerType
 import org.rsmod.api.area.checker.isInWildernessBasic
 import org.rsmod.api.player.hook.PlayerObjTakeRedirectHook
+import org.rsmod.content.other.lootingbag.LootingBagScript.Companion.BAGS
 import org.rsmod.content.other.lootingbag.LootingBagScript.Companion.BAG_INV
 import org.rsmod.content.other.lootingbag.LootingBagScript.Companion.BAG_OPEN
-import org.rsmod.content.other.lootingbag.LootingBagScript.Companion.BAGS
 import org.rsmod.game.entity.Player
 import org.rsmod.game.inv.Inventory
 import org.rsmod.game.obj.Obj
