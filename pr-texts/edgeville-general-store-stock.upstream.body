@@ -1,30 +1,46 @@
-**Problem.** `.data/raw-cache/server/shops/generalshop2.toml` (the Edgeville General Store, from 6299e4114 "Mapped some osrs shops") is cut off at the top: the header fields (`sellMultiplier`, `buyMultiplier`, `delta`, `size`, `protect`, `runWeight`, `restock`, `allStock`, `placeholders`) and the first nine stock entries are missing, and the chisel entry lost its `[[inventory.stock]]` line, so its `obj`/`count`/`restockCycles` land on the inventory table. Packed, `inv.generalshop2` has size 0 and four stock entries; `Inventory.create` allocates `size` slots and writes every stock entry into them, so opening the shop throws `ArrayIndexOutOfBoundsException`. Nothing on `main` opens `generalshop2` yet (the Edgeville shopkeepers still open Lumbridge's `generalshop5`; #351 changes that and waits for this PR).
+## Summary
 
-**Change.**
-- `generalshop2.toml` rebuilt from the wiki's Edgeville General Store stock table, in its order: pot 5 (10 ticks), jug 2 (100), empty jug pack 5 (20), shears 2 (100), bucket 3 (10), empty bucket pack 15 (10), bowl 2 (50), cake tin 2 (50), tinderbox 2 (100), chisel 2 (100), hammer 5 (100), knife 1 (2), newcomer map 5 (100), security book 5 (100). Obj names are the ones `generalshop5.toml` uses for the same items. The five entries that survived the truncation already had these values.
+`.data/raw-cache/server/shops/generalshop2.toml` (the Edgeville General Store, from 6299e4114 "Mapped some osrs shops") is cut off at the top: the header fields (`sellMultiplier`, `buyMultiplier`, `delta`, `size`, `protect`, `runWeight`, `restock`, `allStock`, `placeholders`) and the first nine stock entries are missing, and the chisel entry lost its `[[inventory.stock]]` line, so its `obj`/`count`/`restockCycles` land on the inventory table. Packed, `inv.generalshop2` has size 0 and four stock entries; `Inventory.create` allocates `size` slots and writes every stock entry into them, so opening the shop throws `ArrayIndexOutOfBoundsException`. Nothing on `main` opens `generalshop2` yet (the Edgeville shopkeepers still open Lumbridge's `generalshop5`; our #351 changes that and waits for this PR).
+
+This rebuilds the toml from the wiki's Edgeville General Store stock table:
+- Stock, in the wiki's order: pot 5 (10 ticks), jug 2 (100), empty jug pack 5 (20), shears 2 (100), bucket 3 (10), empty bucket pack 15 (10), bowl 2 (50), cake tin 2 (50), tinderbox 2 (100), chisel 2 (100), hammer 5 (100), knife 1 (2), newcomer map 5 (100), security book 5 (100). Obj names are the ones `generalshop5.toml` uses for the same items. The five entries that survived the truncation already had these values.
 - Header as in the other general store tomls: Shared, stack Always, 1300 / 400 / 30 (the wiki's 130% / 40% / 3%), `restock = true`, `protect`, `runWeight`, `allStock`, `placeholders` false.
 - `size = 40`, as in the general stores #341 rewrote from live captures (Falador, Karamja, Nardah, Miscellania): general stores hold the items players sell to them beyond their base stock. The older raw-cache tomls use size = stock count (Lumbridge 15); either covers the stock.
 
-**Tests.** None added (a data fix; AGENTS.md skips config-matches-wiki tests). To check it: `./gradlew :or-cache:buildCache`, then decode inv 4 (`inv.generalshop2`) from `.data/cache/SERVER`: it has size 40, stack Always, scope Shared and the 14 stock entries above in that order. A one-off scan of the 395 tomls in `.data/raw-cache/server/shops` and the 6 inventories in the content packs' `pack/configs` found no other inventory with stock keys on its table, no `size`, or a `size` below its stock count.
+## Type of change
 
-On this branch (off `main` bcdb03292): `freshCache` + `mergePluginGamevals`, then `:or-cache:buildCache` pass; the packed `inv.generalshop2` decodes as size 40, flags restock only, stack Always, scope Shared, 14 stock entries in the order and counts above. The change is one data file, so no module's tests are affected.
+- [x] Bug fix
+- [ ] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [x] Cache / gamevals / pack data
+- [ ] Docs / tooling
 
-Nothing was checked in game from this exact branch.
+## How it was tested
 
-**Data sources.** OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): Edgeville General Store, Stock section (and Changes: knives added 19 January 2022). #341 for the 40-slot general store size.
+- Upstream `main` 731fd392a + this branch (clean merge; it also merges cleanly onto 829b9477d, which touches no shop toml): `freshCache` + `mergePluginGamevals`, `buildCache`, `spotlessCheck`, `assemble`, `test` (726 tests, 0 failures), `integration` (79 tests, 0 failures), and the server boots to "Server ready". `tools/scripts/fix_gameval_conflicts.py --check`: no conflicts.
+- The packed cache: `ServerCacheManager.getInventory(4)` (`inv.generalshop2`) has size 40, stack Always, scope Shared and the 14 stock entries above, in that order, with those counts and restock cycles.
+- A one-off scan of the 395 tomls in `.data/raw-cache/server/shops` and the 6 inventories in the content packs' `pack/configs` found no other inventory with stock keys on its table, no `size`, or a `size` below its stock count.
+- Not checked in game: nothing on `main` opens this shop yet (#351 does). No test added (a data fix; AGENTS.md skips config-matches-wiki tests).
 
-**Caveats.**
+## Checklist
+
+- [x] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes) (none added)
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
+- [x] State in varbits/varps, not attrs (no state)
+- [x] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the stock, counts, restock times and multipliers match the wiki. The gaps are listed under notes below rather than in `docs/quirks.md`; none of them is introduced by this PR.
+- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): we have no rsprox dumps of the official game (and this is shop data, not new content)
+- [x] No unrelated or hand-edited generated changes
+
+## Screenshots / notes for reviewers
+
+Data sources: OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): Edgeville General Store, Stock section (and Changes: knives added 19 January 2022). #341 for the 40-slot general store size.
+
+Known gaps:
 - Size 40 is taken from #341's captures of other general stores, not a capture of Edgeville's.
 - As with every general store toml upstream, `allStock = false`: the store only buys items it stocks, while OSRS general stores buy any tradeable item. Unchanged here.
 - `sellMultiplier` / `buyMultiplier` / `delta` are kept for the toml format; prices come from the `shops.open` call.
 
-**Release note.** The Edgeville General Store's stock data is complete (14 items); opening it no longer fails.
-
-**Checklist**
-- [x] The change compiles (`./gradlew build`).
-- [x] Tests related to the change pass (none added; existing suites pass).
-- [x] No documentation change needed.
-- [x] No unrelated formatting or dependency changes.
-- [x] Manual testing notes are under Tests above.
+Release note: the Edgeville General Store's stock data is complete (14 items); opening it no longer fails.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

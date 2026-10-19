@@ -1,20 +1,42 @@
-Fork PR (same branch, for browsing): https://github.com/AlexPerrin/OpenRune-Server/pull/17
+## Summary
 
 Follow-up to #356 (rune pouch), from an accuracy check of the merged module against the OSRS Wiki.
 
-**Problem.** In the rune pouch interface (190), clicking the rune pouch itself on the inventory side answers "You can only store runes in the rune pouch.". OSRS answers "Don't be silly." (OSRS Wiki, Rune pouch, Trivia: "If a player attempts to store the rune pouch while the storage interface is open, the message "Don't be silly." appears in the chatbox.").
+In the rune pouch interface (190), clicking the rune pouch itself on the inventory side answers "You can only store runes in the rune pouch.". OSRS answers "Don't be silly." (OSRS Wiki, Rune pouch, Trivia: "If a player attempts to store the rune pouch while the storage interface is open, the message "Don't be silly." appears in the chatbox.").
 
-**Change.** `RunePouchScript.inventoryOp()`: an inventory-side click on any of the four pouches (rune pouch, divine rune pouch and their locked variants) answers "Don't be silly." before the rune check; other non-runes keep the existing line.
+`RunePouchScript.inventoryOp()`: an inventory-side click on any of the four pouches (rune pouch, divine rune pouch and their locked variants) answers "Don't be silly." before the rune check; other non-runes keep the existing line.
 
-**Tests.** No new test: this is a message in a simple op handler (AGENTS.md, "Unit tests"). The existing `RunePouchScriptTest` still passes.
+## Type of change
 
-On this branch (Docker `eclipse-temurin:21`, upstream's `./gradlew`, after `freshCache`): the rune pouch module's `spotlessCheck`, `test` and `integration` pass (`RunePouchScriptTest` 5/5).
+- [x] Bug fix
+- [ ] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [ ] Cache / gamevals / pack data
+- [ ] Docs / tooling
 
-Checked in game on a branch server (main + this fix, desktop RuneLite, a members account): with a rune pouch, a divine rune pouch, a rune pouch (l), coins and air runes in the inventory, opening the pouch and left-clicking each in the interface's inventory side gave "Don't be silly." for all three pouches (nothing stored), "You can only store runes in the rune pouch." for the coins, and stored one air rune. To repeat it: open a rune pouch and click the pouch itself, then a non-rune, then a rune.
+## How it was tested
 
-**Data sources.** OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): "Rune pouch", Trivia.
+- In game on a branch server (main + this fix, desktop RuneLite, a members account, items spawned for the test): with a rune pouch, a divine rune pouch, a rune pouch (l), coins and air runes in the inventory, opening the pouch and left-clicking each on the interface's inventory side gave "Don't be silly." for all three pouches (nothing stored), "You can only store runes in the rune pouch." for the coins, and stored one air rune. This was run on an earlier commit of this branch with the same condition, order and message; the current commit was not re-run in game. To repeat it: open a rune pouch and click the pouch itself, then a non-rune, then a rune.
+- Upstream `main` 731fd392a + this branch: `freshCache` + `mergePluginGamevals`, `buildCache`, `spotlessCheck`, `assemble`, `test` (726 tests, 0 failures), `integration` (79 tests, 0 failures; `RunePouchScriptTest` 5/5), and the server boots to "Server ready". It also merges cleanly onto 829b9477d, which doesn't touch the module.
+- No new test: this is a message in a simple op handler (AGENTS.md, "Unit tests").
 
-**Caveats.** The wiki's Trivia line names the rune pouch only; the divine rune pouch and the locked pouches get the same line because they use the same interface (190), and the Divine rune pouch page does not mention it.
+## Checklist
+
+- [x] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes) (none added)
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
+- [x] State in varbits/varps, not attrs (no new state)
+- [x] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the message matches the wiki's Trivia line. The extension to the divine and locked pouches, and the module's remaining gaps, are listed under notes below rather than in `docs/quirks.md`.
+- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): we have no rsprox dumps of the official game (and this is one chat message)
+- [x] No unrelated or hand-edited generated changes
+
+## Screenshots / notes for reviewers
+
+Fork PR (same branch, for browsing): https://github.com/AlexPerrin/OpenRune-Server/pull/17
+
+Data sources: OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): "Rune pouch", Trivia.
+
+The wiki's Trivia line names the rune pouch only; the divine rune pouch and the locked pouches get the same line because they use the same interface (190), and the Divine rune pouch page does not mention it.
 
 This fixes one line. The same check found these still missing in the rune pouch module; each would be its own later fix, and none is in this PR:
 - Death: an unlocked pouch is lost on a PvP death (Wilderness, PvP worlds); on a PvM death it goes to the gravestone with its runes (wiki, Rune pouch intro and Changes, 21 June 2023).
@@ -25,13 +47,6 @@ This fixes one line. The same check found these still missing in the rune pouch 
 - One rune pouch per player; Glarial's Tomb and Koschei only with an empty pouch (wiki, Changes).
 - Not sourced (no wiki line or capture): the other refusal messages, Empty stopping at the first rune that does not fit, the mapping of interface ops to quantities, and Store-X/Withdraw-X not changing the remembered custom amount.
 
-**Release note.** Storing the rune pouch in itself now says "Don't be silly.", as in OSRS.
-
-**Checklist**
-- [x] The change compiles (`./gradlew build`).
-- [x] Tests related to the change pass (`./gradlew assemble test integration`, `spotlessCheck`).
-- [x] No documentation change needed.
-- [x] No unrelated formatting or dependency changes.
-- [x] Manual testing notes are under Tests above.
+Release note: storing the rune pouch in itself now says "Don't be silly.", as in OSRS.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
