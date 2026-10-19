@@ -1,6 +1,6 @@
 # Genie random event (acc/genie, upstream PR #355)
 
-Spec for the audited rewrite on `acc/genie` (one commit 7a2316ea9 on main 731fd392a: the feature, the timer ids, the AGENTS.md trim and the hand-over fix, squashed).
+Spec for the audited rewrite on `acc/genie` (one commit 068aabee2 on main 829b9477d: the feature, the timer ids, the AGENTS.md trim, the hand-over fix, the repeat-Talk-to line and the late-completion guard, squashed).
 No earlier audit exists for this feature; this one was written 2026-10-18 by sd23. The osrs-mcp
 server was down, so the wiki was read directly (oldschool.runescape.wiki, `?action=raw` and page fetches).
 
@@ -34,7 +34,7 @@ for each rule.
 | 17 | Lamp XP | "ten times their skill level of choice" (Lamp); "10 times the current level" (Genie) | `statBase(stat) * 10` | matches (base vs boosted level unsourced, caveat) |
 | 18 | Rub / give messages | not on the wiki | "Your wish has been granted!"; no message on receipt | unsourced (caveat) |
 | 19 | Other player's Dismiss | not documented | "He isn't interested in you." | unsourced (caveat) |
-| 20 | Completed / no-event-zone talk | "Have a nice day, [Master/Mistress]." (Transcript) | not implemented (the Genie gives the lamp anywhere) | scope gap (caveat) |
+| 20 | Completed / no-event-zone talk | "Have a nice day, [Master/Mistress]." (Transcript) | completed: a repeat Talk-to before he leaves gets the line; no-event zone: not implemented (the Genie gives the lamp anywhere) | completed matches; zone case scope gap (caveat) |
 | 21 | Underwater Genie | possible underwater at Mogre Camp / off Fossil Island (Genie, Trivia) | not implemented | scope gap (caveat) |
 
 ## Divergences

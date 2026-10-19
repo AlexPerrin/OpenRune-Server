@@ -1,0 +1,34 @@
+## Summary
+
+Fixes the stile issue a-thoren found while testing #366: "you can jump over the stile from too far away and the code assumes you're right next to it, meaning you don't always end up in the sheep pen". The cause is the shared `StileScript` (every `fullstyle` stile, including the Sheep Shearer pen's), so this is its own change rather than part of #366.
+
+`StileScript.climbStile` climbed from the player's tile wherever the interaction ended, e.g. a tile diagonal to the stile or beside it along the fence, so the forced move could start and end on the wrong tiles. It now takes the stile's footprint tile on the player's side of the fence, walks the player onto it (`playerMove`), and then climbs to the other footprint tile, the same way the Port Sarim stile on `main` does. If the player can't reach the start tile, nothing happens.
+
+## Type of change
+
+- [x] Bug fix
+- [ ] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [ ] Cache / gamevals / pack data
+- [ ] Docs / tooling
+
+## How it was tested
+
+- `content:generic:generic-locs`: `spotlessCheck`, `test` and `integration` pass: RESULTS_PENDING.
+- To check in game: at the Sheep Shearer pen stile north-west of Lumbridge, click Climb-over from a tile diagonal to the stile and from the tile beside it along the fence, on both sides. Each time the player walks onto the stile's tile on their side, climbs, and ends on the other side.
+
+## Checklist
+
+- [ ] Builds and the server boots (our QA gate checks this before the PR is updated)
+- [x] Tests only cover complex logic and anything that moves items (no dupes): no new test, simple loc handler
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
+- [x] State in varbits/varps, not attrs
+- [x] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): no deviation known
+- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): we have no dumps of the official game
+- [x] No unrelated or hand-edited generated changes
+
+## Screenshots / notes for reviewers
+
+Walking to the start tile follows the Port Sarim stile on `main`. As a 2004 reference only, LostCity's content scripts (MIT, https://github.com/LostCityRS/Content, `skill_agility/scripts/shortcuts.rs2`) also choose the side by coordinate and put the player on the start tile before the climb.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

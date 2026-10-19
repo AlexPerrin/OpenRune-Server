@@ -52,11 +52,13 @@ reachable for this pass; the citations are the audit's, checked against the code
 ## Scope gaps
 - Shearing animation and timing on The Thing use the generic `human_shearing` seq; The Thing doesn't run away or squeak (row 19). Both are a PR caveat.
 
-## Tests (AGENTS.md: item-moving paths only)
-`SheepShearerInteractionTest`: accept (varp 1, shears given), accept while holding shears (no second
-pair), partial then final hand-in (varp 6 → 21, rewards once, spare balls kept), 20 balls on the first
-talk (complete before The Thing, 1 spare kept), full coin stack on the hand-in and on the first talk (wool
-returned, quest open, no QP).
+## Tests
+None on the branch now: the maintainer asked for `SheepShearerInteractionTest` to be removed on #366
+(2026-10-19), and `QuestTalkFixture` went with it (nothing else on this branch used it).
+
+## Review: the sheep pen stile (#366, a-thoren)
+The bug is in upstream's shared `StileScript`, not in the quest: fixed as its own change, `fix/stile-approach`
+(spec `accuracy/stile-approach.md`). #366 doesn't depend on it.
 
 ## Ids
 New server-only gamevals, assigned by `tools/scripts/fix_gameval_conflicts.py` from `-1`:
@@ -64,8 +66,12 @@ varp `sheep_shearer_state` 65472; varbits `sheep_shearer_progress` 65449 (bits 0
 `sheep_shearer_saw_thing` 65448 (bit 0 of sheep_shearer_state).
 
 ## PR split
-- `content/sheep-shearer` (this change), off upstream `main`, two commits: `QuestTalkFixture` (test fixture,
-  shared with our other quest branches) and the quest.
-- Depends: the `QuestTalkFixture` commit (35900b277, `fin/quest-test-fixture`). It is included here so the
-  branch builds on its own; if the fixture is opened as its own PR, this one waits for it.
-- Replaces #366. Romeo & Juliet is left to upstream #299.
+- `content/sheep-shearer` (#366): the quest only. New commits on 19aefd90a (tests and fixture removed; the stile
+  change added and reverted, now in `fix/stile-approach`). No `Depends:`.
+- The branch is on main c2492318d and conflicts with current main 829b9477d in
+  `content/quest/pack/src/main/resources/gamevals.toml` (appended lines next to Doric, Knight's Sword, Waterfall).
+  Two ways to update #366, the user's choice at push time:
+  1. Force-push `content/sheep-shearer-829` (one commit 5445240b8 on 829b9477d: the same quest files, gamevals
+     with both sides kept, no tests): a clean single-commit PR.
+  2. Merge main into `content/sheep-shearer` (no history rewrite), resolving the same lines.
+- Romeo & Juliet is left to upstream #299.

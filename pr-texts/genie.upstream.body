@@ -1,25 +1,32 @@
 Fork PR (same branch, for browsing): https://github.com/AlexPerrin/OpenRune-Server/pull/18
 
-Content area from OpenRune/OpenRune-Server#353 (answers there: all of it, one PR per row, ids renumbered against main, wiki data is fine).
+## Summary
 
-Updated: this push replaces the first version with a rewrite checked against the OSRS Wiki, on current `main` (`731fd392a`).
+There were no random events. This adds the Genie random event in a new module `content/events/random-events`, scheduled by the OSRS Wiki's random event spawn mechanics ("Random events", section "Spawn mechanics", which quotes Mod Ash for each rule). Content area from #353. This push replaces the first version with a rewrite checked against the wiki, on current `main` (`829b9477d`).
 
-**Problem.** There were no random events.
-
-**Change.** New module `content/events/random-events` with the Genie, scheduled by the OSRS Wiki's random event spawn mechanics ("Random events", section "Spawn mechanics", which quotes Mod Ash for each rule):
 - **When.** The next event is due 1-2 hours after the last one, on a real-time clock that keeps running while the player is logged out. The due time is stored in a persistent player attribute (`random_event_next_at`, epoch milliseconds), so it survives logout and restarts. A soft timer checks every 5 minutes of play (500 ticks) whether it is due.
 - **Offline.** If the event came due while the player was offline, the due time moves forward by 10-70 minutes on login, as many times as needed to land in the future, and keeps counting.
 - **Where not.** When it is due and the player is somewhere random events are not allowed, the event is missed and a new 1-2 hours is rolled. The places covered: inside a bank with a bank booth (a booth within 7 tiles) or in front of a bank chest (within 2 tiles), except Ferox Enclave; the Grand Exchange's stone square; the God Wars Dungeon, Ancient Cavern, Waterbirth Island Dungeon, Ruins of Tapoyauik and Charred Dungeon (cache areas); and instances (boss lairs and minigames run in instances here).
 - **Transformed.** No event while the player's model is altered (transformation ring, greegree): it is missed in the same way. A Genie that is already out leaves at once if the player transforms (Mod Ash: "the genie would delete itself when it realised you'd equipped that").
 - **Busy.** An open interface or a Make-X repeat (a pending weak queue, which is how Make-X loops run here) holds a due event back. It is retried every tick and spawns as soon as the player is free.
 - **One at a time.** No second event NPC while the Genie is out.
-- **The Genie**: appears beside the player, faces them and says "Greetings, Master/Mistress <name>!". Every 12 seconds he follows them, banks included (wiki, 1 November 2023), and calls them by name with one of the three transcript lines. Talk-to gives the lamp with the transcript's line; the lamp is given as the dialogue opens, and the Genie leaves when it closes or 12 seconds (20 ticks) after Talk-to, whichever is first, so an interrupted Talk-to never loses the lamp or leaves him behind. Dismiss sends him away. He leaves after a minute with "Maybe later." when ignored. Another player's Talk-to gets "Sorry, I'm trying to talk to someone else, but he/she seems to be ignoring me." (the owner's pronoun).
+- **The Genie**: appears beside the player, faces them and says "Greetings, Master/Mistress <name>!". Every 12 seconds he follows them, banks included (wiki, 1 November 2023), and calls them by name with one of the three transcript lines. Talk-to gives the lamp with the transcript's line; the lamp is given as the dialogue opens, and the Genie leaves when it closes or 12 seconds (20 ticks) after Talk-to, whichever is first, so an interrupted Talk-to never loses the lamp or leaves him behind. Talked to again before he goes, he says "Have a nice day, Master/Mistress." (Transcript:Genie, completed event). Dismiss sends him away. He leaves after a minute with "Maybe later." when ignored. Another player's Talk-to gets "Sorry, I'm trying to talk to someone else, but he/she seems to be ignoring me." (the owner's pronoun).
 - **The lamp:** Rub gives 10 x the chosen skill's level in XP, multiplied by the world's XP rate like other XP (`statAdvance`, as upstream's quest lamp does). With a full inventory it is dropped at the player's feet for 3 hours (wiki trivia, Mod Ash: rewards are dropped and stay up to three hours).
 - `::randomevent` summons him (like `::star`), bypassing the schedule.
 
 New server-only gamevals: timers `random_event` (the 5-minute check) and `random_event_genie` (the Genie's calls), written as `-1` and assigned by `tools/scripts/fix_gameval_conflicts.py` (65534 and 65533, one below the cannon PR's timer so the two don't clash).
 
-**Tests.** `GenieRandomEventTest` (8, integration), on the schedule and the lamp hand-over (AGENTS.md):
+## Type of change
+
+- [ ] Bug fix
+- [x] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [x] Cache / gamevals / pack data
+- [ ] Docs / tooling
+
+## How it was tested
+
+Unit/integration: `GenieRandomEventTest` (8, integration), on the schedule and the lamp hand-over (AGENTS.md):
 - the due time is 1-2 h ahead, persisted, and a relog does not restart it;
 - an event due while offline moves 10-70 min forward;
 - a due event spawns him and rolls the next one;
@@ -29,19 +36,32 @@ New server-only gamevals: timers `random_event` (the 5-minute check) and `random
 - a Make-X weak queue delays it;
 - an interrupted hand-over still gives exactly one lamp, and the Genie leaves.
 
-How to check in game (each claim above):
-1. `::randomevent` shows the Genie beside you, facing you, with the greeting overhead. Walk away: within 12 s he is beside you again with a call line. Ignore him for a minute: "Maybe later." and he is gone.
-2. Talk-to gives the lamp. With a full inventory the lamp appears on the floor under you.
-3. Rub: choose a skill, gain 10 x its level in XP.
-4. Scheduling: the attribute `random_event_next_at` is in the character's saved attributes after a login. The rest is too slow to wait for in game (1-2 h); the tests cover it.
+On this branch: the random-events module's `spotlessCheck`, `test` and `integration` pass (`GenieRandomEventTest` 8/8) after `freshCache` and `buildCache`; `tools/scripts/fix_gameval_conflicts.py --check` finds no conflicts. Full build, all tests (726 + 87 integration) and boot to "Server ready" passed on the previous commit of this change in our QA run.
 
-On this branch (Docker `eclipse-temurin:21`, upstream's `./gradlew`, after `freshCache` and `buildCache`): the random-events module's `spotlessCheck`, `test` and `integration` pass (`GenieRandomEventTest` 8/8). `tools/scripts/fix_gameval_conflicts.py --check` finds no conflicts on this branch.
+In game (desktop RuneLite on a branch server, fresh account, on the previous commit; the code differs only in the repeat-Talk-to line and the late-completion guard):
+- `::randomevent`: the Genie appears beside the player, follows within 12 s when they walk away, and is gone a minute later when ignored.
+- Talk-to: the lamp arrives as the line opens; the Genie is gone within 12 s, also when the dialogue is left open or another one replaces it; exactly one lamp each time.
+- A second Talk-to before he goes gave nothing on that commit; on this one it gives "Have a nice day, Master/Mistress.".
+- `::randomevent` with a Genie out: "Your Genie is already here."; Dismiss removes him.
+- Full inventory: exactly one lamp on the floor under the player.
+- Rub: 10 x the skill level x the world's XP rate.
+- Scheduling: too slow to wait for in game (1-2 h); the tests cover it.
 
-Nothing was checked in game from this exact commit.
+## Checklist
 
-**Data sources.** OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): "Random events" (Spawn mechanics, Locations without random events, Bank locations with random events, Changes, Trivia), "Genie" (incl. Changes), "Transcript:Genie", "Lamp". The spawn rules on the wiki cite Mod Ash's posts, archived on the wiki. As a reference only (2004 RuneScape, not OSRS), LostCity's content scripts (MIT, https://github.com/LostCityRS/Content) for the order of the lamp and the departure on Talk-to.
+- [ ] Builds and the server boots (our QA gate checks this before the PR is updated)
+- [x] Tests only cover complex logic and anything that moves items (no dupes)
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
+- [ ] State in varbits/varps, not attrs: the due time is a persistent attribute (epoch milliseconds don't fit a 32-bit varp); happy to switch to a varp holding epoch minutes
+- [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the deviations are listed below, not in `docs/quirks.md`
+- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): we have no dumps of the official game
+- [x] No unrelated or hand-edited generated changes
 
-**Caveats.**
+## Screenshots / notes for reviewers
+
+Data sources: OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): "Random events" (Spawn mechanics, Locations without random events, Bank locations with random events, Changes, Trivia), "Genie" (incl. Changes), "Transcript:Genie", "Lamp". The spawn rules on the wiki cite Mod Ash's posts, archived on the wiki. As a reference only (2004 RuneScape, not OSRS), LostCity's content scripts (MIT, https://github.com/LostCityRS/Content) for the order of the lamp and the departure on Talk-to.
+
+Deviations, guesses and gaps:
 - Approximated: the official no-event zones are hand-drawn and not published. Banks are found from bank booths and chests nearby (radii 7 and 2 are ours), the Grand Exchange square is a 27 x 27 box around the wiki's map centre, and instances stand in for "most bosses and minigames". Not covered: the wiki's other entries (Forestry events, Camdozaal golem workshop, Lake Molch, Shayzien Agility Course, Death's Office, Goblin Cave, Stranglewood, The Scar, POH building mode, boats, PvP worlds, Wintertodt prison, the listed minigames that are not instances here; from "most bosses and combat areas": Abyssal Nexus, Crash Site Cavern, Neypotzli, and Ape Atoll while in greegree form), the per-event restrictions (underwater, Kalphite Lair, Hunter areas). None of these matter for the Genie alone except as places where he can still appear. Of the wiki's "Bank locations with random events", only Ferox Enclave is excepted; the others (Giants' Foundry, the Hosidius charcoal furnaces, Myths' Guild, Rogues' Den, Trouble Brewing, the Sunbleak Island, Wyrmscraig and Charred Island bank chests, Odovacar in Tarn's Lair) count as no-event banks here.
 - Guesses: missing the event while transformed (the wiki only says it "will not spawn"), and re-rolling 1-2 h when an event comes due while the Genie is still out. Treating any pending weak queue as a Make-X repeat. The 1-tick retry while busy (the wiki: it turns up "soon after" the menu closes). The 5-minute check counts from login.
 - Leaving after a minute is the wiki's (Random events: an ignored event "disappears after a minute"). Guess: the call every 12 seconds; the wiki gives 12 s only for the event before the Optional Randoms update.
@@ -49,15 +69,6 @@ Nothing was checked in game from this exact commit.
 - The due time is a persistent attribute, not a varp: epoch milliseconds don't fit a 32-bit varp. Happy to switch to a varp holding epoch minutes if you prefer.
 - Guess: the lamp arrives as the Genie's line opens and his departure does not wait on the dialogue. Not on the wiki; LostCity's 2004 content scripts (`macro events/scripts/general/macro_event_genie.rs2`) do the same, adding the lamp before the line and queueing the departure separately.
 - Unsourced: the lamp uses the base (unboosted) level. The wiki says "level" (Lamp) and "current level" (Genie), and neither says whether boosts count. "Your wish has been granted!" on Rub, and no chat message when the lamp is given (since 9 September 2021 the game says what you received, but the wording is not on the wiki). "He isn't interested in you." on another player's Dismiss.
-- Not implemented: the transcript's "Have a nice day, Master/Mistress." when talked to in a zone without random events (the Genie still gives the lamp there); the underwater Genie; the lamp's skill restrictions (members' skills on free worlds, Construction without a house, Runecraft/Herblore/Sailing before their quests), which belong to the shared lamp chooser. Other random events could build on the same schedule.
-
-**Release note.** The Genie random event, on OSRS's random event schedule.
-
-**Checklist**
-- [x] The change compiles (`./gradlew build`).
-- [x] Tests related to the change pass (`./gradlew assemble test integration`, `spotlessCheck`).
-- [x] No documentation change needed.
-- [x] No unrelated formatting or dependency changes.
-- [x] Manual testing notes are under Tests above.
+- Not implemented: the transcript's "Have a nice day, Master/Mistress." when talked to in a zone without random events (the Genie still gives the lamp there; the completed-event case is implemented); the underwater Genie; the lamp's skill restrictions (members' skills on free worlds, Construction without a house, Runecraft/Herblore/Sailing before their quests), which belong to the shared lamp chooser. Other random events could build on the same schedule.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
