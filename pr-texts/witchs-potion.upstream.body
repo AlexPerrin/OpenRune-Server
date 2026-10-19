@@ -20,7 +20,7 @@ On `main`, Hetty only has her after-quest lines and no rat drops a rat's tail, s
 
 ## How it was tested
 
-On upstream `main` 829b9477d + this branch (Docker `eclipse-temurin:21`, upstream's `./gradlew`, a clean run per step): `freshCache` + `mergePluginGamevals`, `buildCache` (packs `witchs_potion_vars.toml`), `installDist`, `spotlessCheck`, `assemble`, `test` (764 tests, 0 failures), `integration` (79 tests, 0 failures), and the server boots to "Server ready" (the startup check against the quest dbrow passes) with no error in the log. `tools/scripts/fix_gameval_conflicts.py --check`: no conflicts.
+On upstream `main` 829b9477d + this branch (Docker `eclipse-temurin:21`, upstream's `./gradlew`, a clean build, each step its own run (compiles from the build cache, every test run)): `freshCache` + `mergePluginGamevals`, `buildCache` (packs `witchs_potion_vars.toml`), `installDist`, `spotlessCheck`, `assemble`, `test` (764 tests, 0 failures), `integration` (79 tests, 0 failures), and the server boots to "Server ready" (the startup check against the quest dbrow passes) with no error in the log. `tools/scripts/fix_gameval_conflicts.py --check`: no conflicts.
 
 Played end to end in game (desktop RuneLite, fresh account). Cheats: `::tele` for travel (to Hetty's house, and into the neighbouring house where the indoor rats spawn), and `::item` for the eye of newt, onion and burnt meat, whose shop and cooking aren't part of this PR. The rat's tail came from killing a rat.
 - Before the quest, a Lumbridge rat dropped only bones.
