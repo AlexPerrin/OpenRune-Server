@@ -2,8 +2,8 @@ package dev.openrune.tools
 
 import dev.openrune.OsrsCacheProvider
 import dev.openrune.cache.*
-import dev.openrune.cache.filestore.definition.ConfigDefinitionDecoder
 import dev.openrune.cache.CacheDelegate
+import dev.openrune.cache.filestore.definition.ConfigDefinitionDecoder
 import dev.openrune.cache.tools.TaskPriority
 import dev.openrune.cache.tools.incremental.PackUnit
 import dev.openrune.cache.tools.tasks.CacheTask
@@ -58,7 +58,7 @@ data class PackType(
  * from [directory] alone.
  */
 class PackServerConfig(
-    private val rev : Int,
+    private val rev: Int,
     private val directory: File,
     private val extraDirectories: List<File> = emptyList(),
     private val tokenizedReplacements: Map<String, String> = emptyMap(),
@@ -105,7 +105,7 @@ class PackServerConfig(
             table = "object",
             decoder = ObjectDecoder(rev),
             loadBaseInto = { c, dest -> OsrsCacheProvider.ObjectDecoder(dev.openrune.revision.first).load(c, dest) },
-            codec = { base, overlay -> ObjectServerCodec(rev,base, overlay, examinesObject) },
+            codec = { base, overlay -> ObjectServerCodec(rev, base, overlay, examinesObject) },
             create = { ObjectServerType(it) },
         )
 
@@ -146,7 +146,7 @@ class PackServerConfig(
             table = "item",
             decoder = ItemDecoder(rev),
             loadBaseInto = { c, dest -> OsrsCacheProvider.ItemDecoder(dev.openrune.revision.first).load(c, dest) },
-            codec = { base, overlay -> ItemServerCodec(rev,base, overlay) },
+            codec = { base, overlay -> ItemServerCodec(rev, base, overlay) },
             create = { ItemServerType(it) },
             codecVersion = 2,
         )
