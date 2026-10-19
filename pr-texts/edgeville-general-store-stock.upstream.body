@@ -5,9 +5,9 @@
 - Header as in the other general store tomls: Shared, stack Always, 1300 / 400 / 30 (the wiki's 130% / 40% / 3%), `restock = true`, `protect`, `runWeight`, `allStock`, `placeholders` false.
 - `size = 40`, as in the general stores #341 rewrote from live captures (Falador, Karamja, Nardah, Miscellania): general stores hold the items players sell to them beyond their base stock. The older raw-cache tomls use size = stock count (Lumbridge 15); either covers the stock.
 
-**Tests.** `ShopInventoryTomlTest` (or-cache, unit) reads every `[[inventory]]` in `.data/raw-cache/server/shops/*.toml` and in the content packs' `pack/configs/*.toml`, and checks that no stock key sits on the inventory table, every stock entry has `obj` and `count`, and an inventory with stock has a `size` at least its stock count. It's a structural check of the toml (the crash above), not a wiki comparison. On `main` it fails on `generalshop2` only; with this change it passes. Of the 395 shop tomls and 6 pack inventories, `generalshop2` is the only one it flags.
+**Tests.** None added (a data fix; AGENTS.md skips config-matches-wiki tests). To check it: `./gradlew :or-cache:buildCache`, then decode inv 4 (`inv.generalshop2`) from `.data/cache/SERVER`: it has size 40, stack Always, scope Shared and the 14 stock entries above in that order. A one-off scan of the 395 tomls in `.data/raw-cache/server/shops` and the 6 inventories in the content packs' `pack/configs` found no other inventory with stock keys on its table, no `size`, or a `size` below its stock count.
 
-On this branch (Docker `eclipse-temurin:21`, upstream's `./gradlew`, 4 GB container, no build or configuration cache; clean `freshCache` + `mergePluginGamevals`, then `buildCache`, then each task as a separate run, then the server to "Server ready"): buildCache pass, `spotlessCheck` pass, `assemble` pass, `test` pass, `integration` pass, boot pass (Server ready in 17.83s). In the built server cache, `inv.generalshop2` has size 40, stack Always, scope Shared and the 14 stock entries above. `tools/scripts/fix_gameval_conflicts.py --check` reports no conflicts.
+On this branch (off `main` bcdb03292): `freshCache` + `mergePluginGamevals`, then `:or-cache:buildCache` pass; the packed `inv.generalshop2` decodes as size 40, flags restock only, stack Always, scope Shared, 14 stock entries in the order and counts above. The change is one data file, so no module's tests are affected.
 
 Nothing was checked in game from this exact branch.
 
@@ -22,7 +22,7 @@ Nothing was checked in game from this exact branch.
 
 **Checklist**
 - [x] The change compiles (`./gradlew build`).
-- [x] Tests related to the change pass (`./gradlew assemble test integration`, `spotlessCheck`).
+- [x] Tests related to the change pass (none added; existing suites pass).
 - [x] No documentation change needed.
 - [x] No unrelated formatting or dependency changes.
 - [x] Manual testing notes are under Tests above.

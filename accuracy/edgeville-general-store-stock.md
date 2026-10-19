@@ -2,7 +2,7 @@
 
 Spec for rebuilding `inv.generalshop2` (the Edgeville General Store's shop inv), which upstream ships
 truncated. Upstream PR #351 (ours, draft) points the Edgeville shopkeepers at `inv.generalshop2` and depends on
-this change; this branch is off upstream `main` c2492318d and does not include #351.
+this change; this branch is off upstream `main` bcdb03292 (first written off c2492318d) and does not include #351.
 
 ## The defect
 `.data/raw-cache/server/shops/generalshop2.toml` (added in 6299e4114 "Mapped some osrs shops", unchanged since)
@@ -75,7 +75,7 @@ rangingguild_trade_tickets, templeknight_armoury1/2) omit `sellMultiplier`/`buyM
 complete; that is how the wiki dumper writes shops whose wiki infobox has no multiplier, not truncation.
 
 ## Tests
-`ShopInventoryTomlTest` (or-cache, unit): for every `[[inventory]]` in `.data/raw-cache/server/shops/*.toml` and in
-every `content/**/pack/src/main/resources/pack/configs/*.toml`: no `obj`/`count`/`restockCycles` on the inventory
-table, `size` present and >= the number of stock entries when it has stock, every stock entry has `obj` and `count`. Fails on
-upstream main (generalshop2), passes with the fix.
+None in the PR. Upstream's AGENTS.md skips tests for config-matches-cache/wiki checks, so the structural toml
+test from the first version (ShopInventoryTomlTest) was dropped after the upstream gate (qa record).
+Verification: `buildCache`, then the packed `inv.generalshop2` decoded from `.data/cache/SERVER` (size 40, 14
+stock entries in wiki order); the scan of every shop toml above was a one-off script, not a test.

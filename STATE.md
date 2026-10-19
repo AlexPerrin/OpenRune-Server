@@ -30,7 +30,7 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   fix_gameval_conflicts.py) takes `fin/sheep-shearer`'s place in integration.txt; it needs the
   recorded resolution of its gamevals.toml lines next to content/pirates-treasure's (rr-cache
   666570cd...). #367/#368 still stack on #366's old commit f69c8ed4c (with Romeo & Juliet).
-- `fix/edgeville-general-store-stock` (sd24, off main): rebuilds upstream's truncated
+- `fix/edgeville-general-store-stock` (sd24, off main bcdb03292, data only; the toml test was dropped after the upstream gate): rebuilds upstream's truncated
   `generalshop2.toml` (size 0 -> AIOOBE on Trade) to the wiki stock, size 40; #351 (fix/55) depends on it
   and waits until it merges upstream. Spec accuracy/edgeville-general-store-stock.md.
 - Review commits (sd24, on the fork heads, not rebased; these branches are 7 commits behind main, which touches
