@@ -32,3 +32,5 @@ Fixes the stile issue a-thoren found while testing #366: "you can jump over the 
 Walking to the start tile follows the Port Sarim stile on `main`. As a 2004 reference only, LostCity's content scripts (MIT, https://github.com/LostCityRS/Content, `skill_agility/scripts/shortcuts.rs2`) also choose the side by coordinate and put the player on the start tile before the climb.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Fork PR (same branch, for browsing): https://github.com/AlexPerrin/OpenRune-Server/pull/21
