@@ -20,6 +20,7 @@ fix/37-kitten-growth-and-wording
 fix/38-varrock-platebody-smelting
 fix/43-varps-before-first-tick
 fix/46-default-dog-breeds
+fix/55-general-store-stock-wiring
 fix/54-ernest-stage-2
 fix/56-misthalin-mystery-mandy-guards
 fix/57-gameframe-fullscreen-map
