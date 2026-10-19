@@ -22,17 +22,22 @@ Source: https://rsprox.net/database, a database of OSRS sessions recorded and su
 - Titles are almost absent. `?view=described` has only 2 entries: 4272 and 4288, both The Blood Moon Rises,
   revision 239. The only other topical metadata is the world-activity label (2625 have "-"; Leagues V/VI 945;
   Grid Master; Sailing; minigames).
-- Content search (which recordings contain NPC/OBJ/LOC/VARP/VARBIT/INTERFACE/MESSAGE_GAME/... X) exists, but
-  only as `POST https://rsprox.net/api/search`. The JSON body is
+- Content search (which recordings contain NPC/OBJ/LOC/VARP/VARBIT/INTERFACE/MESSAGE_GAME/... X) exists, only as
+  `POST https://rsprox.net/api/search` (approved since 2026-10-19). The JSON body is
   `{conditions:[{type,query}], mode:"ALL"|"ANY", page, limit, sort}`, and type is the numeric index of the
   dropdown (0 NPC, 1 OBJ, 2 LOC, 3 MAPSQUARE, 4 MESSAGE_GAME, 5 VARP, 6 VARBIT, 7 INTERFACE, 8 SEQ,
-  9 SPOTANIM, ...). Because it is POST, it is outside the approved rule. Gameval name lookups are GET
+  9 SPOTANIM, 10 MIDI, 11 SOUND, 12 JINGLE, 14 TEXT). Gameval types take a numeric id as a string; types 4 and 14 are
+  text. Response: `{results:[{submission:{id,date,revision,worldActivity,fileSize},matches}], totalResults, ...}`.
+  The varp index looks sparse: VARP 179 matched only 1718 (which changes it), VARP 67 matched nothing, so a
+  varp hit seems to need a value change in the recording; search by NPC or TEXT as well. Search responses are
+  cached in `re/ref/rsprox/search/`. Gameval name lookups are GET
   (`/gamevals/index`, `/gamevals/oldschool/<cacheId>/<dataset>`).
 
 ## Download
 `GET https://rsprox.net/download/<id>` answers 302 to `https://d339ktxhvl6mrs.cloudfront.net/<id>.bin`
-(RSProx's CDN). That is another host, so it is not followed under the current rule. Files go to
-`re/ref/rsprox/bin/<id>.bin`; record sha256 and size.
+(RSProx's CDN, now approved for downloads). Files go to `re/ref/rsprox/bin/<id>.bin`; record sha256 and size.
+The downloaded files are gzip-compressed (the transcriber rejects them as-is with "Invalid binary master-index
+length"): `gzip -dc bin/<id>.bin > $H/.rsprox/binary/<id>.bin` before transcribing.
 
 ## Transcribe (headless, verified)
 Use the existing RSProx build in the client repo: `re/rsprox` at `v1.0-286-g2eab74ff` (1.0.5, the same build
@@ -40,7 +45,7 @@ staged at C:\osrs-test\rsprox), with decoders for revisions 223–241. Use the ~
 or a server.
 
 ```
-H=<scratch home>; mkdir -p $H/.rsprox/binary; cp <id>.bin $H/.rsprox/binary/
+H=<scratch home>; mkdir -p $H/.rsprox/binary $H/.rsprox/settings; gzip -dc bin/<id>.bin > $H/.rsprox/binary/<id>.bin
 ~/tools/jdk-21.0.12.1+1/bin/java -Duser.home=$H \
   -Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=9 -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=9 \
   -cp "re/rsprox/build/osrs-test-runtime/*" net.rsprox.proxy.cli.TranscribeCommandKt -name <id>
@@ -49,6 +54,11 @@ H=<scratch home>; mkdir -p $H/.rsprox/binary; cp <id>.bin $H/.rsprox/binary/
 - The proxy properties block all network access. This was verified on one of our own OpenRune desktop
   recordings (revision 241). It produced a full transcript with varps/varbits named, game messages and
   runclientscript.
+- For community recordings the proxy properties are dropped, because the transcriber must fetch the build cache
+  from archive.openrs2.org (approved). Create `$H/.rsprox/settings` first, or it logs a settings write error.
+  archive.rsprox.net answered 403 for clientscript names (warning only; scripts show by id). Varp/varbit names are
+  not resolved in these transcripts (ids only). Verified 2026-10-19 on 1619–1622 (rev 225.1, cache 1943) and
+  1718 (rev 227.1, cache 1974): 1718 (4.45 MB gz) transcribes in about a minute.
 - Cache dependency: the transcriber needs the cache for each recording's exact build. It looks in
   `$H/.rsprox/caches` first and otherwise fetches from `https://archive.openrs2.org`. Clientscript type names
   come from `https://archive.rsprox.net`; without them it only logs a warning. For community recordings this is
@@ -59,9 +69,12 @@ H=<scratch home>; mkdir -p $H/.rsprox/binary; cp <id>.bin $H/.rsprox/binary/
 |---|---|---|---|
 | Fishing Trawler | 2396 (world activity "Fishing Trawler", 17.59 KB) | 229 | candidate, not downloaded; small, likely partial |
 | Player trading | trade worlds: 547, 548, 1699–1701 (227); 2388, 2392, 2497, 2796–2799 (229); 2844 (230); 4270, 4271 (239) | 227–239 | candidates; a trade-world label does not prove a trade happened |
-| Sheep Shearer, Goblin Diplomacy, Witch's Potion, Demon Slayer, Shield of Arrav, Black Knights' Fortress, Dragon Slayer I, Druidic Ritual, dwarf multicannon, Genie/random events, Kalphite Queen, Tutorial Island, Edgeville/Lumbridge general stores, idle logout, fullscreen world map | none found | — | no titles or labels. Finding them needs the content search (POST), e.g. by quest varp, NPC (Fred, Kalphite Queen, Genie), LOC (cannon), INTERFACE (shop, world map, trade) |
+| Sheep Shearer (full quest) | 1718 (Leagues V; quest at ticks 7184–7744: shearing incl. The Thing, spinning at Lumbridge Castle, Fred start dialogue, all-at-once hand-in, varp 179 0→1→21, quest complete if 153) | 227 | transcribed; notes `re/ref/rsprox/notes/sheep-shearer.md`. Leagues caveat: league task messages/overlay interleaved |
+| Sheep shearing mechanics (post-quest) | 1619, 1620, 1621, 1622 (same account, varp 179 = 21 at login): shear timing, 50-tick regrowth, sheared ids, "already been shorn", no-shears message, The Thing (1620), pen gate 12986 | 225 | transcribed; same notes file. No Fred, spinning or hand-in |
+| Goblin Diplomacy, Witch's Potion | not yet searched (VARP 67 search: no hits) | — | next: search by NPC (Generals, Hetty) and TEXT/MESSAGE_GAME |
+| Demon Slayer, Shield of Arrav, Black Knights' Fortress, Dragon Slayer I, Druidic Ritual, dwarf multicannon, Genie/random events, Kalphite Queen, Tutorial Island, Edgeville/Lumbridge general stores, idle logout, fullscreen world map | none found | — | no titles or labels; use the content search (POST), e.g. by NPC, LOC (cannon), INTERFACE (shop, world map, trade) |
 
-## Pending approvals
-To go further, the user needs to approve: (a) POST to `rsprox.net/api/search`, (b) GET from
-`d339ktxhvl6mrs.cloudfront.net` (downloads), (c) GET from `archive.openrs2.org` for caches
-(`archive.rsprox.net` is optional, for clientscript names).
+## Approvals
+Approved by the user on 2026-10-19 for this work: POST `rsprox.net/api/search`, GET `d339ktxhvl6mrs.cloudfront.net`
+(downloads), GET `archive.openrs2.org` (caches) and `archive.rsprox.net` (clientscript names). Nothing else, and
+nothing ever connects to Jagex/RuneScape.
