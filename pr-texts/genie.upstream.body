@@ -14,7 +14,9 @@ There were no random events. This adds the Genie random event in a new module `c
 - **The lamp:** Rub gives 10 x the chosen skill's level in XP, multiplied by the world's XP rate like other XP (`statAdvance`, as upstream's quest lamp does). With a full inventory it is dropped at the player's feet for 3 hours (wiki trivia, Mod Ash: rewards are dropped and stay up to three hours).
 - `::randomevent` summons him (like `::star`), bypassing the schedule.
 
-New server-only gamevals: timers `random_event` (the 5-minute check) and `random_event_genie` (the Genie's calls), written as `-1` and assigned by `tools/scripts/fix_gameval_conflicts.py` (65534 and 65533, one below the cannon PR's timer so the two don't clash).
+The zones where events are missed or allowed (the listed dungeon areas, Ferox Enclave, the Grand Exchange square) are rows of a server-only `dbtable.random_event_zones` in a new `random-events` pack (an area, or a centre and radius, per row, and whether events are allowed), like upstream's other server-only dbtables.
+
+New server-only gamevals: timers `random_event` (the 5-minute check) and `random_event_genie` (the Genie's calls), written as `-1` and assigned by `tools/scripts/fix_gameval_conflicts.py` (65534 and 65533, one below the cannon PR's timer so the two don't clash); `dbtable.random_event_zones` and its seven `dbrow.random_event_zone_*` rows, assigned the same way.
 
 ## Type of change
 
@@ -36,7 +38,7 @@ Unit/integration: `GenieRandomEventTest` (8, integration), on the schedule and t
 - a Make-X weak queue delays it;
 - an interrupted hand-over still gives exactly one lamp, and the Genie leaves.
 
-On this branch: the random-events module's `spotlessCheck`, `test` and `integration` pass (`GenieRandomEventTest` 8/8) after `freshCache` and `buildCache`; `tools/scripts/fix_gameval_conflicts.py --check` finds no conflicts. Full build, all tests (764 + 87 integration) and boot to "Server ready" pass on this commit in our QA run.
+On this branch: the random-events module's `spotlessCheck`, `test` and `integration` pass (`GenieRandomEventTest` 8/8) after `freshCache` and `buildCache`; `tools/scripts/fix_gameval_conflicts.py --check` finds no conflicts. Full build, all tests (764 + 87 integration) and boot to "Server ready" passed on the previous commit (068aabee2) in our QA run; this one moves the zones into the dbtable.
 
 In game (desktop RuneLite on a branch server, fresh account, on the previous commit; the code differs only in the repeat-Talk-to line and the late-completion guard):
 - `::randomevent`: the Genie appears beside the player, follows within 12 s when they walk away, and is gone a minute later when ignored.
@@ -49,9 +51,9 @@ In game (desktop RuneLite on a branch server, fresh account, on the previous com
 
 ## Checklist
 
-- [x] Builds and the server boots
+- [ ] Builds and the server boots (our QA gate checks this before the PR is updated)
 - [x] Tests only cover complex logic and anything that moves items (no dupes)
-- [ ] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps: gamevals symbols throughout, but `RandomEventLocations` keeps its location rules in Kotlin (the no-event dungeon areas, Ferox Enclave as a bank with events, the Grand Exchange square and the bank radii). Areas themselves are cache data (`.data/raw-cache/map/area`), but I found no upstream pattern for a list of area ids or a radius in the cache (no dbtable/pack config for area lists). Happy to move them if you point me at the place you want them.
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
 - [ ] State in varbits/varps, not attrs: the due time is a persistent attribute (epoch milliseconds don't fit a 32-bit varp); happy to switch to a varp holding epoch minutes
 - [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the deviations are listed below, not in `docs/quirks.md`
 - [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): we have no dumps of the official game

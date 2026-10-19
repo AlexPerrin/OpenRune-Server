@@ -1,6 +1,6 @@
 # Genie random event (acc/genie, upstream PR #355)
 
-Spec for the audited rewrite on `acc/genie` (one commit 068aabee2 on main 829b9477d: the feature, the timer ids, the AGENTS.md trim, the hand-over fix, the repeat-Talk-to line and the late-completion guard, squashed).
+Spec for the audited rewrite on `acc/genie` (068aabee2, then e9c7bcac3 moving the zones into `dbtable.random_event_zones`, on main 829b9477d; 068aabee2 is the feature, the timer ids, the AGENTS.md trim, the hand-over fix, the repeat-Talk-to line and the late-completion guard, squashed).
 No earlier audit exists for this feature; this one was written 2026-10-18 by sd23. The osrs-mcp
 server was down, so the wiki was read directly (oldschool.runescape.wiki, `?action=raw` and page fetches).
 
