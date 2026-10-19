@@ -1,14 +1,81 @@
 # QA: acc/genie
 - Branch: `acc/genie`
-- Commit: `7a2316ea9119f7a7a031df3028c6880f2db5825f`
+- Commit: `068aabee2160cb4fcd96ee5b9a61778bccf97b0d`
 ## Internal gate: **PASS**
 ## Upstream gate: **FAIL**
+
+Re-run by sq24 on 2026-10-19 at 068aabee2, one commit (`feat: Genie random event`) on upstream `main` 829b9477d,
+which was re-fetched and is still the tip. Fork PR AlexPerrin/OpenRune-Server#18. Spec and PR text (upstream's
+template, #369) at fork docs 0c19c7bb3. The verdicts at 7a2316ea9 and f076deed8 below are void.
+
+## Upstream gate at 068aabee2: FAIL. What must change (PR text only)
+1. **The checklist's "game data in the cache, not Kotlin maps" is ticked, but it isn't true of the commit.**
+   - `RandomEventLocations` holds the no-event places as Kotlin data: `NO_EVENT_AREAS` (five area symbols),
+     `BANKS_WITH_EVENTS` (Ferox), and the Grand Exchange box (`GRAND_EXCHANGE_CENTRE` 3165,3490 and radius 13).
+   - Upstream AGENTS.md, "Game data lives in the cache", names "location lists" as data that belongs in a
+     dbtable or enum.
+   - Fix: untick that box with a one-line note (the five areas, the Ferox exception and the GE box are in
+     `RandomEventLocations`; happy to move them to a dbtable). Or move them to the cache, which is a code
+     change and a re-gate.
+2. **Make the test results match this commit**: "Builds and the server boots" can be ticked now. The full
+   test counts on this commit are 764 + 87 (the PR's 726 + 87 were the previous commit's, before #333, #315
+   and #334 added tests).
+
+Everything else in the upstream gate passes:
+- **The 7a2316ea9 FAIL items are done**:
+  - rebased on 829b9477d;
+  - the template's sections (Summary, Type of change, How it was tested, Checklist, Screenshots / notes);
+  - the completed-event "Have a nice day" is implemented and stated;
+  - the in-game check is described.
+- **Checklist, the other boxes**:
+  - the attrs box is unticked, with the persistent attribute explained;
+  - the quirks.md box is unticked, with the deviations in the notes;
+  - the rsprox box is unticked (no dumps);
+  - "Tests only cover complex logic and anything that moves items" is true: the schedule plus the lamp
+    hand-over;
+  - "No unrelated changes" is true: 5 files, all in `content/events/random-events`.
+- **Overlap**: `gh pr list --search "random event"` shows only #355, ours.
+- `fix_gameval_conflicts.py --check` is clean (timers 65534/65533).
+- **Caveats**: complete against the f076deed8 and 7a2316ea9 lists. The no-event-zone case of "Have a nice day"
+  stays a declared gap.
+- **pr-text-review**:
+  - The behaviour claims are true in game (below), including the new "Talked to again before he goes, he says
+    'Have a nice day, Master/Mistress.'".
+  - The in-game list says what was checked on the previous commit and what on this one, and that is accurate.
+
+## Internal gate at 068aabee2: PASS
+- **build-test**:
+  - `qa.sh gate` on clone `qa/genie-068aabee2`, `origin/main` = 829b9477d.
+  - Every step rc=0: compile, freshCache + mergePluginGamevals, buildCache, generateRsa, installDist,
+    spotlessCheck, assemble.
+  - `test` 764/0. `integration` 87/0, `GenieRandomEventTest` 8/8. Total 616 s.
+  - Gamevals check is clean.
+  - Boot: "Server ready in 19.74s". No exception or error lines over the session.
+- **The two changes**:
+  - `talk()` answers "Have a nice day, ${title}." when `handOver` refuses (already handed over).
+  - After the dialogue it untracks the player's Genie only if it is the npc talked to (`genies[player]?.npc
+    === npc`). That closes the late-completion orphan case from the 7a2316ea9 record.
+- **In game** (desktop lock 19:19-19:23, fresh account `sq24g3`):
+
+| Check | Result |
+|---|---|
+| Talk-to | lamp line; lamp in the inventory (1) |
+| Walk away (dialogue closed), Talk-to again at +5 s | "Have a nice day, Master." (npc chat); no second lamp (still 1) |
+| After that | Genie gone at +11 s, with the "Have a nice day" line still open |
+| Continue, new summon, Talk-to, leave the line open 15 s | Genie gone while the line is open |
+| Continue that line, then `::randomevent` | a new Genie is out and tracked: Dismiss removes him. Lamps: 2 over the two hand-overs, one each. |
+
+  The late-completion guard itself can't be reached in game (commands aren't processed while the line is
+  open, and the schedule is 1-2 h). It was checked by reading the code. Clean-up: desktop RuneLite back on the
+  live target (logged in as `desktop`), qa-or-server/qa-or-http removed, lock freed 19:23.
+
+## Earlier run at 7a2316ea9 (void: superseded by 068aabee2)
 
 Re-run by sq24 on 2026-10-19 at 7a2316ea9, one squashed commit (`feat: Genie random event`) on upstream `main`
 731fd392a. Fork PR AlexPerrin/OpenRune-Server#18. Spec and PR text at fork docs d0ef91bd9. The verdicts at
 f076deed8 below are void.
 
-## Upstream gate at 7a2316ea9: FAIL. What must change
+### Upstream gate at 7a2316ea9: FAIL (void). What had to change
 1. **Base and PR template.** Upstream `main` moved during the gate: 731fd392a -> 829b9477d (#369 PR
    template, #348 idle logout, #333 The Knight's Sword, #315 The Ides of Milk and Brutus, #334 Doric's Quest).
    - **#369 adds `.github/pull_request_template.md`.** Its sections are Summary, Type of change, How it was
@@ -57,7 +124,7 @@ Passes:
   - The lamp-before-line order is declared as a guess, with LostCity (MIT) as a 2004 reference only.
 - **pr-text-review**: the claims checked in game below are true. The test list matches the 8 tests.
 
-## Internal gate at 7a2316ea9: PASS
+### Internal gate at 7a2316ea9: PASS (void)
 - **build-test**:
   - `qa.sh gate` on clone `qa/genie-7a2316ea9`: one container, the shared remote build cache for compiles,
     tests never cached, `origin/main` = 731fd392a for the spotless ratchet.
@@ -88,7 +155,7 @@ Passes:
   Rub (10 x level x XP rate). Clean-up: desktop RuneLite back on the live target (logged in as `desktop`),
   qa-or-server/qa-or-http removed, lock freed 18:57.
 
-## Earlier run at f076deed8 (void: superseded by 7a2316ea9)
+### Earlier run at f076deed8 (void: superseded by 7a2316ea9)
 
 Run by sq24 on 2026-10-19 in its own clone. Fork PR AlexPerrin/OpenRune-Server#18, which would replace
 upstream draft #355's branch `content/genie` (only on the user's approval). The commit is two commits on
