@@ -1,0 +1,7 @@
+Merged `main` (e551ba7ce; a merge commit, no rebase) to resolve the conflict with #315:
+- #315's `Gameframe.isGameplay` already keeps the fullscreen world map out of the login gameframe and the fallbacks, which is what this PR's first commit did with `isFallbackCandidate()`. That helper and its `FULLSCREEN_MAP_TOPLEVEL` constant are gone; the branch uses `isGameplay` everywhere.
+- What's left is the stone-arrangement restore from the review: `varbit.gameframe_stone_before_fullscreen` on `varp.gameframe_state` (server-side, Temp, never transmitted), saved when moving from a gameplay frame to the fullscreen map and put back when moving back or at logout. It now tests `isGameplay` instead of the map's top level.
+
+Title and description updated to match. Checked on the merged branch: build cache, compile, `spotlessCheck`, and the server boots. `tools/scripts/fix_gameval_conflicts.py --check` is clean.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

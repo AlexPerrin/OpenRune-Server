@@ -1,37 +1,45 @@
 Fork PR (same branch, for browsing): https://github.com/AlexPerrin/OpenRune-Server/pull/5
 
-**Problem.** At login, when the saved gameframe is missing or doesn't match the client mode (e.g. saved fixed, logging in resizable), `GameframeScript.selectFallback` takes the first gameframe with the same resizable and stone-arrangement flags. The fullscreen world map frame (`toplevel_display`) has the same flags as pre-EoC, and opening the map sets `resizable_stone_arrangement`. So the fallback can pick the fullscreen map frame: the player logs in to a black frame without the map, and that frame is saved, so every later login repeats it.
+## Summary
 
-A second way to get there: opening the fullscreen map overwrites `resizable_stone_arrangement` with the map frame's flag. Closing back to a resizable frame sets it again, but closing to a fixed frame doesn't, and logging out with the map open saves the map's value. The player's classic/modern choice is lost and the next mismatched login falls back on the wrong flag.
+Opening the fullscreen world map overwrites `resizable_stone_arrangement` with the map frame's flag. Closing back to a resizable frame sets it again, but closing to a fixed frame doesn't, and logging out with the map open saves the map's value. The player's classic/modern stone choice is lost, and the next login whose saved frame doesn't match the client mode falls back on the wrong flag.
 
-Reproduced on our build: saved gameframe = the fixed frame, `resizable_stone_arrangement` set, login in resizable mode -> `toplevel_display`.
+This PR first also kept the fullscreen map frame out of the login gameframe and the fallbacks. #315 (Ides of Milk) has since done that on `main` with `Gameframe.isGameplay`, so that part is gone: `main` is merged in (a merge commit, no rebase) and the branch uses `isGameplay` throughout. What remains is the stone-arrangement restore:
+- Moving from a gameplay frame to the fullscreen map remembers `resizable_stone_arrangement`; moving back puts it back, also when closing to a fixed frame and at logout while the map is open. While the map is open the flag still changes as before.
+- The remembered value is a server-side varbit, as asked in review: `varbit.gameframe_stone_before_fullscreen` (0 nothing saved, 1 classic, 2 modern) on a new `varp.gameframe_state` (scope Temp, transmit Never: not saved, never sent), in the gameframe pack's `gameframe_vars.toml`. Ids 65471 / 65447 from `tools/scripts/fix_gameval_conflicts.py`; `--check` is clean on the merged branch.
 
-**Change.**
-- The fullscreen map frame is never a fallback candidate (`selectFallback`, the intermediate-frame lookup), and a saved fullscreen map frame counts as missing at login.
-- Opening the map remembers `resizable_stone_arrangement` and closing it puts the value back, also when closing to a fixed frame and on logout while the map is open. While the map is open the flag still changes as before.
-- The remembered value is a server-side varbit, as asked in review: `varbit.gameframe_stone_before_fullscreen` (0 nothing saved, 1 classic, 2 modern) on a new `varp.gameframe_state` (scope Temp, transmit Never, so not saved and never sent), in the gameframe pack's `gameframe_vars.toml`. Ids 65471 / 65447 assigned by `tools/scripts/fix_gameval_conflicts.py` from `-1`, with the ids of our open Sheep Shearer PR treated as taken. The script picks the next free id, so if another PR with new varps or varbits merges first, the ids may need re-running.
+## Type of change
 
-**Tests.** None added (interface wiring). Checked in game on this branch (desktop RuneLite, fresh account; varbit 4607 is `resizable_stone_arrangement`, 65447 the new server varbit read with `::getvarbit`):
+- [x] Bug fix
+- [ ] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [ ] Cache / gamevals / pack data
+- [ ] Docs / tooling
+
+## How it was tested
+
+On upstream `main` 829b9477d merged into this branch (merge commit e551ba7ce; dev build, Docker, upstream's `./gradlew`): `freshCache` + `mergePluginGamevals`, `buildCache` (packs `gameframe_vars.toml`), compile, `spotlessCheck` pass, `installDist`, and the server boots to "Server ready". `tools/scripts/fix_gameval_conflicts.py --check`: no conflicts. The gameframe module has no tests.
+
+In game on the branch before the merge (desktop RuneLite, fresh account; varbit 4607 is `resizable_stone_arrangement`, 65447 the new server varbit read with `::getvarbit`); the restore code is unchanged by the merge except that it tests `isGameplay` instead of the map's top level:
 - In the resizable classic frame (161, 4607 = 0), opening the fullscreen map gives frame 165, 4607 = 1 (the map frame's flag, as before) and 65447 = 1 (classic saved). Closing it returns to 161 with 4607 = 0 and 65447 = 0.
 - Logging out with the map open and logging back in gives 161 with 4607 = 0 (restored at logout) and 65447 = 0.
-- With the saved frame set to the map frame (`gameframe_toplevel` 165) and 4607 = 1, the next login lands on 164 (pre-EoC, matching the stone flag), not the map frame.
 
-Gate run on upstream `main` 731fd392a + this branch (a clean merge; `main` touches no gameframe or world map file). Docker `eclipse-temurin:21`, upstream's `./gradlew`, 4 GB container, one run per step: `freshCache` + `mergePluginGamevals` pass, `buildCache` pass (packs `gameframe_vars.toml`), `spotlessCheck` pass, `assemble` pass, `test` pass (726 tests, 0 failures), `integration` pass (79 tests, 0 failures), boot to "Server ready" pass. `tools/scripts/fix_gameval_conflicts.py --check` reports no conflicts on the branch, on its merge with `main`, and with the ids of our other open PRs.
+No test added (interface wiring).
 
-**Caveats.**
-- Closing the map back to a fixed frame was not tried in game; it goes through the same restore as the close and logout paths above.
-- Without the change, which frame wins depends on the gameframe rows' order (the fullscreen map row comes before pre-EoC); with it the order doesn't matter.
+## Checklist
 
-**Data sources.** None external: the frames' resizable and stone-arrangement flags come from or-cache's `GameframeTable` rows (161 osrs_stretch, 164 pre_eoc, 165 toplevel_display).
+- [x] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes) (none added)
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
+- [x] State in varbits/varps, not attrs
+- [x] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): no wiki behaviour involved; the frames' flags come from or-cache's `GameframeTable` rows (161 osrs_stretch, 164 pre_eoc, 165 toplevel_display)
+- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): we have no rsprox dumps of the official game (and this is interface state)
+- [x] No unrelated or hand-edited generated changes
 
-**Release note.** Logging in can no longer land on the fullscreen world map's black frame, and the fullscreen map keeps the classic/modern stone choice.
+## Screenshots / notes for reviewers
 
-**Checklist**
-- [x] The change compiles (`./gradlew build`).
-- [x] Tests related to the change pass (`./gradlew assemble test integration`, `spotlessCheck`).
-- [x] No documentation change needed.
-- [x] No unrelated formatting or dependency changes.
-- [x] Manual testing notes are under Tests above.
+Known gap: closing the map back to a fixed frame was not tried in game; it goes through the same restore as the close and logout paths above.
+
+Release note: the fullscreen world map keeps the classic/modern stone choice.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
