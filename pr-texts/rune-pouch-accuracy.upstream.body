@@ -1,18 +1,22 @@
+Fork PR (same branch, for browsing): https://github.com/AlexPerrin/OpenRune-Server/pull/17
+
 Follow-up to #356 (rune pouch), from an accuracy check of the merged module against the OSRS Wiki.
 
 **Problem.** In the rune pouch interface (190), clicking the rune pouch itself on the inventory side answers "You can only store runes in the rune pouch.". OSRS answers "Don't be silly." (OSRS Wiki, Rune pouch, Trivia: "If a player attempts to store the rune pouch while the storage interface is open, the message "Don't be silly." appears in the chatbox.").
 
-**Change.** `RunePouchScript`: a small `storeRejection(obj)` decides the refusal for an inventory-side click: any of the four pouches (rune pouch, divine, and their locked variants) gets "Don't be silly.", other non-runes keep the existing line. The companion object is public so the test can reach it.
+**Change.** `RunePouchScript.inventoryOp()`: an inventory-side click on any of the four pouches (rune pouch, divine rune pouch and their locked variants) answers "Don't be silly." before the rune check; other non-runes keep the existing line.
 
-**Tests.** `RunePouchScriptTest` +1 (integration): each pouch gets "Don't be silly.", coins get the non-rune line, an air rune is accepted. It fails without the change.
+**Tests.** No new test: this is a message in a simple op handler (AGENTS.md, "Unit tests"). The existing `RunePouchScriptTest` still passes.
 
-On this branch (Docker `eclipse-temurin:21`, upstream's `./gradlew`, 4 GB container; a clean `freshCache` of main restored first, then `:or-cache:buildCache :or-cache:mergePluginGamevals`, then each task as a separate run, then `run` to "Server ready"): `buildCache` pass, `spotlessCheck` pass, `assemble` pass, `test` pass (685 tests), `integration` pass (77 tests in 16 suites, `RunePouchScriptTest` 6/6), boot pass (Server ready in 10.9s). `tools/scripts/fix_gameval_conflicts.py --check` finds no conflicts.
+On this branch (Docker `eclipse-temurin:21`, upstream's `./gradlew`, after `freshCache`): the rune pouch module's `spotlessCheck`, `test` and `integration` pass (`RunePouchScriptTest` 5/5).
 
-How to check in game: open a rune pouch, click the pouch in the interface's inventory side: "Don't be silly.". Click a non-rune (e.g. coins): "You can only store runes in the rune pouch.". Nothing was checked in game from this exact branch.
+Checked in game on a branch server (main + this fix, desktop RuneLite, a members account): with a rune pouch, a divine rune pouch, a rune pouch (l), coins and air runes in the inventory, opening the pouch and left-clicking each in the interface's inventory side gave "Don't be silly." for all three pouches (nothing stored), "You can only store runes in the rune pouch." for the coins, and stored one air rune. To repeat it: open a rune pouch and click the pouch itself, then a non-rune, then a rune.
 
 **Data sources.** OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): "Rune pouch", Trivia.
 
-**Caveats.** This fixes one line. The same check found these still missing in the rune pouch module; each would be its own later fix, and none is in this PR:
+**Caveats.** The wiki's Trivia line names the rune pouch only; the divine rune pouch and the locked pouches get the same line because they use the same interface (190), and the Divine rune pouch page does not mention it.
+
+This fixes one line. The same check found these still missing in the rune pouch module; each would be its own later fix, and none is in this PR:
 - Death: an unlocked pouch is lost on a PvP death (Wilderness, PvP worlds); on a PvM death it goes to the gravestone with its runes (wiki, Rune pouch intro and Changes, 21 June 2023).
 - In a bank: Empty puts the runes into the bank, and the bank's deposit buttons take them; loadouts (Configure).
 - Destroy: the cache's destroy warning (item 12791) says the contents fall out; the module neither drops them nor clears the varbits.

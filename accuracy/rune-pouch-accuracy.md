@@ -1,7 +1,7 @@
 # Rune pouch accuracy (fix/rune-pouch-accuracy, follow-up to merged #356)
 
 Upstream merged #356 (the pre-audit rune pouch, squashed as 36f2cfeeb on `main`) on 2026-10-18. This spec is
-for the follow-up `fix/rune-pouch-accuracy` (commit 01c233d80 on main d2a0cd1b1): the delta from the
+for the follow-up `fix/rune-pouch-accuracy` (commit bee197ba9 on main 731fd392a; first version 01c233d80, upstream gate FAIL in qa/rune-pouch-accuracy.md for its test and comments): the delta from the
 merged code to the audited behaviour. It reuses the 2026-10-18 audit (osrs-plugins-reverse
 `openrune/upstream/accuracy/rune-pouch.md`, kept below) and the QA FAIL in `openrune/upstream/qa/rune-pouch.md`
 (at af57c4ad8, the code that merged). Sources: OSRS Wiki "Rune pouch" (intro, Interface, Changes, Trivia),
@@ -14,7 +14,7 @@ Death's Office) is where death handling would hook in.
 
 ## What the merged version gets wrong (QA FAIL items) and what this change does
 1. D1, gameplay-visible: storing the pouch itself from interface 190 says "You can only store runes in the
-   rune pouch."; OSRS says "Don't be silly." (Rune pouch, Trivia). **Fixed here**, with a test.
+   rune pouch."; OSRS says "Don't be silly." (Rune pouch, Trivia). **Fixed here**; the divine and locked pouches get the line by extension (same interface; the wiki states it for the rune pouch only).
 2. Undeclared gaps in the merged PR's caveats: death (PvP loss unless locked; PvM gravestone keeps the
    runes), Empty and deposit in a bank, Destroy (the cache's destroy text says the contents fall out; the
    module neither drops nor clears the varbits), auto-store, the divine pouch's creation and Revert, one
@@ -28,8 +28,9 @@ Death's Office) is where death handling would hook in.
 5. The members-player re-check (`qa-members.sh`) is the QA's, on this commit.
 
 ## Tests
-`RunePouchScriptTest` +1 (integration): every pouch is refused with "Don't be silly.", a non-rune with the
-non-rune line, a rune accepted. Without the change it fails (no `storeRejection`, wrong line).
+No new test (AGENTS.md: a message in a simple op handler). In game, QA's check at 01c233d80 (same behaviour):
+the rune pouch, divine pouch and rune pouch (l) all say "Don't be silly.", coins get the non-rune line, an air
+rune is stored.
 
 ## Ids
 None.
