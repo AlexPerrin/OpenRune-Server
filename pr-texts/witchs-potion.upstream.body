@@ -1,0 +1,52 @@
+## Summary
+
+Witch's Potion (Hetty, Rimmington), on its own and on current `main`. This replaces the earlier version of this PR, which was stacked on #366's old commit (Sheep Shearer, Romeo & Juliet and a test fixture); this branch has no other PR's commits.
+
+On `main`, Hetty only has her after-quest lines and no rat drops a rat's tail, so the quest can't be started or finished.
+
+- Progress is on varp 67 (`varp.hetty`, which the quest list and Quest Helper read) through a new server-only varbit `witchs_potion_progress` (bits 0-1), as Doric's Quest does: 1 started, 2 ingredients given, 3 complete (checked at startup against the `quest_witchspotion` dbrow). The id comes from `tools/scripts/fix_gameval_conflicts.py` (`-1` → 65449).
+- Hetty's dialogue follows the wiki transcript: the opening and witch branch, the offer and start prompt, the ingredient list, "I'm afraid I don't have any of them yet.", the player's line for each of the 14 partial combinations, and the hand-in.
+- The hand-in takes one eye of newt, rat's tail, onion and burnt meat in one inventory transaction (all or nothing), then shows the single message box "You pass the ingredients to Hetty...". Drinking from the cauldron (`loc.hettycauldron`) shows its message box and completes the quest; before the hand-in the player says "As nice as that looks, I think I'll give it a miss for now.". Rewards: 1 QP, 325 Magic XP.
+- Rat's tail: every rat the wiki lists as a source (Rat, the Stronghold of Security rats, Dungeon rat, the level-26 Stronghold giant rats; 13 npc types) drops one for its killer while the quest is in progress. This is an `NpcDeathKillHook` reading the quest's own stage, not a drop-table entry: a `quest_mode = "during"` entry never passes under the default `assume-completed` requirements mode, which would make the quest impossible to finish on a default server.
+- Hetty's after-quest lines move from `RimmingtonTownsfolkScript` into the quest.
+
+## Type of change
+
+- [ ] Bug fix
+- [x] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [x] Cache / gamevals / pack data
+- [ ] Docs / tooling
+
+## How it was tested
+
+On upstream `main` 829b9477d + this branch (dev build, Docker, upstream's `./gradlew`): `freshCache` + `mergePluginGamevals`, `buildCache` (packs `witchs_potion_vars.toml`), compile, `:content:quest:test` pass, `spotlessCheck` pass, `installDist`, and the server boots to "Server ready" (the startup check against the quest dbrow passes). `tools/scripts/fix_gameval_conflicts.py --check`: no conflicts.
+
+Not yet checked in game from this exact branch; an earlier version of the same script runs on our own test server.
+
+No unit tests: the earlier version's dialogue tests needed a separate test fixture, and as with #366 they are left out. The one item move, the hand-in, is a single `invTransaction` deleting exactly one of each ingredient.
+
+## Checklist
+
+- [x] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes) (none added; see above)
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
+- [x] State in varbits/varps, not attrs
+- [x] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the dialogue, rewards, rat list and varp values follow the wiki and Quest Helper. The guesses are listed under notes below rather than in `docs/quirks.md`.
+- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): we have no rsprox dumps of the official game
+- [x] No unrelated or hand-edited generated changes
+
+## Screenshots / notes for reviewers
+
+The rat list is a list of npc symbols in the hook: the cache has no category for "rats that drop a rat's tail".
+
+Data sources: OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): Witch's Potion, Transcript:Witch's Potion, Transcript:Hetty, Rat's tail (Item sources; "100% chance to drop once you begin the quest"), Rat, Dungeon rat, Giant rat; the dialogue follows the transcripts. Quest Helper `WitchsPotion` (BSD): varp 67 step values, cauldron loc 2024. Cache: npc names and ids, the quest dbrow.
+
+Guesses:
+- The tail also drops at stage 2 (ingredients given, potion not drunk): the wiki says only "during the quest".
+- Rat 13624 (`rat_lowwander`) isn't in the wiki's ids and doesn't drop it.
+- The cauldron line after completion, the journal text, the quest scroll item and chathead expressions.
+
+Release note: Witch's Potion is playable; rats drop a rat's tail while it is in progress.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
