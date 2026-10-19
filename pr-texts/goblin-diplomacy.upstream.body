@@ -1,0 +1,61 @@
+## Summary
+
+Goblin Diplomacy, on its own and on current `main`. This replaces the earlier version of this PR, which was stacked on #366's old commit (Sheep Shearer, Romeo & Juliet and a test fixture) and also carried the lookout ladder; the ladder is now its own PR (`fix/goblin-village-lookout-ladder`), and this branch has no other PR's commits.
+
+On `main`, the generals and Grubfoot only have #328's flavour dialogue, the armour crates and dyeing goblin mail do nothing, and the quest can't be started.
+
+- Progress is on the client's own varbits, so the quest list and Quest Helper see it: `gobdip_main` (3 orange wanted, 4 blue, 5 brown, 6 complete; checked at startup against the `quest_goblindiplomacy` dbrow), `gobdip_crate1..3_searched` for the three armour crates, and `gobdip_grubfoot_vis` for Grubfoot's look (npc `catwalk_goblin` turns orange, then blue). No new gamevals.
+- The generals' dialogue follows the wiki transcripts: the five random openers (the "fat" one has "I'll leave you to it."), the topic menu (after "Why are you arguing..." its first entry becomes "What is the goblin new century?"; "I'll leave you to it." always ends the talk), the start, the D-Y-E help loop, the wrong-colour lines, and the three try-ons with Grubfoot as dialogue. After the quest the generals and Grubfoot have their five random dialogues each.
+- Crates: one plain goblin mail each, once ("You find some goblin mail in the crate." / "You search the crate, but but find nothing of interest.").
+- Dyes: red, yellow, blue, orange, green, purple, pink and black dye each turn plain goblin mail into that colour, and red + yellow, yellow + blue and red + blue dye mix into orange, green and purple dye. Each is one inventory transaction (one of each taken, one result added).
+- Handing over the wanted colour (armour used on a general, or the talk option while holding it) takes one piece of armour and moves the quest on; brown completes it. Rewards: 5 QP, 200 Crafting XP, a gold bar.
+- #328's `GoblinGenerals` and `Grubfoot` scripts bind op1 on the same npcs; their lines are the after-quest lines, so they move into the quest script and both files are deleted.
+
+## Type of change
+
+- [ ] Bug fix
+- [x] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [ ] Cache / gamevals / pack data
+- [ ] Docs / tooling
+
+## How it was tested
+
+On upstream `main` 829b9477d + this branch (dev build, Docker, upstream's `./gradlew`): `mergePluginGamevals` + `buildCache`, compile, `:content:quest:test` pass (the goblin-village module has no tests), `spotlessCheck` pass, `installDist`, and the server boots to "Server ready" (the startup check against the quest dbrow passes). `tools/scripts/fix_gameval_conflicts.py --check`: no conflicts (no gamevals added).
+
+Not yet checked in game from this exact branch; an earlier version of the same script runs on our own test server.
+
+No unit tests: the earlier version's dialogue tests needed a separate test fixture, and as with #366 they are left out. The item moves are one `invTransaction` each (dye, mix) or a single add / delete checked before any state changes (crate, hand-in).
+
+## Checklist
+
+- [x] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes) (none added; see above)
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
+- [x] State in varbits/varps, not attrs
+- [x] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the dialogue, crates, rewards and varbits follow the wiki and Quest Helper. The guesses and gaps are listed under notes below rather than in `docs/quirks.md`.
+- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): we have no rsprox dumps of the official game
+- [x] No unrelated or hand-edited generated changes
+
+## Screenshots / notes for reviewers
+
+The dye-to-colour list and the three mixes are a small Kotlin enum and three handlers in the quest script: the cache has no table or enum for them.
+
+The third crate is up the lookout ladder by the south gate, which has no handler on `main`; the ladder fix is its own PR. Without it, plain goblin mail also drops from goblins outside the village.
+
+Data sources: OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): Goblin Diplomacy, Transcript:Goblin Diplomacy, Transcript:Grubfoot, Transcript:General Wartface, Transcript:General Bentnoze, Goblin mail (Products), Orange dye (Creation); the dialogue follows the transcripts. Quest Helper `GoblinDiplomacy` (BSD): the varbits and their step values, item ids. Cache: npc 1965's multinpc order, the crate locs, the quest dbrow.
+
+Guesses:
+- The start value 3 (Quest Helper treats 0 and 3 as one step; nothing shows the write).
+- "Human! Get us <colour> armour!" when asking for a different colour mid-quest.
+- The talk option "I have some <colour> armour here." (the transcript only shows using the armour on a general).
+- The crate's full-inventory message, and "Nothing interesting happens." for armour used on a general outside the quest.
+- The dye message for colours other than orange and blue (same wording), and the dye-mixing message.
+- Black dye (`golem_ink`) is used up like the other dyes, with no vial back.
+- The journal text, the quest scroll item and chathead expressions.
+
+Not included: Grubfoot's try-on cutscenes (dialogue only); re-dyeing already dyed mail and white goblin mail (Land of the Goblins); the generals' Another Slice of H.A.M. dialogues, "Where's Bentnoze gone now?" and the village goblins' quest-era chatter.
+
+Release note: Goblin Diplomacy is playable, with the progress values Quest Helper reads.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
