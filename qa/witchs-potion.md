@@ -106,3 +106,18 @@ What must change before upstream:
    `sheep_shearer_progress`, so the second to merge needs the id re-run (as #362's text says for its ids).
 
 Re-check after 1 (text) and 2 (recordings): the upstream gate only, same commit.
+
+## Upstream re-check of the text at docs d802709e1 (same commit): still FAIL (RSProx pending)
+Checked by sq25 on 2026-10-19 against this record and 4dc1ac9c7:
+- Item 1 done: "How it was tested" now gives this gate (764 / 79, boot with no error, `--check`) and the in-game
+  run with the cheats (`::tele` for travel, `::item` for eye of newt, onion and burnt meat; the tail from a kill),
+  each bullet matching the In-game section above; the untried items (tail at stage 2, the other 13 partial lines,
+  the other rat types) are stated. "Every line shown matched the wiki transcript word for word": true of what I
+  compared.
+- Item 3 done: the notes say varbit 65449 is shared with #366's `sheep_shearer_progress`.
+- One wording fix, to bundle with the next change: "a clean run per step" over-reads my run. It was one `clean`
+  first, then each step as its own `./gradlew` run, with compiles of unchanged modules from the shared build cache
+  (tests never cached). Suggest: "a clean build, each step its own run (compiles from the build cache, every
+  test run)".
+- Item 2 open: the RSProx comparison (dialogue, animations, varps per stage, rewards) waits for the transcript
+  from the transcription agent. The upstream gate stays FAIL until it is done and recorded here.
