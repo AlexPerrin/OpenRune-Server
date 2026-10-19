@@ -10,13 +10,15 @@ it, so idle players stay logged in.
   players stay logged in. Documented in `game.example.yml`; an existing `game.yml` without the key
   gets the default.
 
-**Tests.** None (removed `IdleHandlerTest` as asked in review).
+**Tests.** None (removed `IdleHandlerTest` as asked in review). Checked in game (desktop RuneLite, fresh account): with the default `idle-logout: true`, the client was logged out after about 5-6 idle minutes; with `idle-logout: false` (boot log shows `idleLogout=false`), it was still logged in after 8 idle minutes. IDLE while logout is blocked by combat was not tried.
 
-On this branch merged onto current `main` (c2492318d; `main` hasn't touched these files since the branch point) (Docker `eclipse-temurin:21`, upstream's `./gradlew`, 4 GB container, no build or configuration cache; clean `freshCache` + `mergePluginGamevals`, `buildCache`, then each task as a separate run, then the server to "Server ready"): buildCache pass, `spotlessCheck` pass, `assemble` pass, `test` pass, `integration` pass, boot pass.
+Gate run on upstream `main` bcdb03292 + this branch (a clean merge; `main` touches none of this branch's files up to 731fd392a). Docker `eclipse-temurin:21`, upstream's `./gradlew`, 4 GB container, no build or configuration cache, one run per step: `freshCache` + `mergePluginGamevals` pass, `buildCache` pass, `spotlessCheck` pass, `assemble` pass, `test` pass (708 tests, 0 failures), `integration` pass (79 tests, 0 failures), boot to "Server ready" pass.
 
 **Caveats.** If logout is blocked (in combat), the player gets the logout button's message, and the
 client won't send IDLE again until the next five idle minutes. We have not checked what live does
 in that case.
+
+**Data sources.** OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): Idle, "Logout timer" (players idle for 5 minutes are logged out, if out of combat). rsprot's `Idle` message documentation (sent after 15,000 client cycles without input).
 
 **Release note.** Players are logged out after five idle minutes, as on OSRS; servers can turn this
 off with `gameplay.idle-logout: false`.
