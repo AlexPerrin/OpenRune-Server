@@ -1,15 +1,66 @@
 # QA: content/sheep-shearer
 - Branch: `content/sheep-shearer`
-- Commit: `19aefd90a8b7fa462c3560c60c25d9a2dc7058e6`
+- Commit: `069c15fde865be00679af03cd85fc19a630989b4`
 ## Internal gate: **PASS**
 ## Upstream gate: **PASS**
+
+Re-run by sq24 on 2026-10-19 at 069c15fde. Fork PR AlexPerrin/OpenRune-Server#16; it updates upstream #366
+(head `content/quests-sheep-romeo`, now 19aefd90a) by fast-forward: 19aefd90a is an ancestor of 069c15fde.
+Spec and PR text (upstream's template, #369) at fork docs 42c015d2a+. The verdicts at 19aefd90a below are void.
+
+Commits since 19aefd90a: 6b456af97 (stile change), 60b5eff93 (tests and `QuestTalkFixture` removed, as the
+maintainer asked), e52b004d3 (stile change reverted; it is now fix/stile-approach), 069c15fde (merge of upstream
+main 829b9477d). **Net diff against main: the quest only, 3 files.** `SheepShearer.kt` and
+`sheep_shearer_vars.toml` are byte-identical to 19aefd90a. `quest-pack` `gamevals.toml` adds the three
+symbols next to main's.
+
+## Internal gate at 069c15fde: PASS
+- **build-test**:
+  - `qa.sh gate` on clone `qa/sheep-069c15fde`, `origin/main` = 829b9477d.
+  - Every step rc=0: compile, freshCache + mergePluginGamevals, buildCache, generateRsa, installDist,
+    spotlessCheck, assemble.
+  - `test` 764/0 (`content:quest` 207). `integration` 79/0. Total 648 s.
+  - `fix_gameval_conflicts.py --check` is clean.
+  - Boot: "Server ready in 16.76s". No exception or error lines; the startup check of 21 against the dbrow's
+    end state passed.
+- **accuracy-check**: the quest code is unchanged from 19aefd90a, whose accuracy check passed. The caveats
+  that 19aefd90a's upstream run asked for are in the text: the penguins squeak and run away; only the generic
+  shearing animation.
+- **In game**: not re-run (optional per main). The code is identical to the commit a-thoren checked in game,
+  and the stile is not in this branch.
+
+## Upstream gate at 069c15fde: PASS
+- **Scope**: the quest only (3 files net). The stile fix is separate (fix/stile-approach); #366 doesn't
+  depend on it, and the text says so.
+- **Base**: upstream main 829b9477d (the tip, re-fetched) is merged in. The only conflict was the quest-pack
+  `gamevals.toml`, resolved by keeping both sides; gamevals check clean.
+- **Overlap**: `gh pr list --search sheep` shows #366 (this) and our #367/#368. Those two are stacked on the
+  old #366 commit and carry an old Sheep Shearer; that is the orchestrator's follow-up from the 19aefd90a record,
+  not this branch's.
+- **Template (#369)**: every section is present.
+- **Checklist** is honest:
+  - "Builds and the server boots": unticked with a note. It is true now; it can be ticked.
+  - tests: none, ticked with "none in this PR now";
+  - gamevals symbols, no Kotlin data tables: true;
+  - varps/varbits, no attrs: true;
+  - quirks.md and rsprox: unticked with notes.
+- **pr-text-review**:
+  - True: varp 179 values; rewards; the hand-in lines; the 20-ball shortcut; the reward-room refusal; The
+    Thing's lines; the -1 gamevals assigned by the script; the review notes (tests removed, stile separate);
+    207 tests in `content:quest`, 0 failures; gamevals clean; "Not checked in game by us on this commit".
+  - The merge note is accurate.
+- **Caveats**: unchanged from the passing 19aefd90a list, plus the penguins line.
+- Note for the orchestrator: the PR will show the add-then-remove commits (fixture, stile) and a merge commit.
+  The net diff is clean; upstream may ask to squash (CONTRIBUTING).
+
+## Earlier runs at 19aefd90a (void: superseded by 069c15fde)
 
 Run by sq24 (companion to sd23) on 2026-10-18 in its own clone `re/agents/sq24/or`, detached at the commit.
 The branch is two commits (35900b277 `QuestTalkFixture`, 19aefd90a the quest) on c2492318d, which is
 current `upstream/main` (re-fetched after the run), so the branch tree is upstream `main` + the branch.
 The dev's run (sd23 scratchpad `gate/sheep-shearer-19aefd90a.logs/`) was read as evidence only.
 
-## Upstream gate, first run: FAIL (fixed in docs 4a35daadc; see "Upstream re-run" at the end)
+### Upstream gate, first run: FAIL (fixed in docs 4a35daadc; see "Upstream re-run" at the end)
 The PR's Caveats miss two gaps against the sources. Add them to `pr-texts/sheep-shearer.upstream.body`
 (and to `accuracy/sheep-shearer.md` as rows), or implement them; either is a new commit or text change,
 and the upstream gate is re-run:
@@ -29,7 +80,7 @@ Sheep Shearer (`SheepShearer.kt`, gamevals 63712/63715/63716) and Romeo & Juliet
 replaced with this branch, they have to be rebased onto it and their "Stacked" lines updated. If they
 aren't, they carry a second, conflicting Sheep Shearer.
 
-## Internal gate
+### Internal gate
 ### build-test (at 19aefd90a)
 Own Gradle home volume `sq24-gradle`; every container through `tools/buildq.sh sq24` (`--cpus=4
 --memory=4g`, `--max-workers=2`, test/integration with 1 worker, `-Xmx2g`, cache tasks `-Xmx2600m`,
@@ -102,7 +153,7 @@ Helper, which the tests check (1, 6, 21).
 matches the spec and its sources, apart from one cosmetic gap the spec doesn't list (The Thing doesn't
 walk away), which is for the upstream caveats.
 
-## Upstream gate
+### Upstream gate
 - Internal PASS at the same commit: yes.
 - Scope, one feature: the quest plus its test fixture (test sources only), declared under **Depends:**.
   Nothing unrelated in the diff (5 files: `gamevals.toml`, `sheep_shearer_vars.toml`, `SheepShearer.kt`,
@@ -130,7 +181,7 @@ walk away), which is for the upstream caveats.
 PR-text change only, with the commit still 19aefd90a, the internal PASS stands. The upstream gate is
 re-run on the new text.
 
-## Upstream re-run (docs 4a35daadc, commit still 19aefd90a)
+### Upstream re-run (docs 4a35daadc, commit still 19aefd90a)
 Re-run by sq24 on 2026-10-18. The code commit didn't change, so the internal PASS and the build-test
 results above still stand. sd23's fix only changes text: `pr-texts/sheep-shearer.upstream.body` has one
 new Caveats line, and `accuracy/sheep-shearer.md` has row 19 and an updated scope-gap line. Diff checked
