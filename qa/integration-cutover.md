@@ -1,8 +1,45 @@
 # QA: integration
 - Branch: `integration`
-- Commit: `1f7af4e38934e5a4d485f3500c3d52281b5e17b9`
+- Commit: `be80d1d148eee5cdf964e16b2c8dd26d7a2052a8`
 ## Internal gate: **FAIL**
 ## Upstream gate: **N/A**
+
+## Run at be80d1d14 (sq23, 2026-10-18): FAIL on fix/55-general-store-stock-wiring
+be80d1d14 = 1f7af4e38's set with spotless commits on fix/71, content/looting-bag, fix/74, fix/76, fix/75 and
+local/android, plus fix/55-general-store-stock-wiring (a2d14ae73) in integration.txt.
+
+### What must change
+fix/55 points the Edgeville General Store at `inv.generalshop2` (the mapping matches
+tools/wiki-dumping shopmappings.csv), but that inv's server config is broken upstream:
+`.data/raw-cache/server/shops/generalshop2.toml` (unchanged since 6299e4114 "Mapped some osrs shops", the same on
+upstream/main) is truncated. It has no `sellMultiplier`/`buyMultiplier`/`delta`/`size`/`protect`/`runWeight`/
+`restock`/`allStock`/`placeholders` lines, and the first nine `[[inventory.stock]]` entries are missing (the
+chisel entry has also lost its header). Decoded from the packed SERVER cache built at be80d1d (config archive 2,
+group 60):
+- `inv.generalshop2` (4): size=0, flags=1 (protect only, no restock), stock hammer x5, knife x1 (2t), newcomer_map
+  x5, sos_security_book x5.
+- `inv.generalshop5` (24, Lumbridge): size=15, flags=4 (restock), 15 items matching the wiki's Lumbridge General
+  Store stock exactly (pot 5/10t, jug 2/100, jug pack 5/20, shears 2/100, knife 5/100, bucket 3/10, bucket pack
+  15/10, bowl 2/50, cake tin 2/50, tinderbox 2/100, chisel 2/100, spade 5/100, hammer 5/100, newcomer map 5/100,
+  security book 5/100).
+- `inv.generalshop1` (3, Al Kharid): 13 items, matching the wiki (no spade, no knife).
+
+`Inventory.create` (engine/game/.../inv/Inventory.kt:159) allocates `arrayOfNulls(type.size)` = 0 slots and then
+writes the 4 stock entries into `objs[0..3]`, so Shops.open (api/shops/.../Shops.kt:173) on the Edgeville
+shopkeeper's Trade option throws ArrayIndexOutOfBoundsException. Before fix/55, Edgeville opened generalshop5 and
+worked. Either repair generalshop2.toml on fix/55 to the wiki's Edgeville stock (that is generalshop5 without the
+spade, with knife x1 restocking every 2 ticks, 14 slots, restock on, generalshop5's multipliers), or take fix/55
+out of the cutover. The Lumbridge half is correct.
+
+### Steps run at be80d1d
+Uncached `clean :or-cache:freshCache :or-cache:mergePluginGamevals` (341 s), `:or-cache:buildCache` (89 s) and the
+fix scripts (add_varcs 1293/1294, fix_long_varps 40 ops in 6 scripts, fix_reftable 9973/9974, check_cache 9975
+groups, max 9974) passed. The rest of the chain (install, spotlessCheck, assemble, test, integration, image,
+boot, DB dry run) was stopped once the failure above was confirmed, on main's instruction (fix/55 is dropped from
+the next integration commit). `fix_gameval_conflicts.py --check` was clean per main.
+
+## History: run at 1f7af4e38 (FAIL, spotlessCheck)
+- Commit: `1f7af4e38934e5a4d485f3500c3d52281b5e17b9`
 
 Scope: the live-server cutover ("safe to run live"): fork main c2492318d + the 61 branches of
 local/integration-tools:integration.txt. Accuracy per branch is out of scope (each branch gets its own gates).
@@ -11,7 +48,7 @@ Run by sq23 on 2026-10-18 in its own clone (re/agents/sq23/or, detached at the c
 `-Xmx2g`, cache tasks `-Xmx2600m`, `-Pkotlin.compiler.execution.strategy=in-process`,
 `--no-build-cache --no-configuration-cache`).
 
-## What must change
+### What must change (1f7af4e38)
 `spotlessCheck` fails in 7 modules (10 files). Each file is ratcheted against `origin/main` because a branch
 touched it; run `spotlessApply` on each branch named below (on that branch, not on integration), push, rebuild
 integration:
@@ -35,7 +72,7 @@ integration:
 Nothing else failed. The fixes are formatting only, but they are new commits: the build, the tests and the boot
 must be re-run on the new integration commit.
 
-## Build and test (at 1f7af4e38)
+### Build and test (at 1f7af4e38)
 | Step | Result | Time |
 |---|---|---|
 | `clean :or-cache:freshCache :or-cache:mergePluginGamevals` (fresh OpenRS2 cache 2740, rev 241) | pass | 293 s |
@@ -51,7 +88,7 @@ must be re-run on the new integration commit.
 The first `install` attempt hit `OutOfMemoryError` in freshCache with the JavaExec default heap (1 GB in a 4 GB
 container); rerun with `-Xmx2600m` as qa.sh does. Infrastructure, not the branch.
 
-## Image and boot-check
+### Image and boot-check (1f7af4e38)
 - Image `osrs-openrune:integration-1f7af4e` (id 2fc8c22fdf99), built with openrune/Dockerfile and .dockerignore
   from this clone's installDist, `.data` (fixed cache, gamevals, keys, rsa.properties) and `game.yml`
   (identical to the live tree's).
@@ -59,7 +96,7 @@ container); rerun with `-Xmx2600m` as qa.sh does. Infrastructure, not the branch
   log.
 - Built from 1f7af4e38, so it carries the FAIL above; it is not the image to deploy once the spotless fixes land.
 
-## Dry run on a copy of the live DB
+### Dry run on a copy of the live DB (1f7af4e38)
 - `pg_dump` of the live osrs-openrune DB (read only, through a postgres:16 client on its network), restored into
   the image's own embedded PostgreSQL on volume `sq23-pgdata`, server on port 43612 (live containers untouched),
   restarted on the restored data: "Server ready in 12.6s". Flyway history: 23 migrations, max 28, the same in the
@@ -83,7 +120,7 @@ container); rerun with `-Xmx2600m` as qa.sh does. Infrastructure, not the branch
   (`kc_cave_bug`, `temp_restore_65527`) have server configs in .data/raw-cache/server/varp.toml.
 - No data migration needed (saves keyed by name, as expected).
 
-## Cleanup
+### Cleanup (1f7af4e38)
 Containers sq23-boot and sq23-dry removed, volume sq23-pgdata removed, the dump and the DB-copy snapshots
 deleted. Kept: the image and the Gradle home volume `sq23-gradle` for the re-run. Logs:
 /tmp/claude-1000/-home-alex-osrs-plugins-reverse/a0087aa1-b8d3-439d-add9-f4cbee8fc5e6/scratchpad/sq23/
