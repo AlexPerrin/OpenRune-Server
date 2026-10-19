@@ -57,6 +57,25 @@ the data is unchanged). In-game: n/a as before (nothing on `main` opens `inv.gen
 - Caveats: the spec's three gaps (size 40 from other stores' captures, `allStock = false` as in every upstream
   general store, multipliers unused) are all listed; the accuracy check found no others.
 
+## Upstream re-check: PASS (PR text in upstream's PR template, docs bc84271a8, same commit)
+Checked by sq25 on 2026-10-19. sd24 rewrote `pr-texts/edgeville-general-store-stock.upstream.body` into upstream's new PR template
+(#369, `.github/pull_request_template.md` on upstream `main` 829b9477d); the commit is unchanged.
+- Template sections present, in order: Summary, Type of change, How it was tested, Checklist, Screenshots / notes
+  for reviewers. Data sources and the release note are in the notes; `.github/CONTRIBUTING.md` asks for a
+  release-note summary "in the PR body" and data-source notes, not headings, so that is fine.
+- Checklist ticked honestly: builds and boots (true, record above); no test added (true); symbols, not raw ids
+  (true); no new state (true); "Matches the OSRS wiki" ticked with the reason that the gaps are listed in the
+  notes rather than in `docs/quirks.md` (true: stock, counts, restock times and multipliers match the wiki; size 40 and `allStock = false` are not wiki statements contradicted by this PR); "checked against rsprox dumps" left unticked with the
+  reason (we have none); no unrelated changes (true).
+- Claims re-checked against ca527418a and this record: the Summary (truncation, crash, the 14 rows, header,
+  size 40); "How it was tested" (731fd392a + the branch: buildCache, spotless, assemble, test 726/0,
+  integration 79/0, boot, `--check` clean; the packed `getInventory(4)` decode; the 395 + 6 inventory scan;
+  not checked in game because nothing on `main` opens the shop) all match the internal gate above. Data sources
+  (wiki Stock section and Changes, #341) and the release note present.
+- Merges cleanly onto upstream `main` 829b9477d (`git merge-tree`), and nothing between 731fd392a and 829b9477d
+  touches `.data/raw-cache/server/shops` (`git diff --name-only 731fd392a 829b9477d`), as the text says.
+- Caveats: unchanged from the text that passed above, all present in the notes.
+
 ---
 
 ## Earlier run at a2412b26f

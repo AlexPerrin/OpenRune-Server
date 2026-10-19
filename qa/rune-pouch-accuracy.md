@@ -43,6 +43,27 @@ verdicts at 01c233d80 below are void; the four upstream items they asked for are
 - **Caveats complete**: the divine/locked-by-extension line (recommended at 01c233d80) is in, and the module
   gaps from the earlier FAIL are all listed (unchanged from 01c233d80, checked there).
 
+## Upstream re-check: PASS (PR text in upstream's PR template, docs bc84271a8, same commit)
+Checked by sq25 on 2026-10-19. sd24 rewrote `pr-texts/rune-pouch-accuracy.upstream.body` into upstream's new PR template
+(#369, `.github/pull_request_template.md` on upstream `main` 829b9477d); the commit is unchanged.
+- Template sections present, in order: Summary, Type of change, How it was tested, Checklist, Screenshots / notes
+  for reviewers. Data sources and the release note are in the notes; `.github/CONTRIBUTING.md` asks for a
+  release-note summary "in the PR body" and data-source notes, not headings, so that is fine.
+- Checklist ticked honestly: builds and boots (true, record above); no test added (true); symbols, not raw ids
+  (true); no new state (true); "Matches the OSRS wiki" ticked with the reason that the gaps are listed in the
+  notes rather than in `docs/quirks.md` (true: the message is the wiki's Trivia line; the divine/locked extension is stated in the notes); "checked against rsprox dumps" left unticked with the
+  reason (we have none); no unrelated changes (true).
+- Claims re-checked against bee197ba9 (one commit on 731fd392a, +5 lines in `RunePouchScript.kt`) and this
+  record: interface 190, the four pouches answer "Don't be silly." before the rune check; the in-game paragraph
+  says it ran on an earlier commit with the same condition, order and message and that the current commit was
+  not re-run (true, as recorded above; items were spawned, which the text says); 731fd392a + the branch:
+  test 726/0, integration 79/0 with `RunePouchScriptTest` 5/5, boot (sq24's run above); no new test (AGENTS.md).
+  Fork PR link #17 correct; title matches the commit subject. Data sources (wiki Rune pouch, Trivia, CC
+  BY-NC-SA) and the release note present.
+- Merges cleanly onto upstream `main` 829b9477d (`git merge-tree`), and nothing between 731fd392a and 829b9477d
+  touches `content/skills/magic/rune-pouch` (`git diff --name-only 731fd392a 829b9477d`), as the text says.
+- Caveats: unchanged from the text that passed above, all present in the notes.
+
 ## Earlier run at 01c233d80 (void: superseded by bee197ba9)
 
 Run by sq24 (companion to sd23) on 2026-10-18/19. Fork PR AlexPerrin/OpenRune-Server#17. Spec
