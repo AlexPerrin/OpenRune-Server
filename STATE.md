@@ -8,10 +8,10 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
 - **Live test server**: container `osrs-openrune` (game + JS5, port 43594), sidecars
   `osrs-openrune-http` (8080, Android, LOCAL_AUTH) and `osrs-openrune-http-desktop` (8082, desktop
   RuneLite via RSProx). Compose stack: `openrune/docker-compose.yml` in osrs-plugins-reverse.
-- **Live code** (since 2026-10-19 02:45 UTC): fork `integration` at `5da8d3e46` (fork main `c2492318d` + the
-  branches in integration.txt, without fix/55), image `osrs-openrune:integration-5da8d3e`, tagged `:241` for
-  compose. Internal gate PASS: qa/integration-cutover.md. Rollback: `osrs-openrune:rollback-fb10fd3` (the old
-  openrune.patch tree). openrune.patch is retired.
+- **Live code** (since 2026-10-19 04:05 UTC): fork `integration` at `5cc473397` (fork main `db78abf73` + the
+  branches in integration.txt, local/integration-tools 06090a107), image `osrs-openrune:integration-5cc4733`, tagged
+  `:241` for compose. Internal gate PASS: qa/integration-cutover.md. Rollback: `osrs-openrune:rollback-5da8d3e`
+  (previous integration), then `rollback-fb10fd3` (the retired openrune.patch tree).
 - **Sidecar** image `osrs-rsps-test:241` is built from `server/` in osrs-plugins-reverse. jav_config
   param 3 is the desktop client's members-world flag (now true), param 5 the world flags.
 
