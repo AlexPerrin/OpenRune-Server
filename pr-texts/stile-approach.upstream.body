@@ -14,7 +14,7 @@ Fixes the stile issue a-thoren found while testing #366: "you can jump over the 
 
 ## How it was tested
 
-- `content:generic:generic-locs`: `spotlessCheck`, `test` and `integration` pass: RESULTS_PENDING.
+- `content:generic:generic-locs`: `spotlessCheck` and `integration` pass (4 tests, 0 failures; the module has no unit tests), after `freshCache`.
 - To check in game: at the Sheep Shearer pen stile north-west of Lumbridge, click Climb-over from a tile diagonal to the stile and from the tile beside it along the fence, on both sides. Each time the player walks onto the stile's tile on their side, climbs, and ends on the other side.
 
 ## Checklist
