@@ -36,7 +36,7 @@ Unit/integration: `GenieRandomEventTest` (8, integration), on the schedule and t
 - a Make-X weak queue delays it;
 - an interrupted hand-over still gives exactly one lamp, and the Genie leaves.
 
-On this branch: the random-events module's `spotlessCheck`, `test` and `integration` pass (`GenieRandomEventTest` 8/8) after `freshCache` and `buildCache`; `tools/scripts/fix_gameval_conflicts.py --check` finds no conflicts. Full build, all tests (726 + 87 integration) and boot to "Server ready" passed on the previous commit of this change in our QA run.
+On this branch: the random-events module's `spotlessCheck`, `test` and `integration` pass (`GenieRandomEventTest` 8/8) after `freshCache` and `buildCache`; `tools/scripts/fix_gameval_conflicts.py --check` finds no conflicts. Full build, all tests (764 + 87 integration) and boot to "Server ready" pass on this commit in our QA run.
 
 In game (desktop RuneLite on a branch server, fresh account, on the previous commit; the code differs only in the repeat-Talk-to line and the late-completion guard):
 - `::randomevent`: the Genie appears beside the player, follows within 12 s when they walk away, and is gone a minute later when ignored.
@@ -49,9 +49,9 @@ In game (desktop RuneLite on a branch server, fresh account, on the previous com
 
 ## Checklist
 
-- [ ] Builds and the server boots (our QA gate checks this before the PR is updated)
+- [x] Builds and the server boots
 - [x] Tests only cover complex logic and anything that moves items (no dupes)
-- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
+- [ ] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps: gamevals symbols throughout, but `RandomEventLocations` keeps its location rules in Kotlin (the no-event dungeon areas, Ferox Enclave as a bank with events, the Grand Exchange square and the bank radii). Areas themselves are cache data (`.data/raw-cache/map/area`), but I found no upstream pattern for a list of area ids or a radius in the cache (no dbtable/pack config for area lists). Happy to move them if you point me at the place you want them.
 - [ ] State in varbits/varps, not attrs: the due time is a persistent attribute (epoch milliseconds don't fit a 32-bit varp); happy to switch to a varp holding epoch minutes
 - [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the deviations are listed below, not in `docs/quirks.md`
 - [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): we have no dumps of the official game
