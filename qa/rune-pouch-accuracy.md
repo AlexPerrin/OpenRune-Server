@@ -1,8 +1,49 @@
 # QA: fix/rune-pouch-accuracy
 - Branch: `fix/rune-pouch-accuracy`
-- Commit: `01c233d80cc1b9f7625b8383612340abac1a5c59`
+- Commit: `bee197ba90c7cec7a56e1174651b21662c70bf08`
 ## Internal gate: **PASS**
-## Upstream gate: **FAIL**
+## Upstream gate: **PASS**
+
+Re-run by sq24 on 2026-10-19 at bee197ba9, one commit on upstream `main` 731fd392a (re-fetched: still the tip),
+fork PR AlexPerrin/OpenRune-Server#17 (head bee197ba9). Spec and PR text at fork docs ec16f5d67. Both
+verdicts at 01c233d80 below are void; the four upstream items they asked for are done.
+
+## Internal gate at bee197ba9: PASS
+- **build-test** (`qa.sh gate`, one container, shared remote build cache for compiles, tests never cached; clone
+  `qa/rpa-bee197ba9`, `origin/main` set to 731fd392a for the spotless ratchet; logs `rpa-bee197ba9.logs/`):
+  compile, freshCache + mergePluginGamevals, buildCache, generateRsa, installDist, spotlessCheck, assemble all
+  rc=0; `test` 726 tests, 0 failures/errors; `integration` 79 tests, 0 failures/errors (`RunePouchScriptTest`
+  5/5); total 632 s. Boot: "Server ready in 9.36s", no exception or error lines. The tree is upstream main +
+  the commit (the base is the tip). `fix_gameval_conflicts.py --check`: no conflicts.
+- **accuracy-check**: the change is `if (internal in RunePouch.pouches) { mes(DONT_BE_SILLY); return }` in
+  `inventoryOp()`, after the Op10 examine and before the rune check, and `const val DONT_BE_SILLY = "Don't be
+  silly."`. The same condition, order and line as 01c233d80's `storeRejection` (checked in game there, table
+  below), without the helper. Wiki Rune pouch, Trivia (re-read 2026-10-18 through osrs-mcp) unchanged.
+- **In-game**: not re-run. The player-visible path is identical to 01c233d80's, which was checked in game as a
+  members player (all three pouches "Don't be silly.", coins the non-rune line, air stored).
+
+## Upstream gate at bee197ba9: PASS
+- **The 01c233d80 FAIL items are done:** no new test, the companion object stays `private`, no KDoc, based on
+  the current upstream main 731fd392a, PR text updated.
+- **Scope**: one file, +5 lines (`RunePouchScript.kt`); no docs files on the code branch.
+- **Overlap**: `gh pr list -R OpenRune/OpenRune-Server --state open --search "rune pouch"`: only #319
+  (gravestones), which doesn't touch the module. No `Depends:`.
+- `fix_gameval_conflicts.py --check` clean; no ids added.
+- **CONTRIBUTING / AGENTS.md**: `fix:` subject, Co-Authored-By line; Release note, Checklist, Data sources
+  (CC BY-NC-SA), manual testing notes, Claude Code line present. No test, per AGENTS.md "Unit tests" (a
+  message in a simple op handler); no comments.
+- **pr-text-review** (`pr-texts/rune-pouch-accuracy.upstream.body` at ec16f5d67, title matches the commit
+  subject), every claim against bee197ba9:
+  - True: interface 190; the four pouches (12791, 24416, 27281, 27509) answer "Don't be silly." before the
+    rune check, other non-runes keep the line; "No new test", `RunePouchScriptTest` still passes (5/5 here,
+    the PR says 5/5); spotless/test/integration pass; the wiki quote is verbatim; fork PR link #17 correct.
+  - The in-game paragraph describes QA's check, which ran at 01c233d80 on main bcdb03292 + that commit, not
+    on bee197ba9. Accepted: same code path and line (above). If upstream asks, it was the first version of
+    this fix.
+- **Caveats complete**: the divine/locked-by-extension line (recommended at 01c233d80) is in, and the module
+  gaps from the earlier FAIL are all listed (unchanged from 01c233d80, checked there).
+
+## Earlier run at 01c233d80 (void: superseded by bee197ba9)
 
 Run by sq24 (companion to sd23) on 2026-10-18/19. Fork PR AlexPerrin/OpenRune-Server#17. Spec
 `accuracy/rune-pouch-accuracy.md` and PR text `pr-texts/rune-pouch-accuracy.{title,upstream.body}` at docs
@@ -15,7 +56,7 @@ Varrock platebody smelting, #312 Slayer). None of them touches `content/skills/m
 rune enums or the varbits the pouch uses; `git merge-tree` of bcdb03292 and the commit is clean. It doesn't
 matter for this change, but the next commit should be based on the current `main`.
 
-## Upstream gate: FAIL. What must change
+### Upstream gate at 01c233d80: FAIL (void). What must change
 The behaviour is right (internal gate below). The commit doesn't follow upstream `AGENTS.md` (on `main`
 bcdb03292), and the PR text has to follow the code:
 1. **Drop the new test and keep the companion object private.** AGENTS.md, "Unit tests — where they earn
@@ -68,7 +109,7 @@ Everything else in the upstream gate passes:
   rune pouch module gap: Construction can't take runes from the pouch (Trivia). That belongs to
   Construction, so no caveat is needed.
 
-## Internal gate: PASS
+### Internal gate at 01c233d80: PASS (void)
 
 ### build-test
 Fresh self-contained clone at 01c233d80 (scratchpad `qa/rpa-01c233d80`, `game.yml` from
