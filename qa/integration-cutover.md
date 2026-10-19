@@ -1,14 +1,81 @@
 # QA: integration
 - Branch: `integration`
-- Commit: `be80d1d148eee5cdf964e16b2c8dd26d7a2052a8`
-## Internal gate: **FAIL**
+- Commit: `5da8d3e46abc9020e786c740c150a94a85acd0d8`
+## Internal gate: **PASS**
 ## Upstream gate: **N/A**
 
-## Run at be80d1d14 (sq23, 2026-10-18): FAIL on fix/55-general-store-stock-wiring
+## Run at 5da8d3e46 (sq23, 2026-10-18): PASS
+5da8d3e46 = be80d1d14 without fix/55-general-store-stock-wiring (local/integration-tools d87819fa2 drops it
+from integration.txt). `git diff be80d1d14 5da8d3e46`: the two general-store scripts and integration.txt only.
+Same setup as below: clone re/agents/sq23/or detached at the commit (tree clean before the run), Gradle home
+volume `sq23-gradle`, every Gradle container through tools/buildq.sh (`--cpus=4 --memory=4g`, `-Xmx2g`, cache
+tasks `-Xmx2600m`, `-Pkotlin.compiler.execution.strategy=in-process`, `--no-build-cache
+--no-configuration-cache`, `--max-workers=2`, tests 1 worker).
+
+| Step | Result | Time (incl. buildq queue) |
+|---|---|---|
+| `clean :or-cache:freshCache :or-cache:mergePluginGamevals` | pass | 1113 s |
+| `:or-cache:buildCache` | pass | 376 s |
+| `add_varcs.py` (1293, 1294), `fix_long_varps.py` (40 ops in 6 scripts: 778, 779, 5156, 5732, 5733, 9911), `fix_reftable.py` (groups 9973, 9974), `check_cache.py` (9975 groups, max 9974) | pass | 3 s |
+| `generateRsa :server:app:installDist -x test` | pass | 620 s |
+| `spotlessCheck` | pass | 154 s |
+| `assemble` | pass | 310 s |
+| `test --continue` (1 worker) | pass: 790 tests, 0 failed, 0 errors, 0 skipped | 724 s |
+| `integration --continue` (1 worker) | pass: 210 tests, 0 failed, 0 errors, 0 skipped | 613 s |
+| `fix_gameval_conflicts.py --check` | clean ("No gameval conflicts or unassigned IDs found.") | |
+
+### Image and boot-check
+- Image **`osrs-openrune:integration-5da8d3e`** (id 7c4e623c2d48), built with openrune/Dockerfile and
+  .dockerignore from this clone's installDist, `.data` (fixed cache, gamevals, keys) and `game.yml`.
+  `game.yml` and `.data/rsa.properties` are byte-identical to the live tree's (openrune/src).
+- Boot-check (`--tmpfs /app/.data/postgres:uid=1000`, fresh DB): "Server ready in 11.26s", no ERROR, WARN or
+  exception in the log.
+
+### General stores (fix/55 dropped)
+Static check at 5da8d3e46 on the packed SERVER cache (config archive 2, group 60). Both stores open an inv
+whose size covers its stock, so Inventory.create cannot overflow:
+- Edgeville General Store -> `inv.generalshop5`: size 15, restock on, 15 items (the wiki's Lumbridge stock; the
+  wiki's Edgeville stock is the same minus the spade, with knife x1 at a 2-tick restock).
+- Lumbridge General Store -> `inv.generalshop1`: size 13, restock on, 13 items (the wiki's Al Kharid stock; no
+  spade, no knife, so the X Marks the Spot spade is not sold here).
+This is the wiring the live server runs now. The mismatches against the wiki are known and come before this
+cutover; fixing them is fix/55's job, once generalshop2.toml is repaired (see the be80d1d14 run below).
+
+### Short dry run on a copy of the live DB
+- `pg_dump -Fc` of the live osrs-openrune DB (read only; postgres:16-alpine client on its network namespace,
+  live containers untouched). Restored with `pg_restore --clean --if-exists --no-owner` into the image's
+  embedded PostgreSQL on volume `sq23-pgdata` (server `sq23-dry` on 127.0.0.1:43612), then restarted:
+  "Server ready in 10.64s". Flyway after restart: `public` at 28 (23 migrations) and `main` at 1, both "up
+  to date. No migration necessary", the same history as in the dump, so no migration runs at cutover.
+- Headless login/logout (tools/multiclient/desktop_login.py, modulus served from scratch on 127.0.0.1 only):
+  `tester`: login OK, 8 UPDATE_STOCKMARKET_SLOT, toplevel 601 (its saved gameframe is the mobile one, so the
+  script's desktop-toplevel check reports FAIL; expected for this account). `desktop`: login OK, toplevel 161,
+  PASS.
+- Saves of both accounts (varps, inventories, objs, attrs, stats, position), compared before login and after the
+  disconnect-logout had settled (saves stable across two snapshots 30 s apart): **no key lost**.
+  For `tester`, these are unchanged: inventory (9), worn (4), bank (35), collection_transmit (2), stats, attrs and
+  position. The GE offer is unchanged: `ge_slot1_item` 380 (lobster), count 1, price 1, state 2. The quest varps
+  are unchanged (`cookquest` 2, `rjquest` 100, `sheep` 21, `doricquest` 0, `questlist` 5131, `qp` 11).
+  Changed, as in a normal session: `playtime`, `map_clock`, `date_vars`, `cat_growth` (tester). Added:
+  `ge_logout_minute` (both). `follower_npc` is back to 0 after logout.
+- The server log had 1 line: `[ERROR] Cycle took too long (elapsed=604ms)` during the tester login. The host
+  was running other agents' Gradle builds at the time. Load, not a functional error.
+- Cleanup: `sq23-dry` and `sq23-pgdata` removed, the dump and the snapshots deleted.
+
+### Cleanup
+All sq23 containers and the local RSA HTTP servers are stopped. The superseded images
+`osrs-openrune:integration-1f7af4e` and `-be80d1d` were removed. Kept: `osrs-openrune:integration-5da8d3e`
+and the Gradle volume `sq23-gradle`. Logs:
+/tmp/claude-1000/-home-alex-osrs-plugins-reverse/a0087aa1-b8d3-439d-add9-f4cbee8fc5e6/scratchpad/sq23/r4/.
+
+## History: run at be80d1d14 (FAIL, fix/55-general-store-stock-wiring)
+- Commit: `be80d1d148eee5cdf964e16b2c8dd26d7a2052a8`
+- Internal gate: **FAIL**
+
 be80d1d14 = 1f7af4e38's set with spotless commits on fix/71, content/looting-bag, fix/74, fix/76, fix/75 and
 local/android, plus fix/55-general-store-stock-wiring (a2d14ae73) in integration.txt.
 
-### What must change
+### What must change (be80d1d14)
 fix/55 points the Edgeville General Store at `inv.generalshop2` (the mapping matches
 tools/wiki-dumping shopmappings.csv), but that inv's server config is broken upstream:
 `.data/raw-cache/server/shops/generalshop2.toml` (unchanged since 6299e4114 "Mapped some osrs shops", the same on
