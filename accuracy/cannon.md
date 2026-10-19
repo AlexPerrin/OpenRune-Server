@@ -1,7 +1,7 @@
 # Dwarf multicannon (acc/cannon, upstream PR #354)
 
-Spec for the audited rewrite on `acc/cannon` (one commit 0d0190f3c on main 731fd392a: the
-feature, the timer id, the `mcannon_world` fix, the capture-citation removal and the AGENTS.md trim, squashed). Reuses the 2026-10-18 audit of the first version (osrs-plugins-reverse
+Spec for the audited rewrite on `acc/cannon` (one commit bc243d141 on main 829b9477d: the
+feature, the timer id, the `mcannon_world` fix, the capture-citation removal, the AGENTS.md trim, and sq24's fixes (XP capped at the target's hitpoints, the no-ammo message), squashed). Reuses the 2026-10-18 audit of the first version (osrs-plugins-reverse
 `openrune/upstream/accuracy/cannon.md`: 29 rows, D1-D10), with each row's status on this branch. Its sources:
 OSRS Wiki "Dwarf multicannon" (Assembly; Mechanics: Damage and experience, Accuracy, Revolutions, Targets,
 Breaking/Decay/Death; Prohibited areas; Changes), "Cannonball", "Cannon base", "Transcript:Nulodion"; the
@@ -51,12 +51,14 @@ Rows 1, 3-6, 8, 10, 11, 15, 17, 20-22, 26 and 28 matched in the audit and are un
   inventory spaces to pick that up."), the one-cannon line's capital "Cannon", and pick-up as two lines.
 
 ## Scope gaps (PR caveats)
+Also (sq24, 2026-10-19): the buff bar's decay timer (`%buff_cannon_decay_start`, never set) and the trivia's "I'm
+currently under attack" line.
 Granite cannonballs; Combat Achievement capacities (35/45/60); prohibited areas other than the Grand
 Exchange; bosses destroying cannons and immune monsters; the 1-damage floor at very low accuracy (2019);
 the ornament kit; the south-west "push"; `mcannon_setuptime`.
 
 ## Tests
-`DwarfMulticannonTest` (14, integration; AGENTS.md: item flows, timers, targeting) and `NulodionCannonSaleTest`
+`DwarfMulticannonTest` (15, integration, incl. the XP overkill case; AGENTS.md: item flows, timers, targeting) and `NulodionCannonSaleTest`
 (+1): see the PR text.
 
 ## Ids
