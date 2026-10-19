@@ -54,12 +54,16 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   bits, or renaming an inv does. Unknown varp names are skipped on load and dropped on the next save.
 
 ## Build, test, deploy
-- Every build container goes through `tools/buildq.sh <owner> -- docker run ...` (FIFO, 2 slots),
-  `--cpus=4 --memory=4g`, `--max-workers=2`, `-Xmx2g`, `-Pkotlin.compiler.execution.strategy=in-process`,
-  `--no-build-cache --no-configuration-cache` for branch checks. `integration` runs out of memory with
-  2 workers: use 1.
-- Branch gate: clean main cache, `buildCache mergePluginGamevals`, `spotlessCheck`, `assemble`, `test`,
-  `integration` (separate runs), boot to "Server ready in".
+- Gate: `openrune/upstream/qa/qa.sh gate <clone>` (= `build`): one priority ticket (buildq class gate,
+  2 slots), one 5 GB container, steps clean+qaCacheToolsClasspath, freshCache+mergePluginGamevals,
+  buildCache, generateRsa, installDist, spotlessCheck, assemble+test classes, test (2 JVMs -Xmx1536m),
+  integration (1 JVM), each `--no-daemon`, 4 workers, Kotlin daemon, `--no-configuration-cache`.
+  Remote build cache (tools/gradle-cache.sh, test tasks never cached); OpenRS2 download shared by id
+  (volume openrune-dl-cache). About 17 min cold, 8-12 min warm. Then boot to "Server ready in".
+- Dev builds: `qa.sh dev <owner> <clone> [tasks]` in the warm container qa-dev-<owner> (class dev,
+  never behind gates; incremental compile ~10 s); `qa.sh dev-stop <owner>` when done. Evidence only.
+- Fallback when the cache node is broken: `qa.sh split-build` (old uncached run, one container per step).
+- Fork integration needs `.m2-rsprot` in the clone (qa.sh copies it from openrune/src).
 - Our image also needs, after buildCache: `openrune/scripts/add_varcs.py`, `fix_long_varps.py`
   (OpenRune's CS2 compiler writes long varps with int opcodes), `fix_reftable.py` (zero-size groups
   crash the Android client), and `.m2-rsprot` (our patched RSProt, `openrune.sh rsprot`).
