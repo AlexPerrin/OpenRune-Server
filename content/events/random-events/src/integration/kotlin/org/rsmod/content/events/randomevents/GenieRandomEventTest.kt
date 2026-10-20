@@ -16,7 +16,9 @@ import org.rsmod.api.testing.scope.GameTestScope
 import org.rsmod.content.events.randomevents.GenieRandomEvent.CheckResult
 import org.rsmod.content.events.randomevents.GenieRandomEvent.Companion.CALL_INTERVAL
 import org.rsmod.content.events.randomevents.GenieRandomEvent.Companion.HAND_OVER_TICKS
+import org.rsmod.content.events.randomevents.GenieRandomEvent.Companion.IGNORED_LEAVE_TICKS
 import org.rsmod.content.events.randomevents.GenieRandomEvent.Companion.LAMP
+import org.rsmod.content.events.randomevents.GenieRandomEvent.Companion.LIFETIME_TICKS
 import org.rsmod.content.events.randomevents.GenieRandomEvent.Companion.MAX_EVENT_DELAY_MS
 import org.rsmod.content.events.randomevents.GenieRandomEvent.Companion.MAX_OFFLINE_EXTENSION_MS
 import org.rsmod.content.events.randomevents.GenieRandomEvent.Companion.MIN_EVENT_DELAY_MS
@@ -134,6 +136,19 @@ class GenieRandomEventTest {
             assertNull(script.genieOf(player))
             assertFalse(genie.isSlotAssigned)
             assertEquals(1, player.inv.count(LAMP))
+        }
+
+    @Test
+    fun GameTestState.`an ignored genie says maybe later and leaves three ticks after`() =
+        genieTest { script ->
+            val genie = script.spawn(player)
+            advance(ticks = LIFETIME_TICKS + 1)
+            assertTrue(genie.isSlotAssigned)
+            assertFalse(script.handOver(player))
+            assertEquals(0, player.inv.count(LAMP))
+            advance(ticks = IGNORED_LEAVE_TICKS)
+            assertNull(script.genieOf(player))
+            assertFalse(genie.isSlotAssigned)
         }
 
     private fun GameTestState.genieTest(body: GameTestScope.(GenieRandomEvent) -> Unit) =

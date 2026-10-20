@@ -134,7 +134,7 @@ constructor(
         worldRepo.soundArea(npc.coords, ARRIVE_SOUND, radius = SOUND_RADIUS)
         worldRepo.soundArea(npc.coords, PUFF_SOUND, radius = SOUND_RADIUS)
         player.softTimer(GENIE_TIMER, CALL_INTERVAL)
-        genies[player] = Genie(npc, mapClock.cycle + LIFETIME_TICKS)
+        genies[player] = Genie(npc)
         return npc
     }
 
@@ -147,6 +147,11 @@ constructor(
             return
         }
         val npc = genie.npc
+        if (genie.ignored) {
+            genies.remove(owner)
+            leave(npc)
+            return
+        }
         if (genie.handedOver) {
             if (mapClock.cycle >= genie.leaveCycle) {
                 genies.remove(owner)
@@ -161,10 +166,10 @@ constructor(
             leave(npc)
             return
         }
-        if (mapClock.cycle >= genie.leaveCycle) {
+        if (genie.calls + 1 >= LIFETIME_TICKS / CALL_INTERVAL) {
             npc.say("Maybe later.")
-            genies.remove(owner)
-            leave(npc)
+            genies[owner] = genie.copy(ignored = true)
+            owner.softTimer(GENIE_TIMER, IGNORED_LEAVE_TICKS)
             return
         }
         val besideOwner =
@@ -176,6 +181,7 @@ constructor(
         npc.anim(WAVE)
         val name = "${title(owner)} ${owner.displayName}"
         npc.say(random.pick("Hello, $name?", "Ehem... $name?", "I'm waiting for you, $name!"))
+        genies[owner] = genie.copy(calls = genie.calls + 1)
         owner.softTimer(GENIE_TIMER, CALL_INTERVAL)
     }
 
@@ -206,7 +212,7 @@ constructor(
 
     fun handOver(player: Player): Boolean {
         val genie = genies[player]
-        if (genie == null || genie.handedOver) return false
+        if (genie == null || genie.handedOver || genie.ignored) return false
         val leaveCycle = mapClock.cycle + HAND_OVER_TICKS
         genies[player] = genie.copy(leaveCycle = leaveCycle, handedOver = true)
         player.softTimer(GENIE_TIMER, HAND_OVER_TICKS)
@@ -270,7 +276,13 @@ constructor(
     private fun offlineExtensionMillis(): Long =
         random.of(MIN_OFFLINE_EXTENSION_MS, MAX_OFFLINE_EXTENSION_MS).toLong()
 
-    private data class Genie(val npc: Npc, val leaveCycle: Int, val handedOver: Boolean = false)
+    private data class Genie(
+        val npc: Npc,
+        val leaveCycle: Int = 0,
+        val calls: Int = 0,
+        val handedOver: Boolean = false,
+        val ignored: Boolean = false,
+    )
 
     enum class CheckResult {
         NotDue,
@@ -291,6 +303,7 @@ constructor(
 
         const val LIFETIME_TICKS = 100
         const val HAND_OVER_TICKS = 10
+        const val IGNORED_LEAVE_TICKS = 3
         const val CALL_INTERVAL = 10
         const val LAMP_XP_PER_LEVEL = 10
 
