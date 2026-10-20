@@ -1,8 +1,106 @@
 # QA: fix/edgeville-general-store-stock
 - Branch: `fix/edgeville-general-store-stock`
-- Commit: `ca527418a529f4e69bf6cac04775bff486a23d01`
-## Internal gate: **PASS**
+- Commit: `a695b985ffdbfba3fbd8de5306c103b7be61d4e5`
 ## Upstream gate: **PASS**
+## Internal gate: N/A (dev-checked)
+
+Upstream gate by sq25 on 2026-10-19 at a695b985f (#371 rework: ca527418a + d3cc4faf4 + a695b985f, based on `main`
+bcdb03292; the earlier PASS at ca527418a, kept below, covered only the first commit). The commit is **not on
+GitHub** (pushing it updates draft #371, head still ca527418a): fetched read-only from sd24's clone
+(`re/agents/sd24/or`, worktree wedge). **No fork CI applies, so the local gate replaces it.** Spec
+`accuracy/general-store-inventories.md` and texts `pr-texts/general-store-inventories.{title,upstream.body}`,
+`edgeville-general-store-stock.comment`, `general-store-stock-wiring.comment` read from sd24's docs worktree at
+aa924079b.
+
+## Scope
+Own diff (bcdb03292..a695b985f): 15 files, +283/-26: the four raw-cache tomls `generalshop1/2/3/5`, the four
+`shopmappings.csv` rows, Varrock's `GeneralStore.kt` (`inv.generalshop3` -> `inv.generalshop2`), Al Kharid
+handlers in `AlKharidShopkeepers.kt`, and new script modules with one handler each for Karamja, Desert (Nardah),
+Rellekka (Miscellania) and Zanaris (`build.gradle.kts` + script; `main` has only #341's `pack` submodules there).
+Nothing unrelated. Base: 6 commits behind upstream `main` 829b9477d; **clean merge** (`git merge-tree`), and
+`main`'s 6 commits touch none of these files (they touch `lumbridge.toml` spawns and `npcs.toml`, not shop staff).
+Not rebased, which avoids a force-push to draft #371; the text says so. Overlap: only our #371 and #351 (to be
+closed by the drafted comment); #325 (Giants' Foundry) touches no general store file. `fix:`/`feat:` subjects,
+Alex Perrin (noreply), Co-Authored-By on all three. No tests (data and simple handlers, AGENTS.md); no comments
+added. Raw-cache tomls are tracked and packed on every build (`CacheTools.kt:165-169`, nothing regenerates them);
+#341 put its corrections in area packs instead, but no rule requires that.
+
+## Accuracy (independent)
+- **RSProx, re-read at the source** (`re/ref/rsprox/txt/`):
+  - 1619 (rev 225.1) line 5796 tick 88 `opnpc3` Shop assistant 2814 at (3209, 3248, 0); line 5856 tick 90
+    `update_inv_full id=3`: 1931x5, 1935x2, 20742x5, 1735x2, 946x5, 1925x3, 22660x15, 1923x2, 1887x2, 590x2,
+    1755x2, 952x5, 2347x5, 550x5, 9003x5 = `generalshop1.toml` in order and counts.
+  - 3216 (rev 232.1) line 15044 `opnpc1` generalshopkeeper2 (2815) -> line 15119 `update_inv_full
+    id=generalshop2 (4)`, line 15168 `shop_main_init [generalshop2 (4), "Varrock General Store", ...]`; line
+    15844 assistant 2816 -> line 15893 inv 4 again. 13 items = `generalshop2.toml`.
+  - 424 (rev 232.1) line 97739 `opnpc1` generalshopkeeper8 (2868); "Can I help you at all?" (chathap1);
+    option 1 (line 97770) opens with no player line; line 97773 `update_inv_full id=generalshop8 (38)`,
+    line 97822 title "Zanaris General Store"; assistant 2869 line 98330 -> inv 38 (line 98372). Stock =
+    `generalshop8.toml`. Option 2 gives the player line "No thanks." (chatneu1).
+- **Gamevals**: `inv.generalshop1..8` = 3, 4, 13, 17, 24, 31, 34, 38; `generalshopnardah` 343.
+- **Wiki** (osrs-mcp, via a read-only subtask, spot-checked: Al Kharid page re-read myself): Lumbridge,
+  Varrock, Al Kharid and Edgeville stock tables match the four tomls in item, order, count and restock ticks;
+  130% / 40% / 3% on all four; Edgeville's knife 1 (2t) after the hammer, "19 January 2022 ... now stocks
+  knives". Keeper/assistant ids 2813/2814, 2815/2816, 2817/2818, 2821/2822. Al Kharid chisel sells at 1.
+  Transcripts (Shop keeper (Al Kharid), (Musa Point), Fairy shop keeper, Kazemde, Finn): "Can I help you at
+  all?", option 1 opens with no player line, option 2 -> player "No thanks."; Finn: "Can I help you, Your Royal
+  Highness?", option 1 *with* the player line, option 3 reply "A lot drier in the winter than it is above
+  ground." The handlers match. Not added and listed as known gaps: Al Kharid's Family Crest / Rogue Trader
+  options, Finn's Royal Trouble reply, Karamja gloves 3+ prices (wiki: high alch buy value with gloves 3+).
+- **#341** (merged): live captures for Falador, Nardah and Miscellania, rsprox 75 for Karamja: these handlers
+  use those inventories.
+- Inferred, caveated: Edgeville `generalshop5`, Al Kharid `generalshop3` (no recording opens either), size 40.
+
+## Build (local gate in place of CI)
+Tree `re/agents/sq25/r-store` = upstream `main` 829b9477d merged with a695b985f (merge 509459a13);
+`qa.sh gate` (`GATE_VOL=sq25-gradle`), logs `re/agents/sq25/r-store.logs/`: all steps rc=0, spotlessCheck pass,
+**test 764/0, integration 79/0**. `fix_gameval_conflicts.py --check`: clean. Boot (sq25-or-server, 43597): "Server
+ready in 10.5s", no Exception/ERROR through the in-game session. (The text's 708/0 is the branch alone on
+bcdb03292: sd24's log `re/agents/sd24/gst2.logs`, commit a695b985f, test 708/0, integration 79/0.)
+
+## In game (desktop RuneLite, fresh account `sq25gs`, branch server on the merge tree, desktop lock 22:38-22:45)
+`::tele` to each store; Trade (op3) on each staff NPC; shop interface 300 open; the shop container from
+`get_inventory` / `list_inventories`:
+| Store | Keeper | Assistant | Inv | Stock seen |
+|---|---|---|---|---|
+| Lumbridge | 2813 | 2814 | 3 | 15 items = 1619 exactly |
+| Varrock | 2815 | 2816 | 4 | 13 items = 3216 exactly |
+| Al Kharid | 2817 | 2818 | 13 | 13 items = wiki / toml |
+| Falador | 2819 | 2820 | 17 | 13 (= pack toml) |
+| Edgeville | 2821 | 2822 | 24 | 14 items, knife 1 after the hammer |
+| Rimmington | 2823 | 2824 | 31 | 13 (= toml) |
+| Karamja | 2825 | 2826 | 34 | 11 items (= wiki, = #341 pack toml) |
+| Zanaris | 2868 | 2869 | 38 | 13 items = 424 exactly |
+| Nardah | Kazemde 4755 | - | 343 | 12 (= #341 pack toml) |
+| Miscellania | Finn 1080 | - | 391 | 11 (= #341 pack toml) |
+Talk-to: Al Kharid keeper "Can I help you at all?", options "Yes please. What are you selling?" / "No thanks.";
+2 -> player "No thanks."; 1 -> the store (inv 13), no player line. Kazemde the same (option 2 checked). Finn:
+"Can I help you, Your Royal Highness?", three options; 3 -> "A lot drier in the winter than it is above
+ground."; 1 -> player "Yes please. What are you selling?", then the store.
+
+## PR text, comments (pr-text-review)
+Title and body: every template section present; data sources with licence; known gaps; release note; Claude Code
+line. Claims checked against the commit, `main` and the runs above: the mislabelled csv and tomls; `main`'s
+Lumbridge `generalshop1`, Edgeville `generalshop5`, Varrock `generalshop3`; `generalshop2.toml` on `main` has no
+header (name "Edgeville General Store", size 0); "Karamja, Desert, Rellekka and Zanaris had no script module"
+(only #341's packs); the gate line (branch alone, 708/0, 79/0; merges cleanly); every in-game line (table
+above); the rsprox item ticked for 1619/3216/424. `edgeville-general-store-stock.comment`: first commit unchanged
+(#371 head = ca527418a), two new commits, no rebase: true. `general-store-stock-wiring.comment` (closes #351):
+true (1619 shows inv 3 for Lumbridge; #371 depends on nothing).
+
+## Non-blocking notes
+- The spec's Caveats still say "Al Kharid's shop keeper and assistant have no handler ... Trade there does nothing
+  before and after this PR" and its Tests line mentions only d3cc4faf4; stale since a695b985f (docs only, not
+  in the PR text). sd24 can drop that caveat.
+- Finn's option-3 player line was not seen in the client (the dialogue tool advanced past it); the code has
+  `chatPlayer(quiz, "What's it like living down here?")`, matching the transcript.
+
+---
+
+## Previous gate at ca527418a (superseded by a695b985f; kept as history)
+
+Its header was: # QA: fix/edgeville-general-store-stock / - Branch: `fix/edgeville-general-store-stock` / - Commit: `ca527418a529f4e69bf6cac04775bff486a23d01` / ## Internal gate: PASS / ## Upstream gate: PASS
+
 
 Re-run by sq25 on 2026-10-19 at ca527418a (sd24's fix for the first upstream FAIL: test dropped, rebased onto
 bcdb03292). The first run at a2412b26f follows below, unchanged except for its heading levels.
