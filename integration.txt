@@ -25,6 +25,7 @@ fix/76-obj-add-timers
 fix/rune-pouch-accuracy
 fix/edgeville-general-store-stock
 fix/stile-approach
+fix/fish-barrel-check-and-destroy
 # Content
 content/dragon-specials
 content/reconnect-login
@@ -55,4 +56,3 @@ local/skip-cs2-packs
 local/op-overrides
 local/treasure-trails
 local/integration-tools
-fix/fish-barrel-check-and-destroy
