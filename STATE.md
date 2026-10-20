@@ -10,7 +10,7 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   RuneLite via RSProx). Compose stack: `openrune/docker-compose.yml` in osrs-plugins-reverse.
 - **Live code** (since 2026-10-19 04:05 UTC): fork `integration` at `5cc473397` (fork main `db78abf73` + the
   branches in integration.txt, local/integration-tools 06090a107), image `osrs-openrune:integration-5cc4733`, tagged
-  `:241` for compose. Internal gate PASS: qa/integration-cutover.md. Rollback: `osrs-openrune:rollback-5da8d3e`
+  `:241` for compose. Checked (dev's check, CI/qa.sh gate): qa/integration-cutover.md. Rollback: `osrs-openrune:rollback-5da8d3e`
   (previous integration), then `rollback-fb10fd3` (the retired openrune.patch tree).
 - **Sidecar** image `osrs-rsps-test:241` is built from `server/` in osrs-plugins-reverse. jav_config
   param 3 is the desktop client's members-world flag (now true), param 5 the world flags.
@@ -34,7 +34,7 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   PR contents only after the user's OK): `content/goblin-diplomacy-829` 4f5e59627 (quest only; deletes #328's
   GoblinGenerals/Grubfoot; cache varbits only), `content/witchs-potion-829` 4dc1ac9c7 (varbit
   `witchs_potion_progress` 65449, the same id as sheep_shearer_progress: integration's --check reassigns the
-  later one; internal gate PASS, upstream waits on the RSProx comparison), and the ladder split out as
+  later one; in integration (dev-checked); the upstream gate waits on the RSProx comparison), and the ladder split out as
   `fix/goblin-village-lookout-ladder` 475eefb76 (new PR). Specs accuracy/{goblin-diplomacy,witchs-potion,
   goblin-village-lookout-ladder}.md.
 - `fix/edgeville-general-store-stock` (sd24, off main bcdb03292, data only; the toml test was dropped after the upstream gate): rebuilds upstream's truncated
@@ -73,6 +73,9 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   (volume openrune-dl-cache). About 17 min cold, 8-12 min warm. Then boot to "Server ready in".
 - Dev builds: `qa.sh dev <owner> <clone> [tasks]` in the warm container qa-dev-<owner> (class dev,
   never behind gates; incremental compile ~10 s); `qa.sh dev-stop <owner>` when done. Evidence only.
+- Shipping to integration (user, 2026-10-19): no QA step. The dev hands over the spec (`accuracy-check` incl. RSProx),
+  behaviour checked against it, and green CI at the commit (fork GitHub Actions; `qa.sh gate` where CI doesn't apply);
+  the orchestrator adds it to integration and deploys. server-qa runs only the upstream gate.
 - Fallback when the cache node is broken: `qa.sh split-build` (old uncached run, one container per step).
 - Fork integration needs `.m2-rsprot` in the clone (qa.sh copies it from openrune/src).
 - Our image also needs, after buildCache: `openrune/scripts/add_varcs.py`, `fix_long_varps.py`
@@ -116,7 +119,7 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
    android-local), compare inventories, bank, GE offer and quest varps before/after. No data
    migration is expected (saves are by name).
 3. Cutover: the orchestrator deploys the pinned integration commit; then the client QA pass.
-4. QA gates (accuracy spec + checklist) for the new branches: fix/06-76, content/reconnect-login,
+4. Dev's check (accuracy spec incl. RSProx + green CI) for the new branches, then the upstream gate where they go upstream: fix/06-76, content/reconnect-login,
    dragon-specials, pirates-treasure, looting-bag, fletching.
 5. Treasure Trails: drop local/treasure-trails once upstream's clue scrolls land (keep varp names).
 6. Romeo & Juliet: drop local/romeo-juliet when #299 merges (check the varp 144 saves carry over).
