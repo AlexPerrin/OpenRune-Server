@@ -2,7 +2,15 @@
 
 Fixes the stile issue a-thoren found while testing #366: "you can jump over the stile from too far away and the code assumes you're right next to it, meaning you don't always end up in the sheep pen". The cause is the shared `StileScript` (every `fullstyle` stile, including the Sheep Shearer pen's), so this is its own change rather than part of #366.
 
-`StileScript.climbStile` climbed from the player's tile wherever the interaction ended, e.g. a tile diagonal to the stile or beside it along the fence, so the forced move could start and end on the wrong tiles. It now takes the stile's footprint tile on the player's side of the fence, walks the player onto it (`playerMove`), and then climbs to the other footprint tile, the same way the Port Sarim stile on `main` does. If the player can't reach the start tile, nothing happens.
+`StileScript.climbStile` climbed from wherever the interaction ended, toward the stile's far footprint tile. From a diagonal tile or from beside the stile along the fence the forced move started off line, and from the far side it moved the player one tile without crossing. The stile's two footprint tiles block walking (loc 12982: 1x2, blocks walk), so the player can't simply walk onto them either.
+
+It now does what the official game does in an RSProx recording of the pen stile (1718, ticks 2328-2333):
+1. The player walks to the tile just outside the footprint on their side, in line with the crossing (the side is chosen by coordinate across the fence). If they can't get there, nothing happens.
+2. The tick after reaching that tile, a one-tile forced move onto the near footprint tile.
+3. The next tick, the existing climb (`human_walk_style`, exactmove 30/94 cycles, facing the crossing) to the far footprint tile.
+4. Three ticks later a one-tile forced move onto the tile beyond it.
+
+The forced moves and the climb's exactmove use `TeleportType.Exempt`: crossing a fence isn't a teleport, and a teleport restriction must not leave the player standing on the stile. `climbOver` is shared with `FenceCrossingScript` (Gertrude's fence), which gets the same exemption.
 
 ## Type of change
 
@@ -14,23 +22,27 @@ Fixes the stile issue a-thoren found while testing #366: "you can jump over the 
 
 ## How it was tested
 
-- `content:generic:generic-locs`: `spotlessCheck` and `integration` pass (4 tests, 0 failures; the module has no unit tests), after `freshCache`.
-- To check in game: at the Sheep Shearer pen stile north-west of Lumbridge, click Climb-over from a tile diagonal to the stile and from the tile beside it along the fence, on both sides. Each time the player walks onto the stile's tile on their side, climbs, and ends on the other side.
+- `StileScriptTest` (new, `content:generic:generic-locs` integration): the climb comes 1 tick after the step on and the step off 3 ticks after the climb; from the south, from the north, from beside the stile along the fence, from four tiles away, and a north-facing stile crossed east to west; each ends on the tile beyond the far footprint tile. The module's integration suite passes (10 tests, 0 failures) with `spotlessCheck`, after `freshCache`.
+- In game on this commit (desktop RuneLite through RSProx on a branch server, the Sheep Shearer pen stile at 3197,3276), from 2 tiles south and 1 tile north in line, from beside the stile along the fence on both sides, from a diagonal tile on both sides, from 4-6 tiles south-west, from 3 tiles north-east, and standing on the in-line tile. In our own RSProx transcript of that session every crossing went: the in-line tile on the player's side, the next tick onto the near stile tile, the tick after that the climb (seq 839, exactmove 30/94), three ticks later onto the tile beyond the stile, the same ticks as the official recording below. No server errors.
 
 ## Checklist
 
-- [ ] Builds and the server boots (our QA gate checks this before the PR is updated)
-- [x] Tests only cover complex logic and anything that moves items (no dupes): no new test, simple loc handler
+- [x] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes): the stile's side and tile geometry
 - [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
-- [x] State in varbits/varps, not attrs
-- [x] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): no deviation known
-- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): we have no dumps of the official game
+- [x] State in varbits/varps, not attrs: no state
+- [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the deviations are in the notes below, not in `docs/quirks.md`
+- [x] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): recording 1718, the pen stile crossed from the north
 - [x] No unrelated or hand-edited generated changes
 
 ## Screenshots / notes for reviewers
 
-Walking to the start tile follows the Port Sarim stile on `main`. As a 2004 reference only, LostCity's content scripts (MIT, https://github.com/LostCityRS/Content, `skill_agility/scripts/shortcuts.rs2`) also choose the side by coordinate and put the player on the start tile before the climb.
+Data sources: the cache (loc 12982: size 1x2, blocks walking); RSProx recording 1718 (revision 227), ticks 2328-2333: the player reaches the in-line tile outside the stile on the op tick, steps onto the near footprint tile the next tick, climbs (seq 839 delay 30, exactmove 30/94 to the far footprint tile) the tick after that, and steps off onto the tile beyond three ticks later. As a 2004 reference only, LostCity's content scripts (MIT, https://github.com/LostCityRS/Content, `skill_agility/scripts/shortcuts.rs2`) cross the same way.
+
+Caveats:
+- No `loc_merge`: the official game merges the player with the stile model during the climb (start 30, end 94); the engine has no loc-merge API, so the model isn't merged (visual only).
+- Clicking from beside the stile or from a diagonal tile: the recording only shows an in-line approach. We walk the player to the in-line tile first (a guess).
+- The step on and step off are one-tile non-jump teleports; they go out as walk steps, as in the recording. The climb's own tile change goes out as a teleport (the recording: a walk step); that comes from `exactMove`, which the stile already used.
+- Clicking from beside the stile, the walk to the in-line tile starts the tick after the interaction; standing on the in-line tile already, the step on comes on the interaction's tick. The recording shows neither case.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Fork PR (same branch, for browsing): https://github.com/AlexPerrin/OpenRune-Server/pull/21
