@@ -30,13 +30,16 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   fix_gameval_conflicts.py) takes `fin/sheep-shearer`'s place in integration.txt; it needs the
   recorded resolution of its gamevals.toml lines next to content/pirates-treasure's (rr-cache
   666570cd...).
-- Unstacked #367/#368 (sd24, each one commit on upstream main 829b9477d, no fixture, no tests; they replace the
-  PR contents only after the user's OK): `content/goblin-diplomacy-829` 4f5e59627 (quest only; deletes #328's
-  GoblinGenerals/Grubfoot; cache varbits only), `content/witchs-potion-829` 4dc1ac9c7 (varbit
-  `witchs_potion_progress` 65449, the same id as sheep_shearer_progress: integration's --check reassigns the
-  later one; in integration (dev-checked); the upstream gate waits on the RSProx comparison), and the ladder split out as
+- Unstacked #367/#368 (sd25, 2026-10-19; no fixture, no tests): each is the current PR head + a merge commit whose
+  tree is main 829b9477d + the quest, so pushing onto the PR branch is a fast-forward. Fork branches
+  `content/goblin-diplomacy-unstacked` d77ac2b76 (merge f81121fa7 of sd24's 4f5e59627, + RSProx fixes: crate "but
+  find nothing", synth `pick`, dye synth 2392 `gobdip_dye_goblin_mail`) and `content/witchs-potion-unstacked`
+  23e1b7c5d (tree = 4dc1ac9c7; varbit `witchs_potion_progress` 65449, the same id as sheep_shearer_progress: the
+  second to merge re-runs fix_gameval_conflicts). Squash-merge clean in any order with #366's 069c15fde and the
+  ladder; with true merge commits WP conflicts after #366 + GD (both heads still contain f69c8ed4c). In
+  integration: `content/witchs-potion-829` (same tree). Upstream push waits for the user. The ladder is
   `fix/goblin-village-lookout-ladder` 475eefb76 (new PR). Specs accuracy/{goblin-diplomacy,witchs-potion,
-  goblin-village-lookout-ladder}.md.
+  goblin-village-lookout-ladder}.md, texts and #367/#368 comments in pr-texts/.
 - `fix/edgeville-general-store-stock` (sd24, off main bcdb03292, data only; the toml test was dropped after the upstream gate): rebuilds upstream's truncated
   `generalshop2.toml` (size 0 -> AIOOBE on Trade) to the wiki stock, size 40; #351 (fix/55) depends on it
   and waits until it merges upstream. Spec accuracy/edgeville-general-store-stock.md.

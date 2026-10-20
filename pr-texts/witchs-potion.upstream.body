@@ -1,10 +1,10 @@
 ## Summary
 
-Witch's Potion (Hetty, Rimmington), on its own and on current `main`. This replaces the earlier version of this PR, which was stacked on #366's old commit (Sheep Shearer, Romeo & Juliet and a test fixture); this branch has no other PR's commits.
+Witch's Potion (Hetty, Rimmington), on current `main`. Its net diff against `main` is this quest only; the branch history still holds the earlier stacked commits, which a squash merge drops.
 
 On `main`, Hetty only has her after-quest lines and no rat drops a rat's tail, so the quest can't be started or finished.
 
-- Progress is on varp 67 (`varp.hetty`, which the quest list and Quest Helper read) through a new server-only varbit `witchs_potion_progress` (bits 0-1), as Doric's Quest does: 1 started, 2 ingredients given, 3 complete (checked at startup against the `quest_witchspotion` dbrow). The id comes from `tools/scripts/fix_gameval_conflicts.py` (`-1` → 65449).
+- Progress is on varp 67 (`varp.hetty`, which the quest list and Quest Helper read) through a new server-only varbit `witchs_potion_progress` (bits 0-1), as Doric's Quest does: 1 started, 2 ingredients given, 3 complete (checked at startup against the `quest_witchspotion` dbrow). The id was assigned by `tools/scripts/fix_gameval_conflicts.py` (65449; 63718 in the first version of this PR).
 - Hetty's dialogue follows the wiki transcript: the opening and witch branch, the offer and start prompt, the ingredient list, "I'm afraid I don't have any of them yet.", the player's line for each of the 14 partial combinations, and the hand-in.
 - The hand-in takes one eye of newt, rat's tail, onion and burnt meat in one inventory transaction (all or nothing), then shows the single message box "You pass the ingredients to Hetty...". Drinking from the cauldron (`loc.hettycauldron`) shows its message box and completes the quest; before the hand-in the player says "As nice as that looks, I think I'll give it a miss for now.". Rewards: 1 QP, 325 Magic XP.
 - Rat's tail: every rat the wiki lists as a source (Rat, the Stronghold of Security rats, Dungeon rat, the level-26 Stronghold giant rats; 13 npc types) drops one for its killer while the quest is in progress. This is an `NpcDeathKillHook` reading the quest's own stage, not a drop-table entry: a `quest_mode = "during"` entry never passes under the default `assume-completed` requirements mode, which would make the quest impossible to finish on a default server.
@@ -20,17 +20,17 @@ On `main`, Hetty only has her after-quest lines and no rat drops a rat's tail, s
 
 ## How it was tested
 
-On upstream `main` 829b9477d + this branch (Docker `eclipse-temurin:21`, upstream's `./gradlew`, a clean build, each step its own run (compiles from the build cache, every test run)): `freshCache` + `mergePluginGamevals`, `buildCache` (packs `witchs_potion_vars.toml`), `installDist`, `spotlessCheck`, `assemble`, `test` (764 tests, 0 failures), `integration` (79 tests, 0 failures), and the server boots to "Server ready" (the startup check against the quest dbrow passes) with no error in the log. `tools/scripts/fix_gameval_conflicts.py --check`: no conflicts.
+On the branch head (current `main` 829b9477d + the quest), the fork's GitHub Actions run of upstream's CI workflow: `freshCache`, `buildCache` (packs `witchs_potion_vars.toml`), `generateRsa`, `assemble test integration`, and the server boots to "Server ready" (the startup check against the quest dbrow passes); `Formatting` (`spotlessCheck`) and `tools/scripts/fix_gameval_conflicts.py --check` are clean.
 
-Played end to end in game (desktop RuneLite, fresh account). Cheats: `::tele` for travel (to Hetty's house, and into the neighbouring house where the indoor rats spawn), and `::item` for the eye of newt, onion and burnt meat, whose shop and cooking aren't part of this PR. The rat's tail came from killing a rat.
+Played end to end in game twice (desktop RuneLite, a fresh account each time). Cheats: `::tele` for travel (to Hetty's house, and into the neighbouring house where the indoor rats spawn), and `::item` for the eye of newt, onion and burnt meat, whose shop and cooking aren't part of this PR. The rat's tail came from killing a rat.
 - Before the quest, a Lumbridge rat dropped only bones.
 - Hetty: the opening, the witch branch, the offer and "Start the Witch's Potion quest?"; No gives the decline lines and varp 67 stays 0; Yes gives the start lines and varp 67 = 1.
-- The cauldron at stage 1 gives "As nice as that looks, I think I'll give it a miss for now.".
+- The cauldron at stages 0 and 1 gives "As nice as that looks, I think I'll give it a miss for now.".
 - With nothing, "I'm afraid I don't have any of them yet." and Hetty's reminder; with only the tail, the matching partial line.
 - A Rimmington rat dropped a rat's tail next to its bones.
 - With all four: the hand-in lines and the one message box; the four items left the inventory and varp 67 = 2. Talking again: "Well are you going to drink the potion or not?" / "Yes, I will.".
 - The cauldron: the drinking message box, the quest complete scroll, varp 67 = 3, 1 quest point and the Magic XP.
-- After the quest: Hetty's "How's your magic coming along?" lines, and a rat dropped only bones.
+- After the quest: Hetty's "How's your magic coming along?" lines, the cauldron gives the "give it a miss" line again, and a rat dropped only bones.
 
 Every line shown matched the wiki transcript word for word. Not tried in game: the tail at stage 2, the other 13 partial lines (built from the same four parts), and the other rat types.
 
@@ -39,11 +39,11 @@ No unit tests: the earlier version's dialogue tests needed a separate test fixtu
 ## Checklist
 
 - [x] Builds and the server boots
-- [x] Tests only cover complex logic and anything that moves items (no dupes) (none added; see above)
-- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
+- [ ] Tests only cover complex logic and anything that moves items (no dupes): no tests added, see How it was tested
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps, except the list of rats that drop the tail (the cache has no category for it, see notes)
 - [x] State in varbits/varps, not attrs
-- [x] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the dialogue, rewards, rat list and varp values follow the wiki and Quest Helper. The guesses are listed under notes below rather than in `docs/quirks.md`.
-- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): we have no rsprox dumps of the official game
+- [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the dialogue, rewards, rat list and varp values follow the wiki and Quest Helper; the guesses are listed in the notes below, not in `docs/quirks.md` (which holds engine notes)
+- [x] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): the cauldron after the quest (recording 468, revision 233: the player's "give it a miss" line with the neutral chathead, no sound or anim) matches; no recording has Hetty's dialogue, the rat's tail, the hand-in or the reward
 - [x] No unrelated or hand-edited generated changes
 
 ## Screenshots / notes for reviewers
@@ -57,7 +57,7 @@ Ids: varbit 65449 is also taken by `sheep_shearer_progress` in #366. Whichever o
 Guesses:
 - The tail also drops at stage 2 (ingredients given, potion not drunk): the wiki says only "during the quest".
 - Rat 13624 (`rat_lowwander`) isn't in the wiki's ids and doesn't drop it.
-- The cauldron line after completion, the journal text, the quest scroll item and chathead expressions.
+- The journal text, the quest scroll item and chathead expressions.
 
 Release note: Witch's Potion is playable; rats drop a rat's tail while it is in progress.
 

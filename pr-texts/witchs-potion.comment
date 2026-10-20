@@ -1,0 +1,10 @@
+Updated and no longer stacked: the net diff against `main` is now Witch's Potion only, and it merges on its own (the earlier commits stay in the branch history, no force-push; a squash merge drops them).
+
+- The branch had #366's old commit (`f69c8ed4c`: Sheep Shearer, Romeo & Juliet and the `QuestTalkFixture` test fixture) under it. It now has a merge commit on top (no force-push) whose tree is current `main` (829b9477d) plus Witch's Potion only, so the diff against `main` is six files: the quest script, its varbit (`witchs_potion_vars.toml`, `gamevals.toml`), the kill-hook binding in `QuestModule.kt` with the `api.death` dependency in `build.gradle.kts`, and Hetty's after-quest lines moved out of `RimmingtonTownsfolkScript.kt`.
+- Removed: the Sheep Shearer and Romeo & Juliet content, the test fixture and the dialogue tests (as on #366, where the quest tests were dropped).
+- Changes to the quest since the first version: the rat's tail is now an `NpcDeathKillHook` on the quest's stage instead of a `quest_mode = "during"` entry in a new `rat.toml` drop table, because that entry never passes under the default `assume-completed` requirements mode. It drops from all 13 rat types the wiki lists as sources (Rat, the Stronghold of Security rats, Dungeon rat, the level-26 giant rat), where the table covered two. The hand-in's two message boxes are now one, as in the transcript, and drinking from the cauldron is a message box instead of a game message. The KDoc is removed and the helpers are private. The varbit id is reassigned by `tools/scripts/fix_gameval_conflicts.py` (63718 → 65449).
+- Ids: `witchs_potion_progress` (65449) is the same id as #366's `sheep_shearer_progress`. Whichever merges second needs `tools/scripts/fix_gameval_conflicts.py` re-run (or upstream CI's reassignment).
+
+Title and description updated to match.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

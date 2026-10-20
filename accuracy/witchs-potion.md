@@ -35,7 +35,20 @@ was not reachable for this pass; the citations are the audit's, checked against 
 | 10 | Rat's tail: 100% once the quest is started | Rat's tail ("100% chance to drop once you begin the quest"; unobtainable after completion) | `WitchsPotionRatTail` (`NpcDeathKillHook`): stage 1-2, dropped for the killer | matches |
 | 11 | Which rats | Rat (2854, 2855), Stronghold of Security rat (2492, 2513), Dungeon rat (2865-2867, 3607-3609), level-26 giant rat (2510-2512); not the other giant rats | the 13 `npc.*` names for those ids | matches (D1 fixed) |
 | 12 | Tail at stage 2 | "during the quest" only | drops | guess (caveat) |
-| 13 | Cauldron after the quest | not documented | the "give it a miss" line | guess (caveat) |
+| 13 | Cauldron after the quest | the player's "As nice as that looks, I think I'll give it a miss for now." (RSProx 468: varp 67 = 3) | the "give it a miss" line | matches (RSProx) |
+
+## RSProx comparison (2026-10-19, sd25)
+Searched rsprox.net (references/rsprox.md) by NPC 4619 (Hetty), 1187; LOC 2024; VARP 67; OBJ 300 (rat's tail); TEXT
+"rat's tail", "You pass the ingredients to Hetty", "You drink from the cauldron", "Witch's Potion", "Hetty", "As nice
+as that looks". No recording has the quest itself (no talk with Hetty, no rat's tail drop: OBJ 300 has no hits, no
+hand-in, no quest complete). Completed accounts show varp 67 = 3 at login (468, 3246, 350, 3931), as the branch's end
+stage.
+- **468** (rev 233.1), after the quest: tick 3384 oploc1 on `hettycauldron` 2024; tick 3386 the player's chathead
+  (chat_right 217, anim chatneu1 588) "As nice as that looks, I think I'll give it a miss for now.", no varp change,
+  sound or anim. The branch's line, `neutral` chathead and post-quest behaviour match (row 13 was a guess, now
+  matches).
+- **4182** (rev 238.1): the same line and chathead on another drinkable cauldron (55410), not Hetty's.
+- Not recorded: Hetty's dialogue, the rat's tail stage, the hand-in box, drinking. Those rows stay on the wiki.
 
 ## Why a kill hook
 A drop-table entry with `quest_mode = "during"` never passes under the default
@@ -43,7 +56,7 @@ A drop-table entry with `quest_mode = "during"` never passes under the default
 could not be finished. The hook reads the quest's own stage and works in every mode.
 
 ## Guesses (PR caveats)
-Rows 12, 13; the journal text; the quest scroll item (eye of newt); chathead expressions; rat 13624
+Row 12; the journal text; the quest scroll item (eye of newt); chathead expressions; rat 13624
 (`rat_lowwander`) is not in the wiki's ids and doesn't drop it.
 
 ## Tests
@@ -57,4 +70,4 @@ New server-only varbit `witchs_potion_progress`, assigned by `tools/scripts/fix_
 `sheep_shearer_progress` 65449; integration's `--check` reassigns the later branch.
 
 ## PR split
-One commit off upstream `main`, no `Depends:`. Replaces #368's contents (force-push after the user approves).
+No `Depends:`. Replaces #368's contents as a fast-forward: `content/witchs-potion-unstacked` = the PR head + a merge commit whose tree is `main` + this quest (after the user approves).

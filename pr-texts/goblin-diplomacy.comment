@@ -1,0 +1,11 @@
+Updated and no longer stacked: the net diff against `main` is now Goblin Diplomacy only, and it merges on its own (the earlier commits stay in the branch history, no force-push; a squash merge drops them).
+
+- The branch had #366's old commit (`f69c8ed4c`: Sheep Shearer, Romeo & Juliet and the `QuestTalkFixture` test fixture) under it. It now has a merge commit on top (no force-push) whose tree is current `main` (829b9477d) plus Goblin Diplomacy only, so the diff against `main` is the quest script, the removal of #328's `GoblinGenerals.kt` and `Grubfoot.kt`, and one synth name in the quest pack's `gamevals.toml`.
+- Removed: the Sheep Shearer and Romeo & Juliet content, the test fixture and the dialogue tests (as on #366, where the quest tests were dropped), and the Goblin Village lookout ladder. The ladder goes in its own fix PR (`fix/goblin-village-lookout-ladder`).
+- One more commit on top fixes three details against an RSProx recording of the official game: the empty crate says "You search the crate, but find nothing of interest." (the wiki transcript doubles the "but"); the crate plays the `pick` sound when it gives the mail; dyeing goblin mail plays synth 2392, named `gobdip_dye_goblin_mail` in the quest pack's `[gamevals.synth]`.
+- #328's generals and Grubfoot lines are the wiki's after-quest lines. They are moved verbatim into the quest's completed stage, because both files bind op1 on the same npcs the quest needs.
+- Changes to the quest since the first version, all checked against the wiki transcripts: the "fat" opener has the wiki's third option "I'll leave you to it.". "What is the goblin new century?" replaces "Why are you arguing..." in the topic menu once that has been asked. Before the quest starts, Grubfoot has his pre-quest complaint instead of the after-quest lines. The generals' after-quest talk includes the wiki's fifth dialogue. Goblin mail can be dyed red, yellow, green, purple, pink and black as well as orange and blue. The KDoc is removed and the helpers are private.
+
+Title and description updated to match.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

@@ -36,9 +36,9 @@ citations checked against the code.
 | 6 | Topic menu, "Why are you arguing" swaps to "What is the goblin new century?", leave always ends | Transcript, Dialogue 1 tree | `mainMenu` loop with `askedWhy` | matches (D2 fixed) |
 | 7 | Peace, pick red / green, different colour, start prompt, D-Y-E help loop | Transcript, verbatim | `mainMenu`, `pickColour`, `differentColour`, `whereToGet` | matches |
 | 8 | "Different colour" asked mid-quest | not in the transcript | "Human! Get us <colour> armour!" | guess (caveat) |
-| 9 | Three crates, one goblin mail each, once | objbox "You find some goblin mail in the crate."; then "You search the crate, but but find nothing of interest." Locations: behind the generals' hut, the western hut, "up a ladder near the gate" (Goblin Diplomacy, Walkthrough) | `searchCrate` on `gobdip_crate1..3_searched` | matches; the third crate needs the lookout ladder fix |
+| 9 | Three crates, one goblin mail each, once | objbox "You find some goblin mail in the crate." with synth 2581 (`pick`); then the game message "You search the crate, but find nothing of interest." (RSProx 3243; the wiki transcript has "but but", the official game one "but"). Locations: behind the generals' hut, the western hut, "up a ladder near the gate" (Goblin Diplomacy, Walkthrough) | `searchCrate` on `gobdip_crate1..3_searched`, `synth.pick` on the find | matches (RSProx fixes in d77ac2b76); the third crate needs the lookout ladder fix |
 | 10 | Crate with a full inventory | not documented | "You don't have enough inventory space.", varbit not set | guess (caveat) |
-| 11 | Dyes on plain goblin mail | orange / blue: "You dye the goblin mail orange." (Transcript); every colour has a product (Goblin mail, Products) | red, yellow, blue, orange, green, purple, pink, black dye, one transaction each, same message | matches for orange / blue; other messages guessed |
+| 11 | Dyes on plain goblin mail | orange / blue: "You dye the goblin mail orange." (Transcript); every colour has a product (Goblin mail, Products) | red, yellow, blue, orange, green, purple, pink, black dye, one transaction each, same message | matches: orange / blue (Transcript); black, yellow, blue, orange, purple messages and synth 2392 (RSProx 1694); red, green, pink by the same wording |
 | 12 | Dye mixing | red+yellow orange, yellow+blue green, red+blue purple (Orange dye, Creation; no message given) | `mixDyes`, one transaction, "You mix the two dyes and make <colour> dye." | message guessed |
 | 13 | Wrong colour on a general | "What do you think of this colour?" / "That wrong colour." / "We tell you get <colour> armour." | `useOnGeneral` | matches |
 | 14 | Right colour: Grubfoot try-on dialogue, orange → blue → brown, complete | Transcript, verbatim | `handIn`: takes the armour, sets the look varbit and stage; dialogue only | matches (cutscene is a scope gap) |
@@ -49,9 +49,30 @@ citations checked against the code.
 | 19 | Hand-in from the talk menu | the transcript shows only using the armour on a general | extra option "I have some <colour> armour here." when the wanted armour is held | guess (caveat) |
 | 20 | Completion | "Congratulations, you've completed a quest: Goblin Diplomacy" | framework `completeQuest` | matches |
 
+## RSProx comparison (2026-10-19, sd25)
+Searched rsprox.net (references/rsprox.md) by NPC 669, 670, 675, 676, 1965, 671-673, 11249, 11250, 3391, 3392; LOC
+16559-16561; VARBIT 2378, 13594, 2379-2381; TEXT "You find some goblin mail in the crate.", "Human! Get us",
+"goblin new century", "Wartface", "Bentnoze", "orange armour", "goblin mail". No recording has the quest itself (no
+start, no stage changes, no hand-in, no quest complete); completed accounts show `gobdip_main` = 6 at login (3243,
+1694, 350, 3246, 3931), as the branch's end stage.
+- **3243** (rev 233.1), a crate searched after the quest: tick 3390 `gobdip_crate2_searched` 0→1, goblin_armour
+  288 into the inventory, synth 2581, objectbox 193 with obj 288 and "You find some goblin mail in the crate.", no
+  anim or spotanim; tick 3393 the second search gives the game message "You search the crate, but find nothing of
+  interest." in the same tick, no sound. The branch had "but but" (from the wiki) and no sound: both fixed
+  (d77ac2b76). The crate gives the mail after the quest too while its varbit is 0: the branch doesn't check the
+  stage, matches.
+- **1694** (rev 226.1, during Land of the Goblins, not this quest): using a dye on goblin mail swaps the item, plays
+  synth 2392 and sends "You dye the goblin mail <colour>." (black with obj 4622 `golem_ink`, yellow, blue, orange,
+  purple), no anim. The branch's message and black-dye item match; the sound was missing, fixed (d77ac2b76,
+  `synth.gobdip_dye_goblin_mail` = 2392). The recording also re-dyes already dyed mail (yellow → blue → orange →
+  purple) and Aggie's dye removal; both are Land of the Goblins era and stay out of scope (caveat).
+- Not recorded: the generals' and Grubfoot's dialogue, the dye mixing, the hand-ins, the reward scroll. Those rows
+  stay on the wiki transcripts.
+
 ## Guesses (PR caveats)
-Rows 2, 8, 10, 11 (colours other than orange/blue), 12, 18, 19; the journal text; the quest scroll item; chathead
-expressions; black dye (`golem_ink`) used up like the other dyes (no vial back).
+Rows 2, 8, 10, 11 (red, green and pink messages only), 12, 18, 19; the journal text; the quest scroll item; chathead
+expressions. Black dye (`golem_ink`) used up with no vial back is no longer a guess: RSProx 1694 removes obj 4622
+from its slot.
 
 ## Scope gaps (PR notes)
 - Grubfoot's try-on cutscenes (curtain, camera) are dialogue only.
@@ -70,4 +91,4 @@ changes (crate, hand-in). Verification is the dev build and an in-game run.
 - `content/goblin-diplomacy` (this change), one commit off upstream `main`. No `Depends:`.
 - Related, not a dependency: `fix/goblin-village-lookout-ladder` (the third crate is on the lookout). Without it,
   plain goblin mail still drops from goblins outside the village.
-- Replaces #367's contents (force-push after the user approves).
+- Replaces #367's contents as a fast-forward: `content/goblin-diplomacy-unstacked` = the PR head + a merge commit whose tree is `main` + this quest, + the RSProx fix commit (after the user approves).
