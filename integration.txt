@@ -26,6 +26,7 @@ fix/rune-pouch-accuracy
 fix/edgeville-general-store-stock
 fix/stile-approach
 fix/fish-barrel-check-and-destroy
+fix/ground-item-despawn-times
 # Content
 content/dragon-specials
 content/reconnect-login
