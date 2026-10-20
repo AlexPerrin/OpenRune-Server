@@ -99,7 +99,9 @@ Recordings (RSProx database, local transcripts `re/ref/rsprox/txt/`; facts only,
 Generic shearing (`Sheep.kt`: op -> seq 893 + synth 761 -> +2 ticks "You get some wool.", wool 1737,
 transform to the sheared id, regrowth after 50 ticks, "This sheep has already been shorn.", "You need a set of
 shears to do this."), spinning (if 270, seq 894, one ball per 3 ticks) and the pen gate (12986 -> 12988/12989,
-synth 67, closes after 300 ticks) were read in 1619-1622 and 1718 for reference only. They aren't changed by
+synth 67, closes after 300 ticks) were read in 1619-1622 and 1718 for reference only (re-checked by a read-only subtask; spot-checked at
+source: 1619 t144 anim + synth 761, t146 wool 1737 + transform 1304; 1621 t426 "already been shorn"; 1619
+gate re-added t374). They aren't changed by
 this branch and aren't judged here.
 
 ### What must change

@@ -1,8 +1,112 @@
 # QA: acc/genie
 - Branch: `acc/genie`
-- Commit: `068aabee2160cb4fcd96ee5b9a61778bccf97b0d`
-## Internal gate: **PASS**
+- Commit: `e9c7bcac3e5fb1d17ef2d9747bbbea5c00b52793`
+## Internal gate: N/A (dev-checked)
 ## Upstream gate: **FAIL**
+
+Run by sq24 on 2026-10-19 at e9c7bcac3: two commits on upstream `main` 829b9477d (re-fetched, still the tip):
+068aabee2 (`feat: Genie random event`, checked below) and e9c7bcac3 (`feat: keep the random event zones in a
+server-only dbtable`). Fork PR AlexPerrin/OpenRune-Server#18 (head e9c7bcac3). Spec and PR text at fork docs
+aa3080530. The verdicts at 068aabee2 and earlier below are void. The gate stopped at the first failure, the
+RSProx comparison (accuracy); the in-game re-check was not run (the code has to change anyway; the desktop
+lock was held by sq25 with a grant pending for sd24).
+
+## Upstream gate at e9c7bcac3: FAIL. What must change
+
+### The e9c7bcac3 change itself: passes
+- The five dungeon areas (no events), Ferox Enclave (events allowed) and the Grand Exchange box (centre
+  3165,3490,0, radius 13, no events) are rows of server-only `dbtable.random_event_zones` (columns area,
+  allowed, centre, radius) in a new `random-events/pack` (`RandomEventsPluginPack`), the same pattern as
+  upstream's `ShootingStarsTable`/`StrongholdFloorsTable` packs. `RandomEventLocations.isDisallowed` takes the
+  first zone containing the tile and returns `!allowed`, else the bank check. The old order (GE, then the
+  dungeons, then Ferox) gave the same results: none of the rows overlap.
+- Ids by `fix_gameval_conflicts.py`: dbtable 65501, dbrows 63886-63892; `--check` on the branch: "No gameval
+  conflicts or unassigned IDs found."
+- Build of the branch server tree (`qa.sh gate-run`, main c2492318d + e9c7bcac3 = the e9c7bcac3 tree):
+  cache, compile and installDist rc=0; `api/generated` gets `RandomEventZonesRow` (git-ignored, generated, as
+  upstream's other tables); the dbtable and the seven dbrows are in the built gamevals. Boot: "Server ready in
+  13.22s", no exception or error lines. The zone rows are only read by the 5-minute schedule check, which
+  can't be reached in game in a session (1-2 h due time, pushed forward again on login); the integration
+  tests' bank case runs through `isDisallowed` and so loads the table.
+- Nit (not blocking): `row.allowed ?: false` on the generated non-null `Boolean`.
+- CI at the exact commit (dispatched by sq24; no run existed): `CI` run 39348038658
+  (https://github.com/AlexPerrin/OpenRune-Server/actions/runs/39348038658), head e9c7bcac3, **success**
+  (freshCache, buildCache, generateRsa, `assemble test integration`, boot to ready); `Formatting` run
+  39348041267, head e9c7bcac3, **success**.
+
+### RSProx comparison: FAIL (gameplay-visible divergences, all primary-sourced)
+Recordings (RSProx database, transcripts in `re/ref/rsprox/txt/`, local only; facts only, no names):
+- Content search NPC 326 (`npc.macro_geni`): 87 recordings. Already transcribed: **1718** (rev 227.1,
+  Leagues V) shows three other players' Genies from spawn to leave (t1058-1068, t1177-1280, t7140-7160).
+- TEXT "Please take this lamp": 16 recordings. Downloaded and transcribed **3056** (rev 231, base game,
+  sha256 e81902a7...b8f0): the recording player's own Genie, t4000-4041, Talk-to, lamp, Rub. (3031 from the
+  "Have a nice day" search turned out to be another NPC's line; no recording of the Genie's "Have a nice day"
+  was found.)
+
+Matches: the greeting and the three call lines (text, random pick), "Maybe later." when ignored, the
+lifetime (ignored: "Maybe later." 100 ticks after the spawn, 1718 t1177 -> t1277), the Talk-to line and its
+chathead (chathap, `happy`), the lamp (obj 2528) given at Talk-to before the dialogue is continued, the
+xpreward interface (240) title "Choose the stat you wish to be advanced!", 10 x level XP (990 at level 99,
+3056 t4038).
+
+Must be fixed (new commit on `acc/genie`):
+1. **Call interval: 10 ticks, not 20.** Every recorded Genie calls every 10 ticks: 1718 t1178 greeting,
+   calls at t1187, 1197, 1207, ... 1267, "Maybe later." t1277; 3056 greeting t4001, calls t4010, 4020, 4030.
+   The branch's `CALL_INTERVAL` is 20 (12 s, from the pre-2014 behaviour). Fix: `CALL_INTERVAL = 10`.
+2. **Wave on the greeting and every call.** Each greeting and call plays npc seq 863 (`emote_wave`) the same
+   tick as the overhead text (1718, 3056). The branch plays no animation. Fix: `anim` `seq.emote_wave` with
+   each `say`.
+3. **Smoke puff and sounds on arrival and departure.** Arrival: `map_anim` 86 (`smokepuff`, height 124) and
+   `sound_area` 2301 and 1930 (range 7) at the Genie's tile (1718 t1059/1178/7141, 3056 t4001). Departure
+   (ignored, after the hand-over, or otherwise): `map_anim` 86 and `sound_area` 1930 at his tile (1718
+   t1069/7161 and after "Maybe later." t1280, 3056 t4041). The branch has none.
+4. **The reward message at Talk-to.** With the lamp, the same tick: game message "Your reward is:
+   <col=ff0000>1</col> x <col=ff0000>Lamp</col>." (3056 t4030). The branch sends none, and its Caveats call
+   the wording undocumented.
+5. **Rub result.** Official: messagebox (if 229) "Your wish has been granted!<br>You have been awarded 990
+   Construction XP!" and synth 2655 (3056 t4038). The branch sends the game message "Your wish has been
+   granted!" only. Fix: the mesbox with "You have been awarded <xp> <Skill> XP!" (and the sound).
+6. **Departure after the hand-over: 10 ticks after Talk-to, not when the dialogue closes.** 3056: Talk-to
+   t4030, dialogue continued t4033, the Genie stays until t4040 (deleted, smoke at t4041), while the player
+   rubs the lamp. The branch removes him as soon as the dialogue closes (`leave(npc)` after `startDialogue`),
+   or at 20 ticks. Fix: `HAND_OVER_TICKS = 10` and don't leave on dialogue close (keep the interrupted-dialogue
+   safety: the lamp is already given at Talk-to). This also changes the "Talked to again before he goes"
+   window the PR text describes.
+
+Caveats to add or update (PR text):
+- "Maybe later." is followed by the departure 3 ticks later (1718 t1277 -> t1280); the branch leaves the same
+  tick.
+- The arrival tile: the Genie is added on a tile next to the player (diagonal in two of the four spawns) and
+  in one case steps one tile to stand orthogonally beside them the next tick (1718 t1059). The greeting comes
+  the tick after the add. The branch greets on the spawn tick, on the first free of its eight offsets.
+- One recorded greeting has no title ("Greetings, <name>!", 1718 t7141); the condition is unknown. The branch
+  always says Master/Mistress.
+- The lamp XP is not multiplied by anything officially (990 at 99); the branch's `statAdvance` applies the
+  world's XP rate (already declared).
+- "Have a nice day, Master/Mistress." is in no recording found; it stays sourced from the transcript.
+- The no-event zones, the schedule (1-2 h, 5-minute check, offline extension) and the transformed/busy rules
+  can't be seen in a recording; they stay sourced from the wiki's Spawn mechanics (re-read through osrs-mcp
+  `wiki_page` "Random events", "Genie", "Transcript:Genie" this run: every quoted rule is still there).
+
+### PR text (must change with the code)
+- "Every 12 seconds he follows them ... calls them": 10 ticks (6 s) after fix 1, with the recordings as the
+  source; drop the "Guess: the call every 12 seconds" caveat.
+- "the Genie leaves when it closes or 12 seconds (20 ticks) after Talk-to": update to fix 6.
+- The Caveats' "no chat message when the lamp is given (... the wording is not on the wiki)" and the "Your wish
+  has been granted!" line: replace by the recorded messages (fixes 4, 5).
+- The rsprox checklist box ("we have no dumps of the official game"): tick it, citing recordings 1718 and
+  3056 (and add `docs/quirks.md`/notes as before).
+- "How it was tested", In game: "on the previous commit; the code differs only in the repeat-Talk-to line and
+  the late-completion guard" is not true of e9c7bcac3: the in-game runs were on 7a2316ea9 and 068aabee2 (sq24
+  records), and e9c7bcac3 also moves the zones into the dbtable. Restate after the new commit's in-game run.
+- The spec `accuracy/genie.md`: add the RSProx section (rows 9, 10, 12, 13, 18 and new rows for the wave,
+  the smoke/sounds and the departure delay) and drop "osrs-mcp server was down".
+
+Not checked because the gate stopped: the in-game re-check at e9c7bcac3, `pr-text-review` beyond the claims
+above, CONTRIBUTING/template (unchanged sections from 068aabee2, which passed). Scope and overlap pass: 8
+files, all in `content/events/random-events` (module, pack, test, gamevals); `gh pr list --search genie` /
+`"random event"`: only #355 (ours, draft).
+
 
 Re-run by sq24 on 2026-10-19 at 068aabee2, one commit (`feat: Genie random event`) on upstream `main` 829b9477d,
 which was re-fetched and is still the tip. Fork PR AlexPerrin/OpenRune-Server#18. Spec and PR text (upstream's
