@@ -19,6 +19,7 @@ import org.rsmod.content.other.treasuretrails.StashUnitScript.Companion.isFilled
 import org.rsmod.content.other.treasuretrails.TreasureTrailScript.Advance
 import org.rsmod.content.other.treasuretrails.TreasureTrailScript.Companion.CASKETS
 import org.rsmod.content.other.treasuretrails.TreasureTrailScript.Companion.REWARD_INV
+import org.rsmod.content.other.treasuretrails.TreasureTrailScript.Companion.checkStepsMessage
 import org.rsmod.content.other.treasuretrails.TreasureTrailScript.Companion.currentStep
 import org.rsmod.content.other.treasuretrails.TreasureTrailScript.Companion.rollRewards
 import org.rsmod.game.cheat.Cheat
@@ -198,6 +199,30 @@ class TreasureTrailScriptTest {
             assertNull(script.keyDrop(player, -1))
             player.inv[5] = InvObj(checkNotNull(step.key), 1)
             assertNull(script.keyDrop(player, npc))
+        }
+
+    @Test
+    fun `check names the clue's tier`() {
+        assertEquals("You have completed 0 steps on this beginner clue scroll.", checkStepsMessage(beginner, 0))
+        assertEquals("You have completed 1 step on this easy clue scroll.", checkStepsMessage(easy, 1))
+        assertEquals("You have completed 3 steps on this medium clue scroll.", checkStepsMessage(TrailTier.Medium, 3))
+        assertEquals("You have completed 5 steps on this hard clue scroll.", checkStepsMessage(TrailTier.Hard, 5))
+    }
+
+    @Test
+    fun GameTestState.`check steps on each tier's clue names that tier`() =
+        runInjectedGameTest(TreasureTrailScript::class, null, TreasureTrailScript::class) { script ->
+            prepare()
+            for ((tier, done) in TrailTier.entries.zip(listOf(0, 1, 2, 3))) {
+                script.giveClue(Cheat(player, "clue", listOf(tier.label, "", "3")))
+                VarPlayerIntMapSetter.set(player, tier.stepsDoneVarp, done)
+                val clue = TrailSteps.clueObj(checkNotNull(currentStep(player, tier)))
+                val type = checkNotNull(dev.openrune.ServerCacheManager.getItem(clue))
+                assertEquals(1, type.interfaceOptions.indexOf("Check steps"), type.name)
+                with(script) { player.withProtectedAccess { checkSteps(type) } }
+                val steps = if (done == 1) "step" else "steps"
+                assertMessageSent("You have completed $done $steps on this ${tier.label} clue scroll.")
+            }
         }
 
     @Test

@@ -211,7 +211,7 @@ constructor(
     fun ProtectedAccess.checkSteps(obj: ItemServerType) {
         val tier = tierOf(obj.id) ?: return
         val done = player.vars[tier.stepsDoneVarp]
-        mes("You have completed $done ${if (done == 1) "step" else "steps"} on this clue scroll.")
+        mes(checkStepsMessage(tier, done))
     }
 
     private suspend fun ProtectedAccess.talkToStepNpc(npc: Npc, npcType: Int) {
@@ -763,6 +763,13 @@ constructor(
     data class CasketRow(val obj: ItemServerType, val min: Int, val max: Int, val weight: Int, val noted: Boolean)
 
     companion object {
+        /**
+         * Check's message (RSProx: "You have completed 3 steps on this master clue scroll."), with
+         * [tier]'s lowercase name as the tier word.
+         */
+        fun checkStepsMessage(tier: TrailTier, done: Int): String =
+            "You have completed $done ${if (done == 1) "step" else "steps"} on this ${tier.label} clue scroll."
+
         const val DEVICE = "obj.beginner_device"
         const val CLUE_TEXT_INTERFACE = "interface.trail_cluetext"
         const val CLUE_TEXT = "component.trail_cluetext:text"
