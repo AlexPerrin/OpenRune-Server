@@ -1,8 +1,81 @@
 # QA: fix/57-gameframe-fullscreen-map
 - Branch: `fix/57-gameframe-fullscreen-map`
-- Commit: `d3a194b9e47b680569eb01ab4008551a054bdcce`
-## Internal gate: **PASS**
-## Upstream gate: **PASS**
+- Commit: `e551ba7cea4cc638ff3c6ca6923fc45f2f519d93`
+## Upstream gate: **FAIL**
+## Internal gate: N/A (dev-checked)
+
+Run by sq25 on 2026-10-19 at the merge commit e551ba7ce (upstream `main` 829b9477d merged into d3a194b9e; backs
+upstream PR #362). The commit is not on GitHub: fetched read-only from sd24's clone (`re/agents/sd24/or`, worktree
+w57) into `re/agents/sq25/or`, gated in a fresh `git clone --shared` `re/agents/sq25/r-57` (`origin/main` =
+829b9477d). Text `pr-texts/gameframe-fullscreen-map.{title,upstream.body,comment}` at docs aa3080530. The
+earlier PASS at d3a194b9e (kept below) is voided by this commit.
+
+## Failing item: accuracy, the RSProx comparison finds an unlisted divergence
+
+Recording 3204 (rsprox.net, revision 232.1; found by INTERFACE 165 and VARBIT 4607 searches, transcribed
+locally) switches between `toplevel_osrs_stretch` (161) / `toplevel_pre_eoc` (164) and `toplevel_display` (165)
+eight times (Oculus orb and the login welcome screen; it never opens the world map 595). On none of these
+switches does the official server send `resizable_stone_arrangement` (4607): the frame goes 161 -> 165 -> 161
+(and 164 -> 165 -> 164) with 4607 unchanged. 4607 changes once in the recording, 0 -> 1, sent just before the
+161 -> 164 `if_opentop` after the player picked the layout in the display settings (tick 5916-5917).
+
+The branch, like `main`, writes 4607 = 1 (the 165 row's flag) when the fullscreen map opens, and with this PR
+puts the old value back on close/logout. In game on this commit (below) 4607 goes 0 -> 1 -> 0 around the map.
+Official evidence for the same top level says 4607 is not touched at all. The PR text says "While the map is
+open the flag still changes as before" and has no caveat for it, and its rsprox note says "we have no rsprox
+dumps of the official game", which is no longer true.
+
+**Required change, one of:**
+- (preferred, code) don't write `resizable_stone_arrangement` when moving into or out of a frame that is not
+  `isGameplay` (the official behaviour in 3204). The stone choice then survives the map, fixed-frame closes and
+  logout by itself, and the saved-state varbit may become unnecessary: the dev/orchestrator decide, since it was
+  the maintainer's review request. Re-gate at the new commit.
+- (text only) keep the code, and in the PR text: list the divergence in the notes/caveats ("the official server
+  doesn't send `resizable_stone_arrangement` on switches to `toplevel_display`: RSProx recording 3204, Oculus
+  orb; this PR still sets it while the map is open and restores it"), and replace "we have no rsprox dumps of the
+  official game" with what was compared (3204: toplevel 165 switches; no recording opens the world map 595).
+  Re-check: pr-text-review only.
+
+## Checks that passed at e551ba7ce
+
+### build-test (local gate; the commit isn't on GitHub, so no fork CI)
+`openrune/upstream/qa/qa.sh gate` with `GATE_VOL=sq25-gradle`, logs `re/agents/sq25/r-57.logs/`:
+1a-compile 17s, 1-cache 72s, 2-buildcache 36s, 2b-rsa 20s, 7-install 27s, 3-spotless 18s, 4-assemble 80s,
+5-test 105s (764 tests, 0 failures), 6-integration 132s (79 tests, 0 failures), all rc=0. Boot (container
+sq25-or-server, port 43597): "Server ready in 12.6s", no Exception/ERROR line in the session.
+`fix_gameval_conflicts.py --check` on the tree: "No gameval conflicts or unassigned IDs found."
+
+### Scope
+Net diff against `main` 829b9477d: 3 files, +38/-1 (GameframeScript.kt, the gameframe `gamevals.toml`, the new
+`gameframe_vars.toml`); `isFallbackCandidate`/`FULLSCREEN_MAP_TOPLEVEL` are gone and #315's `isGameplay` is used
+throughout, as the merge message and the text say. On current `main`. Only #362 touches the gameframe
+(`gh pr list --search gameframe`); #370 and #371 (updated today) add no varp 65471 / varbit 65447.
+
+### In game (desktop RuneLite, fresh account `sq25gf`, branch server on 43597, desktop lock 20:29-20:41)
+4607 read with `get_var`, 65447 with `::getvarbit gameframe_stone_before_fullscreen`, top level from
+`list_interfaces`.
+- 161, `::varbit resizable_stone_arrangement 0`: 4607 = 0, 65447 = 0. Orb "Fullscreen World Map": 165, 4607 = 1,
+  65447 = 1. Close (595:38): 161, 4607 = 0, 65447 = 0.
+- Same with 4607 = 1 first: open -> 165, 4607 = 1, 65447 = 2; close -> 161, 4607 = 1, 65447 = 0.
+- 4607 = 0, map open, logout (182 logout CC_OP) and login: 161, 4607 = 0, 65447 = 0.
+- `::varbit gameframe_toplevel 165`, logout and login: 161 (`gameframe_toplevel` = 161), 4607 = 0.
+- Not tried: closing the map to a fixed frame (as the text says).
+
+### PR text and comment (pr-text-review), apart from the failing item
+- Title `fix:`; every template section present; data sources; release note; Claude Code line.
+- Problem, change, ids 65471/65447, Temp/Never scope, `--check`, and "the gameframe module has no tests": true
+  of the commit.
+- "In game on the branch before the merge": true, and now also checked on the merge (above); worth saying so
+  when the text is next edited.
+- The drafted `.comment` is true of e551ba7ce (merge commit, no rebase; `isFallbackCandidate()` and
+  `FULLSCREEN_MAP_TOPLEVEL` dropped; the restore tests `isGameplay`; build cache, compile, spotlessCheck, boot,
+  `--check`). It should change with whichever fix above is chosen (and can add test 764/0, integration 79/0).
+
+---
+
+## Previous gate at d3a194b9e (voided by e551ba7ce; kept as history)
+
+Its header was: # QA: fix/57-gameframe-fullscreen-map / - Branch: `fix/57-gameframe-fullscreen-map` / - Commit: `d3a194b9e47b680569eb01ab4008551a054bdcce` / ## Internal gate: PASS / ## Upstream gate: PASS
 
 Run by sq25 (companion to sd24) on 2026-10-19. The commit is not pushed (the fork branch backs open upstream
 PR #362, head still a01ebb28b); fetched from sd24's clone `re/agents/sd24/or` (worktree w57). Three commits on
