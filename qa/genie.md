@@ -1,8 +1,89 @@
 # QA: acc/genie
 - Branch: `acc/genie`
-- Commit: `e9c7bcac3e5fb1d17ef2d9747bbbea5c00b52793`
+- Commit: `3ccb86bd85c6d96e1e067761d0bb72d64a7d47fd`
 ## Internal gate: N/A (dev-checked)
 ## Upstream gate: **FAIL**
+
+sq30 ran this on 2026-10-20 at 3ccb86bd8, which is five commits on upstream `main` 829b9477d. I re-fetched `main` and it is still the tip. The commits are 068aabee2, e9c7bcac3, sd23's 9a222bd53 and a44a3daa0, and sd30's 3ccb86bd8. Fork PR #18. The spec is `accuracy/genie.md` and the PR text `pr-texts/genie.upstream.body`, both at fork docs 9eb87c281. The gate fails on accuracy, and two of the PR text's claims change with it. The verdicts at e9c7bcac3 and earlier, below, are void and kept as history.
+
+Evidence is in `re/evidence/gate-acc-genie/` (main checkout):
+- `sq30-session-3ccb86bd8.txt`: the RSProx transcript of my desktop2 session on the branch server.
+- `sq30-session-genie-lines.txt`: the Genie's packets from that transcript.
+- `runA-*.json`, `runB-timeline.json`: devtools timelines.
+- `branch-server.log`
+
+## What must change (new commit on `acc/genie`)
+
+1. **He leaves at the wrong time after Talk-to.** The recordings show him leaving on his next call tick (the add's 10-tick grid). The branch leaves exactly 10 ticks after Talk-to (`HAND_OVER_TICKS`).
+   - **Why the spec's reading falls short.** Rule 15 and sq24's fix 6 read "10 ticks after Talk-to" from 3056 alone. There the Talk-to fell on a call tick: add t4000, Talk-to t4030 (that tick's call still fires), delete t4040. That recording can't tell "Talk-to + 10" apart from "the next call tick".
+   - **What 1718 adds** (`re/ref/rsprox/txt/1718.txt`). Its two Genies that were neither ignored nor left to time out leave off the Talk-to + 10 pattern but on the grid:
+     - G1: add t1058 (line 29553), Genie face cleared t1062 (29708), delete t1068 (29900) = add + 10. There was no call at all.
+     - G3: add t7140 (135751), call t7150, face cleared t7156 (136079), delete t7160 (136208) = add + 20.
+     - In 3056 the face is cleared on Talk-to + 1 (t4031, line 40559). Read that way, the Talk-to for G1 was t1061 and he left 7 ticks later; for G3 it was t7155 and he left 5 ticks later.
+     - Even without that inference, a delete at add + 10 can't be Talk-to + 10, because the earliest possible Talk-to is add + 1.
+     - The ignored G2 never clears its face (t1177-1280).
+     - All four recorded departures are on the add's grid: +10, +20, +40, and +103 after "Maybe later." at +100.
+   - **Branch in game** (my transcript): add t794, call t804, Talk-to t808 (opnpc1, line 13903), delete t818 (line 14111). That is Talk-to + 10. The recordings put it at t814, the next call tick.
+   - **Fix:** don't restart the timer at Talk-to (drop `HAND_OVER_TICKS` and `leaveCycle`). On the call timer's next fire after the hand-over, leave with the smoke and sound 1930, and send no call or wave. Keep "Have a nice day" for a Talk-to in between. Update the test, and spec rule 15 ("leaves on his next call tick, 1-10 ticks after Talk-to; 1718 G1/G3, 3056").
+   - In the PR text, replace "he leaves 10 ticks after Talk-to whatever the dialogue is doing" with the new rule. If the code isn't changed, say it as a caveat and drop the claim that it comes from the recordings.
+2. **The Rub message gives the wrong XP.** On this world the message says 10 times the level, but the player gets that times the world's XP rate.
+   - **In game:** Attack level 1 Rub gives the messagebox "Your wish has been granted!<br>You have been awarded 10 Attack XP!" (transcript t874, if 229:3, synth 2655). The XP that arrives is **+1500** (devtools xp history tick 1471: xpGained 1500, the world rate x150). The lamp went from 2 to 1.
+   - **Cause:** `rub()` prints `statBase * 10` but calls `statAdvance(stat, xp.toDouble())`, which applies the rate.
+   - **Official:** the recording (3056 t4038) shows 990 Construction XP at level 99. The message and the XP are the same number, with no multiplier.
+   - **Fix, either one:**
+     - give the unscaled XP (`statAdvance` with the rate turned off, if the API allows it), so the message stays true;
+     - or print the XP actually added.
+   - Update the PR text's lamp bullet and caveat C7 to match. Today they say the rate applies, while the message says otherwise.
+3. **PR text, "How it was tested".** "These still need an in-game run on this commit; our QA gate does it before the PR is marked ready" is now out of date. On the next commit, give the gate's in-game result instead: the run below, redone at the fix.
+
+## Checked and passing at 3ccb86bd8
+**sq24's six divergences.** I compared each against the recordings (re-read at the lines cited: 3056.txt lines 40212-40700, 1718.txt G1/G2/G3) and against my session's transcript on the branch server. All but the leave timing are fixed:
+
+| sq24 item | Recording | Branch in game (my transcript tick / line) | Verdict |
+|---|---|---|---|
+| Call interval | calls every 10 ticks from the add (3056 t4010/4020/4030, 1718 G2 t1187...1267) | ignored Genie: add t913, calls t923, 933, ... 1003 (lines 16040-17428), 10 ticks apart | fixed |
+| Wave | seq 863 with the greeting and every call | seq 863 at t794, 804, 913, 923, ... 1003, 1040; none with "Maybe later." | fixed |
+| Smoke and sounds | arrival: map_anim 86 h124 x2 + sound_area 2301 and 1930 r7; departure: map_anim 86 + 1930 | arrival t794/913/1040: one map_anim 86 h124 + 2301 + 1930 r7 at the add tile; departure t818/1016/1046: map_anim 86 + 1930 at his tile | fixed (one puff instead of two, and on the add tick: already in the PR's caveats) |
+| Reward message | "Your reward is: <col=ff0000>1</col> x <col=ff0000>Lamp</col>." the Talk-to tick | same text, t808, the opnpc1 tick (line 13906); lamp +1 the same tick | fixed |
+| Rub message box | if 229 "Your wish has been granted!<br>You have been awarded 990 Construction XP!" + synth 2655 | if 229 "...awarded 10 Attack XP!" (skill capitalised) + synth 2655, t874 | fixed in form; the XP number is wrong (item 2) |
+| Leave timing | see item 1 | Talk-to + 10 | **not matching** (item 1) |
+
+**sd30's departure (3ccb86bd8).** This matches 1718 G2 exactly:
+- "Maybe later." at t1013 = add + 100, in place of the 10th call, with no seq (line 17582).
+- Delete at t1016 = add + 103, with map_anim 86 and sound 1930 at his tile (lines 17613-17623).
+- The code says it on the 10th timer fire (`calls + 1 >= LIFETIME_TICKS / CALL_INTERVAL`) and leaves after `IGNORED_LEAVE_TICKS` = 3. A Talk-to in those 3 ticks goes through `handOver`, which refuses (`ignored`), so the player gets "Have a nice day" and no lamp. That case is listed as a guess.
+
+**Also in game.** Fresh account `sq30g1` on the branch server (my containers on ports 43598/8085), desktop2 under its lock from 01:58 to 02:31. A run between 02:03 and 02:12 is not counted: another agent's commands reached my client through a shared helper script, and the orchestrator confirmed it.
+- Greeting: "Greetings, Master sq30g1!" on the add tick.
+- Following: teleported 6 tiles away at t1550 (client tick), he was beside the player again at the next call.
+- Second Talk-to after the lamp: "Have a nice day, Master." (t816), and no second lamp.
+- `::randomevent` with a Genie out: "Your Genie is already here."
+- Dismiss: delete with smoke and sound 1930 the same tick (t1046).
+- Lamp chooser: interface 240, "Choose the stat you wish to be advanced!".
+- The server log has no exception or error lines except my own malformed `::tele` (an IllegalArgumentException for level 50).
+- Not re-run (unchanged code paths, checked by sq24 at 068aabee2): full inventory, interrupted dialogue, another player's lines.
+
+**Accuracy, other rules.** I re-read "Random events", "Genie" and "Transcript:Genie" through osrs-mcp `wiki_page` on 2026-10-20. Every quoted rule in spec rows 1-8, 10, 12-14, 16-18, 21-24 and 27 is still there. The cache has NPC 326 with ops Talk-to/Dismiss, and the gamevals have seq 863 `emote_wave` and spotanim 86 `smokepuff`. Synth 2301 has no cache name, which is why it gets the module name `macro_genie_appear`. The caveats C1-C7 in the PR cover the remaining gaps from the spec. Not in the spec, minor: the official Genie stops facing the player one tick after Talk-to; I didn't check this on the branch.
+
+**Build.**
+- Fork CI at exact head 3ccb86bd85c6d96e1e067761d0bb72d64a7d47fd: `CI` run 39375088118 is success. It ran freshCache, buildCache, generateRsa and `assemble test integration`, and booted to "Server ready in 14.6s".
+- `Formatting` run 39375089748: success.
+- The branch server's own build (`qa.sh gate-run` on 829b9477d + 3ccb86bd8, identical tree) booted to "Server ready in 10.42s".
+- `fix_gameval_conflicts.py --check`: "No gameval conflicts or unassigned IDs found."
+
+**Scope.** 8 files, all in `content/events/random-events`, based on current `main`, no `Depends:`.
+- Commit subjects are `feat:`/`fix:` with Co-Authored-By.
+- `gh pr list -R OpenRune/OpenRune-Server --search genie` and `"random event"` both show only #355 (ours, draft).
+- The PR text has all the template's sections (Summary, Type of change, How it was tested, Checklist, Screenshots / notes). Its other claims are true of the commit:
+  - 9 tests, as listed;
+  - ids 65534/65533/65501/63886-63892, and synth 2301;
+  - the checklist ticks and notes;
+  - the recordings cited.
+
+---
+## History (void)
+
+### Run by sq24 at e9c7bcac3 (void; was `## Upstream gate: FAIL` at commit e9c7bcac3e5fb1d17ef2d9747bbbea5c00b52793)
 
 Run by sq24 on 2026-10-19 at e9c7bcac3: two commits on upstream `main` 829b9477d (re-fetched, still the tip):
 068aabee2 (`feat: Genie random event`, checked below) and e9c7bcac3 (`feat: keep the random event zones in a
