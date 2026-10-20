@@ -59,6 +59,11 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   works (was swallowed); Fill on a full barrel sends the wiki's full message. No new ids. Spec
   accuracy/fish-barrel-check-and-destroy.md; no RSProx recording of the barrel exists. Fork PR to be opened by the
   orchestrator (pr-texts/fish-barrel-check-and-destroy.*).
+- `fix/ground-item-despawn-times` (sd28, 3 commits on main 829b9477d, head 8bc126d49, fork PR #23): player drops use
+  OSRS timers (GE-tradeable 100/300, others never public 300, clue/challenge scrolls and Mimic 6100) and OBJ_ADD
+  carries timeUntilPublic/timeUntilDespawn/ownership/neverBecomesPublic, matched to RSProx. Note: upstream's
+  `ItemServerType.tradeable` reads true for untradeables at runtime; the drop rule uses `stockmarket`. Spec
+  accuracy/ground-item-despawn-times.md. Unblocks client hub-ground-items-despawn once live.
 - `local/*`: never upstream. android (our RSProt build, Android client type, mobile toplevel),
   local-auth (token logins, shared RSA key), test-commands, world-settings (members, Lumbridge
   start, 1x XP, no clans), skip-cs2-packs, treasure-trails (ours while upstream writes its own clue
