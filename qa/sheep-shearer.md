@@ -2,7 +2,119 @@
 - Branch: `content/sheep-shearer`
 - Commit: `069c15fde865be00679af03cd85fc19a630989b4`
 ## Internal gate: **PASS**
-## Upstream gate: **PASS**
+## Upstream gate: **FAIL**
+
+## RSProx comparison at 069c15fde (sq24, 2026-10-19): FAIL
+The upstream gate's accuracy check includes the RSProx comparison; the PASS below was recorded before any
+recording was available (its checklist line said "we have no dumps"). This comparison, at the same commit,
+finds gameplay-visible divergences in the quest's own code, so the upstream gate at 069c15fde is **FAIL**.
+The earlier PASS section stays below as history. Fork CI run 39345674203 (green at 069c15fde) and the base
+(upstream main 829b9477d, still the tip) are unchanged.
+
+Recordings (RSProx database, local transcripts `re/ref/rsprox/txt/`; facts only, no names or chat):
+- **1718** (rev 227.1, Leagues V), ticks 7184-7746: shearing, The Thing, spinning, Fred start + all-at-once
+  hand-in, quest complete. Each fact below was re-read from the transcript, not from the notes alone.
+- **1619-1622** (rev 225.1, quest already complete): shearing mechanics; 1620 has The Thing (t1645-1653
+  shear, t1899 Talk-to).
+- Chathead seq ids resolved through the branch's `gamevals.dat` (chatquiz 554-557, chathap 567-570, chatneu
+  588-591, chatshifty 592-595, chatscared 596-599, chatsad 610-613, chatang 614-617); OpenRune mesanims:
+  quiz, happy, neutral, shifty, worried = chatscared, sad, angry.
+
+### Matches
+- Fred's opening line, options "I'm looking for a quest.|I'm looking for something to kill.|I'm lost." under
+  "Select an option", the offer pages, the exposition about The Thing, the start prompt title "Start the Sheep
+  Shearer quest?" with "Yes.|No.", "Yes, okay. I can do that.": text identical (wrapping aside).
+- Quest start: varp 179 0 -> 1 and "You've started a new quest: <col=0ab0ff>Sheep Shearer</col>" on the
+  continue after "Yes, okay..." (1718 t7731); the framework sends the same line when the stage leaves 0.
+- Completion: varp 179 1 -> 21 in one step (all-at-once hand-in), "Congratulations, you've completed a quest:",
+  quest scroll lines "You have completed Sheep Shearer!", "1 Quest Point", "150 Crafting XP", "60 Coins",
+  Crafting XP +150, coins 995 x60 into the inventory, the 20 balls removed (1718 t7741). The code's rewards
+  and labels produce the same lines.
+- The Thing shear message "The... whatever it is... manages to get away from you!", no wool, no transform, no
+  inventory change (1718 t7259, 1620 t1651).
+- Chathead anims on most pages: Fred page 1 chatang (angry), the offer pages chatneu (neutral), "What do you
+  mean, The Thing?" chatquiz, "Some say..." chatscared (worried), "Well I don't have all day..." chatang,
+  "Yes, okay..." / "In fact Fred..." / "That's the last of them." chathap, "Have you been shearing..." /
+  "It's rude..." chatang, "I'm sorry..." chatsad, "I guess no real 'arm..." chatneu.
+
+### Divergences that must be fixed (new commit on `content/sheep-shearer`)
+1. **The 20-ball branch comes after the quest starts, not instead of it.** 1718 (player holding 20 balls of
+   wool): after "...the small matter of The Thing." the full exposition still plays ("What do you mean, The
+   Thing?" and Fred's three pages), then the start prompt, "Yes, okay. I can do that.", varp 179 0 -> 1 and the
+   "You've started a new quest" message (t7731), and only then "In fact Fred, funnily enough, I actually have
+   20 balls of wool already on me." (in place of "Good! Now one more thing..."). The branch jumps to
+   `alreadyHaveTheWool()` straight after the third offer page: no exposition, no start prompt (the player
+   can't decline), no varp 1, no start message. The wiki transcript places the branch there, but the
+   recording of the live game is the stronger source. Fix: move the `ballsOfWool >= 20` check to after
+   `chatPlayer(happy, "Yes, okay. I can do that.")` and `advanceQuestStage`.
+2. **The all-at-once hand-in ends like a final delivery.** 1718 after "I guess no real 'arm was done. Hand the
+   balls over...": mesbox (if 229) "You give Fred 20 balls of wool." (t7738), player "That's the last of
+   them." (chathap, t7739), Fred "I guess I'd better pay you then." (chatsad, t7740), then completion on that
+   continue, with the balls removed and coins added in the same tick (t7741). The branch completes straight
+   after "Hand the balls over..." with none of these three pages. Fix: add the three pages before completing
+   (keep the re-count of the 20 balls after the last suspension and the give-back if the reward fails).
+3. **Spelling:** the player says "They just looked a little woolly!" (1718 t7734). The branch has "wooly"
+   (copied from the wiki transcript). Fix: "woolly".
+4. **Chathead mesanims** that differ from the recording (fix the mesanim argument):
+   - Fred "Yes, that's it. Bring me 20 balls of wool..." is chathap (569): `happy`, not `neutral`.
+   - Fred "Well now, no one has ever seen The Thing..." is chatshifty (593): `shifty`, not `worried`.
+   - Player "No! Well, maybe... They just looked a little woolly!..." is chatscared (597): `worried`, not
+     `shifty`.
+   - Fred "I guess I'd better pay you then." is chatsad (610): `sad`, not `happy` (applies to `handIn`'s
+     completion branch too, which uses the same line).
+5. **Quest scroll model:** the official scroll shows the shears, obj 1735 at zoom 400 (if_setobject 153:5,
+   1718 t7741). The branch shows `obj.ball_of_wool` at zoom 200. Fix: `ItemRewardDisplay("obj.shears", zoom =
+   400)`.
+
+### Divergences that stay caveats (PR text Caveats)
+- **The Thing's reaction to a shear** (already a caveat; the recordings now give the detail): the player
+  faces it and plays seq 893 with synth 760 (not the sheep's 761) when adjacent; next tick The Thing faces the
+  player, plays seq 3570 and synth 686; the message comes 2-3 ticks after the player anim (1620 t1648 ->
+  t1651, 1718 t7256 -> t7259); then it steps away from the player (1620: one step a tick for four ticks from t1651,
+  south-west/south; 1718: a step north-west at t7260). The branch plays seq 893 and sends the message the same tick, with no sounds, npc anim,
+  face or movement. The caveat line can cite the recordings instead of only the wiki.
+- **The Thing plays seq 3570 by itself** at random (1718: t7178, 7181, 7215 and others) without a player:
+  not implemented (the npc spawn is upstream's, with no idle anim); cosmetic.
+- **The Thing's Talk-to:** 1620 (an account well past the quest, likely after Cold War) gets the player line
+  "I can't speak to the penguins when I'm not in my<br>disguise." (chatshifty). The branch always uses the
+  wiki's standard line "That's a sheep...I think. I can't talk to sheep." The condition for the other line
+  isn't documented; caveat.
+- **Quest complete jingle:** the official plays midi_jingle 154 (`jingle.high_seas` in today's gamevals;
+  1718 t7741); upstream's framework plays `QUEST_COMPLETE_JINGLE` = `jingle.gaol` (153) for every quest. A
+  framework choice outside this branch; caveat (or pass `completeJingle` if the id is confirmed for the
+  current cache).
+- **Per-ball hand-ins** (varp 179 values 2-20, "You give Fred n balls", the final per-ball delivery) are in no
+  recording. The recording's all-at-once path shows a give box before "That's the last of them.", so the
+  per-ball final delivery may have one too; the wiki transcript ("Finishing up") shows none. Keep the wiki
+  version, as a caveat.
+- **When the balls leave the inventory:** officially at completion, together with the coins (1718 t7741);
+  the branch removes them before the dialogue pages (`handIn`) or, after fix 2, wherever the dev puts the
+  take. No visible effect beyond the inventory updating a few pages earlier; caveat if it stays.
+- Fred's other options ("something to kill", "I'm lost", "No."), the mid-quest dialogue and "Fred! Fred! I've
+  seen The Thing!" are in no recording; they keep the wiki transcript as their source.
+- 1718 is Leagues V: league task messages, the overlay (if 660, script 3343) and jingle 283 are not base game
+  and were ignored.
+
+### Out of scope (upstream's code, not in this diff)
+Generic shearing (`Sheep.kt`: op -> seq 893 + synth 761 -> +2 ticks "You get some wool.", wool 1737,
+transform to the sheared id, regrowth after 50 ticks, "This sheep has already been shorn.", "You need a set of
+shears to do this."), spinning (if 270, seq 894, one ball per 3 ticks) and the pen gate (12986 -> 12988/12989,
+synth 67, closes after 300 ticks) were read in 1619-1622 and 1718 for reference only. They aren't changed by
+this branch and aren't judged here.
+
+### What must change
+- Code (new commit): fixes 1-5 above. A new commit voids the gate; the upstream gate is re-run on it.
+- PR text (`pr-texts/sheep-shearer.upstream.body`): line 7 ("the last delivery goes straight to "That's the
+  last of them." with no give box") and line 8 (the 20-ball exchange "comes right after ...the small matter of
+  The Thing."") must describe the fixed flow; the rsprox checklist line ("we have no dumps of the official
+  game") can be ticked, citing recordings 1718 and 1619-1622; add the caveats above (Thing details, idle anim,
+  Talk-to variant, jingle, per-ball hand-ins unrecorded, item-removal timing if kept).
+- Spec (`accuracy/sheep-shearer.md`): **the file on `docs` is corrupted** by commit 8d1f0ca03 (21,851 lines,
+  1.9 MB: a three-line "Chosen (user, 2026-10-19): merge main ..." paragraph was inserted after every
+  character). Stripping that paragraph plus its newline gives back exactly the 77-line version of 0c19c7bb3;
+  the intended addition (that paragraph, once) has to be re-applied. Rows 6, 8/12 (D1, D3), 13, 15 and 19 then
+  need the RSProx findings, and the rsprox row added.
+
 
 Re-run by sq24 on 2026-10-19 at 069c15fde. Fork PR AlexPerrin/OpenRune-Server#16; it updates upstream #366
 (head `content/quests-sheep-romeo`, now 19aefd90a) by fast-forward: 19aefd90a is an ancestor of 069c15fde.
@@ -29,7 +141,7 @@ symbols next to main's.
 - **In game**: not re-run (optional per main). The code is identical to the commit a-thoren checked in game,
   and the stile is not in this branch.
 
-## Upstream gate at 069c15fde: PASS
+## Upstream gate at 069c15fde: PASS (superseded by the RSProx comparison above)
 - **Scope**: the quest only (3 files net). The stile fix is separate (fix/stile-approach); #366 doesn't
   depend on it, and the text says so.
 - **Base**: upstream main 829b9477d (the tip, re-fetched) is merged in. The only conflict was the quest-pack
