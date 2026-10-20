@@ -31,6 +31,7 @@ fin/cannon
 fin/genie
 fin/quest-test-fixture
 content/sheep-shearer
+local/quest-test-fixture
 local/romeo-juliet
 fin/witchs-potion
 fin/goblin-diplomacy
