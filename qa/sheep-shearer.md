@@ -1,10 +1,65 @@
 # QA: content/sheep-shearer
 - Branch: `content/sheep-shearer`
-- Commit: `069c15fde865be00679af03cd85fc19a630989b4`
-## Internal gate: **PASS**
-## Upstream gate: **FAIL**
+- Commit: `01da94f17e2eb0aeefb0d78c42e69bff2ca94f7a`
+## Internal gate: N/A (dev-checked)
+## Upstream gate: **PASS**
 
-## RSProx comparison at 069c15fde (sq24, 2026-10-19): FAIL
+Run by sq24 on 2026-10-19 at 01da94f17 (fork PR AlexPerrin/OpenRune-Server#16; it updates upstream #366 by fast-forward,
+069c15fde being its parent). Spec `accuracy/sheep-shearer.md` and PR text `pr-texts/sheep-shearer.upstream.body` read
+from sd23's docs commit 65cc94f05 (the spec there is the repaired 100-line file). The new commit changes only
+`SheepShearer.kt` (+20/-17): fixes 1-5 of the FAIL at 069c15fde below.
+
+## Upstream gate at 01da94f17: PASS
+- **build-test**: fork CI run 39353944420 (`CI`: cache, assemble/test/integration, boot "Server ready in 11.42s")
+  and 39353946179 (`Formatting`) green at 01da94f17 (head sha checked). `fix_gameval_conflicts.py --check` clean.
+  The branch server (`qa.sh gate-run` + `start`, upstream main 829b9477d + the branch = the commit's tree) booted
+  "Server ready in 11.38s"; no exception or error lines over the session.
+- **accuracy-check against 1718** (re-read at the transcript, ticks 7718-7741; seq ids through the mapping in the
+  FAIL section below), each fix of the FAIL list:
+  1. 20-ball branch after the start: the code checks the balls after `chatPlayer(happy, "Yes, okay...")` and
+     `advanceQuestStage` (1718 t7730-7731). In game: the full exposition and the start prompt played with 20 balls
+     held; varp 179 was still 0 on "Yes, okay. I can do that.", became 1 with "You've started a new quest" on that
+     continue, then "In fact Fred, funnily enough..." (1718 t7731: varp 0 -> 1 and page 13 on the same tick).
+  2. Hand-in ending: in game, "I guess no real 'arm was done..." -> mesbox "You give Fred 20 balls of wool."
+     (inventory still 20 balls) -> "That's the last of them." (still 20) -> "I guess I'd better pay you then." ->
+     on that continue varp 179 = 21, the balls gone and 60 coins in slot 0, "Congratulations, you've completed a
+     quest", Crafting +150 x this world's rate. 1718: t7738 mesbox (no inventory change), t7739, t7740, t7741 (varp
+     1 -> 21, balls removed and coins added in one update). The per-ball path (`handIn`) now goes through the same
+     `lastDelivery` (re-count after the last page, give-back on a failed reward), by code.
+  3. "woolly": in game "No! Well, maybe... They just looked a little woolly!" (1718 t7734).
+  4. Mesanims (code; the devtools bridge doesn't expose chathead anims): "Yes, that's it..." `happy` (1718 569 =
+     chathap), "Well now, no one has ever seen..." `shifty` (593 = chatshifty), "No! Well, maybe..." `worried`
+     (597 = chatscared), "I guess I'd better pay you then." `sad` (610 = chatsad). Every other page of t7718-7740
+     also matches: 616/615/614 angry, 588-590 neutral, 554 quiz, 598 worried, 567/568 happy, 610 sad ("I'm
+     sorry..."), 589 neutral ("I guess no real 'arm...").
+  5. Scroll model: in game 153:5 shows obj 1735 with 400 (zoom), at 78,128; 153:4 "You have completed Sheep
+     Shearer!", 153:9-11 "1 Quest Point", "150 Crafting XP", "60 Coins" (1718 t7741, identical).
+  Page texts and their order in game are identical to 1718 t7718-7740 (wrapping included).
+- **In game, other claims** (desktop lock 22:11-, fresh account `sq24sh2`, branch server 43596): The Thing
+  (npc 731) Shear with shears: "The... whatever it is... manages to get away from you!"; Talk-to: "That's a
+  sheep...I think. I can't talk to sheep."; after completion Fred offers "I'm looking for something to kill.",
+  "I'm lost." and "Fred! Fred! I've seen The Thing!" (the shear attempt set the flag); "I'm lost." gives the
+  transcript's reply.
+- **Caveats**: the PR text lists every gap from the RSProx comparison (The Thing's sounds, anim, face and movement
+  with the recorded ticks; its idle seq 3570; the Talk-to variant; jingle 154 vs the framework's; per-ball
+  hand-ins unrecorded; partial deliveries taking the balls before the give box) and the unsourced items in the
+  spec.
+- **Scope**: net diff against main is the quest only (3 files: `SheepShearer.kt`, `sheep_shearer_vars.toml`,
+  quest-pack `gamevals.toml`). Open upstream PRs on the topic: only #366 (this one); #367/#368 match "sheep" only
+  by text. On current main 829b9477d (merged in). No `Depends:`.
+- **Conventions**: upstream's PR template, every section present; commit subjects `feat:`/`fix:`. Gamevals
+  symbols only. No tests, as the maintainer asked on #366 (the PR says so).
+- **pr-text-review**: every claim checked against the commit (code) and, where it plays, in game; true.
+- Notes (not this branch): the quest start/complete messages carry `@q_mes@` from upstream's `Quest.kt`
+  (1718: `<col=0ab0ff>`); the branch's history keeps the stile commit and its revert and the fixture commit
+  and its removal (net zero; upstream can squash). `varbit.sheep_shearer_progress` 65449 is also #368's
+  `witchs_potion_progress` id: whichever merges second needs `fix_gameval_conflicts.py` re-run (its CI check
+  will flag it).
+
+---
+## History: earlier runs at 069c15fde and 19aefd90a (void)
+
+### RSProx comparison at 069c15fde (sq24, 2026-10-19): FAIL
 The upstream gate's accuracy check includes the RSProx comparison; the PASS below was recorded before any
 recording was available (its checklist line said "we have no dumps"). This comparison, at the same commit,
 finds gameplay-visible divergences in the quest's own code, so the upstream gate at 069c15fde is **FAIL**.
@@ -128,7 +183,7 @@ main 829b9477d). **Net diff against main: the quest only, 3 files.** `SheepShear
 `sheep_shearer_vars.toml` are byte-identical to 19aefd90a. `quest-pack` `gamevals.toml` adds the three
 symbols next to main's.
 
-## Internal gate at 069c15fde: PASS
+### Internal gate at 069c15fde: PASS
 - **build-test**:
   - `qa.sh gate` on clone `qa/sheep-069c15fde`, `origin/main` = 829b9477d.
   - Every step rc=0: compile, freshCache + mergePluginGamevals, buildCache, generateRsa, installDist,
@@ -143,7 +198,7 @@ symbols next to main's.
 - **In game**: not re-run (optional per main). The code is identical to the commit a-thoren checked in game,
   and the stile is not in this branch.
 
-## Upstream gate at 069c15fde: PASS (superseded by the RSProx comparison above)
+### Upstream gate at 069c15fde: PASS (superseded by the RSProx comparison above)
 - **Scope**: the quest only (3 files net). The stile fix is separate (fix/stile-approach); #366 doesn't
   depend on it, and the text says so.
 - **Base**: upstream main 829b9477d (the tip, re-fetched) is merged in. The only conflict was the quest-pack
@@ -167,7 +222,7 @@ symbols next to main's.
 - Note for the orchestrator: the PR will show the add-then-remove commits (fixture, stile) and a merge commit.
   The net diff is clean; upstream may ask to squash (CONTRIBUTING).
 
-## Earlier runs at 19aefd90a (void: superseded by 069c15fde)
+### Earlier runs at 19aefd90a (void: superseded by 069c15fde)
 
 Run by sq24 (companion to sd23) on 2026-10-18 in its own clone `re/agents/sq24/or`, detached at the commit.
 The branch is two commits (35900b277 `QuestTalkFixture`, 19aefd90a the quest) on c2492318d, which is

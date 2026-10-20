@@ -82,7 +82,7 @@ Run by sq24 on 2026-10-19. One commit on upstream `main` 829b9477d (the tip), fo
 `StileScript.kt` +10/-5. Spec and PR text at fork docs e146db7cd. The upstream gate wasn't run: the internal gate
 stopped at the first failure, in game.
 
-## Internal gate: FAIL. What must change
+### Internal gate: FAIL. What must change
 **The Sheep Shearer pen stile can't be climbed at all on this branch.**
 - The stile is `Stile` (loc 12982, 1x2) at 3197,3276, so its footprint is (3197,3276) and (3197,3277).
 - From every start tile tried, on both sides, the player walks up to the stile and stops, without crossing.
@@ -100,7 +100,7 @@ stopped at the first failure, in game.
   Whichever way: check it in game on the pen stile and one other `fullstyle` stile before handing over. The PR
   text's "the player walks onto the stile's tile on their side" has to change with it.
 
-## Evidence
+### Evidence
 - **build-test**:
   - `qa.sh gate` on clone `qa/stile-8a8c0ca7a`, `origin/main` = 829b9477d.
   - Every step rc=0: compile, freshCache + mergePluginGamevals, buildCache, generateRsa, installDist,
