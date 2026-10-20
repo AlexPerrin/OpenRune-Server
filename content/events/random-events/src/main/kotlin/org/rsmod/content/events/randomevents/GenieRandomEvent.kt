@@ -231,7 +231,10 @@ constructor(
         if (invDel(inv, LAMP).failure) return
         statAdvance(stat, xp.toDouble())
         soundSynth(WISH_SOUND)
-        val skill = ServerCacheManager.getStats(stat.asRSCM(RSCMType.STAT))?.displayName
+        val skill =
+            ServerCacheManager.getStats(stat.asRSCM(RSCMType.STAT))
+                ?.displayName
+                ?.replaceFirstChar(Char::uppercaseChar)
         mesbox("Your wish has been granted!<br>You have been awarded $xp $skill XP!")
     }
 
