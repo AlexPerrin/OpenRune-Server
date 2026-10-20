@@ -21,7 +21,6 @@ fix/71-item-config-tradeable
 fix/73-heldu-dispatch-order
 fix/74-bankside-view-op
 fix/75-coal-bag-messages
-fix/76-obj-add-timers
 fix/rune-pouch-accuracy
 fix/edgeville-general-store-stock
 fix/stile-approach
