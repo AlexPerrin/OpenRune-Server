@@ -1,0 +1,47 @@
+## Summary
+
+Two gaps in `FishBarrelScript` (Fishing #191):
+
+- **Check** sent game messages ("The fish barrel is empty.", "The fish barrel contains (n/28):" and one line per fish). In OSRS, Check opens the item box (`objectbox`, interface 193) with the barrel: "The barrel is empty." or "The barrel contains:" followed by `<count> x <item name>` entries separated by commas. RuneLite plugins read that box (193:2) to learn the barrel's contents, e.g. the Fish Barrel plugin from the Plugin Hub, so on our server they never learned the count. Check now uses `objbox` with the clicked barrel and those texts.
+- **Destroy** (op 5) did nothing. The script registers op 5 for all four barrels, which replaces the default drop/destroy handling, and then hit `else -> {}`. Op 5 now opens the destroy confirmation. The fish barrel's note is "You may win another barrel from Tempoross." when it's empty, and the item's `destroy_note_desc` ("The barrel and its contents will be lost. ...") when it holds fish. The sack barrels use their own note. On Yes the barrel is deleted from its slot. Barrels share one store, so the stored fish are cleared only when the player holds no other barrel (inventory or worn).
+
+Fill on a full barrel now sends the wiki's game message "The barrel is full. It may be emptied at a bank." (it was "You have no raw fish to store, or the barrel is full.").
+
+## Type of change
+
+- [x] Bug fix
+- [ ] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [ ] Cache / gamevals / pack data
+- [ ] Docs / tooling
+
+## How it was tested
+
+- `content:skills:fishing`: new `FishBarrelMessagesTest` (5 unit tests: the empty text, one fish type, several types separated by commas, the split into a second box after eight types, the full and empty-barrel destroy texts). `spotlessCheck` passes.
+- In game, desktop RuneLite against this branch:
+  - Check on an empty barrel opened the item box with the barrel and "The barrel is empty.", and no game messages.
+  - After Fill with 3 raw shrimps and 2 raw anchovies, Check showed "The barrel contains:<br>2 x Raw anchovies, 3 x Raw shrimps".
+  - Fill on a full barrel (28 fish) sent "The barrel is full. It may be emptied at a bank."
+  - Destroy on the full barrel showed the confirmation with the filled note. No kept the barrel and its 28 fish; Yes removed it.
+  - A new open barrel then showed the empty note on Destroy, and Yes removed it.
+
+## Checklist
+
+- [x] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes): the Check texts; Destroy only deletes the clicked slot after the confirmation
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps: destroy notes come from the item params; the empty-barrel note isn't in the cache, so it is a constant
+- [ ] State in varbits/varps, not attrs: the barrel's contents stay in #191's attr; not changed here
+- [x] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): see the notes below
+- [ ] New content checked against rsprox dumps where possible: rsprox.net has no recording with a fish barrel (searched by its obj ids and texts)
+- [x] No unrelated or hand-edited generated changes (spotless also moved one import in the file)
+
+## Screenshots / notes for reviewers
+
+Sources: the wiki's [Fish barrel](https://oldschool.runescape.wiki/w/Fish_barrel) page (Check, the full message, the infobox's Destroy notes for an empty and a filled barrel), the cache (ops `Fill, Check, Open/Close, -, Destroy`; `destroy_note_desc`), and the texts that RuneLite plugins expect (the Fish Barrel hub plugin's parser and its test: `The barrel contains:<br>1 x Raw anglerfish, 2 x Raw monkfish, ...`).
+
+Not confirmed by any source:
+- How the official server splits a very long list. Here more than eight fish types continue in a second box, without the header.
+- Which action sends the full message. Here it's Fill on a full barrel. Catching fish into a full open barrel stays silent, as before.
+- Whether destroying one of two barrels loses the shared contents. Here the contents are kept until the last barrel goes.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

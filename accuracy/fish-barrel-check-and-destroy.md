@@ -2,7 +2,7 @@
 
 Fix for upstream's `FishBarrelScript` (`content/skills/fishing`, added in Fishing #191), on main 829b9477d.
 Found by the client track: the Fish Barrel hub plugin (molo-pl, `fish-barrel`) learns the barrel's count from
-Check's chatbox message box and showed "?" on OpenRune; and a barrel could not be got rid of.
+Check's item box (interface 193) and showed "?" on OpenRune; and a barrel could not be got rid of.
 
 ## Upstream first
 `gh pr list -R OpenRune/OpenRune-Server --state all --search "fish barrel"` and `gh issue list ... --search barrel`
@@ -18,8 +18,9 @@ Check's chatbox message box and showed "?" on OpenRune; and a barrel could not b
 ## Behaviour
 | Rule | Source | After |
 |---|---|---|
-| Check, empty | Hub plugin `FishBarrelWidgetParser` (reads interface 193 comp 2 after Check): `"The barrel is empty."`; tictac7x-charges `U_FishBarrel`: "(Your\|The) barrel is empty." | message box (`mesbox`, interface 193 comp 2): "The barrel is empty." |
-| Check, contents | Wiki, Fish barrel: Check "tells the amount and type of raw fish the player has inside"; hub plugin parser and its test: `The barrel contains:<br>1 x Raw anglerfish, 2 x Raw monkfish, 3 x Raw<br>shrimps, ...` (`<count> x <item name>`, comma separated) | message box: "The barrel contains:<br>" + "<count> x <item name>" joined with ", "; the box wraps the lines |
+| Check box | Hub plugin `FishBarrelPlugin` reads interface 193 comp 2 after Check; gamevals: 193 = `interface.objectbox` (the item box: an item model and text), 229 = `interface.messagebox` | item box (`objbox`) showing the clicked barrel |
+| Check, empty | Hub plugin `FishBarrelWidgetParser`: `"The barrel is empty."`; tictac7x-charges `U_FishBarrel`: "(Your\|The) barrel is empty." | "The barrel is empty." |
+| Check, contents | Wiki, Fish barrel: Check "tells the amount and type of raw fish the player has inside"; hub plugin parser and its test: `The barrel contains:<br>1 x Raw anglerfish, 2 x Raw monkfish, 3 x Raw<br>shrimps, ...` (`<count> x <item name>`, comma separated) | "The barrel contains:<br>" + "<count> x <item name>" joined with ", "; the box wraps the lines |
 | Full | Wiki, Fish barrel: "When the barrel is full ... players will get a message in the chatbox stating: 'The barrel is full. It may be emptied at a bank.'"; hub plugin reads it as a GAMEMESSAGE | Fill on a full barrel sends that game message |
 | Destroy op | Cache: obj 25582 `interfaceOptions=[Fill, Check, Open, null, Destroy]`, 25584 `[Fill, Check, Close, null, Destroy]`; wiki: "the Destroy right-click option will destroy the barrel itself" | op 5 opens the destroy confirmation (interface `confirmdestroy`, clientscript 814) |
 | Destroy texts | Wiki infobox "Destroy": "Empty: You may win another barrel from Tempoross. Filled: The barrel and its contents will be lost. You may win another barrel from Tempoross."; cache `param.destroy_note_desc` on 25582/25584 = the filled text; the sack barrels' param = "You may win another barrel from Tempoross and buy another fish sack from Alry at Molch lake."; title = `param.destroy_note_title` default "Are you sure you want to destroy this item?" | fish barrel: the empty text when the store is empty, else the item's param; sack barrels: their param; title from the param |
@@ -27,9 +28,9 @@ Check's chatbox message box and showed "?" on OpenRune; and a barrel could not b
 
 ## Caveats and guesses
 - Guess: the plugin test's line breaks inside the list ("3 x Raw<br>shrimps") are the box's wrapping; our
-  `mesbox` wraps the same way (TextAlignment, 470 px), so the joined list is sent without manual breaks.
-- Guess: more than ten fish types continue in a second message box without the header (the box holds two pages
-  and the server can't page further). The official split is unknown; ten types of raw fish at once is rare.
+  `objbox` wraps the same way (TextAlignment's chat page width), so the joined list is sent without manual breaks.
+- Guess: more than eight fish types continue in a second item box without the header (the box holds two pages
+  and the server can't page further). The official split is unknown; eight types of raw fish at once is rare.
 - Guess: barrels share one store (wiki: "the items will share their inventory"), so destroying one of two barrels
   keeps the contents; they go with the last one.
 - Guess: the full message is sent on Fill when the barrel is already full. The wiki doesn't say which action sends
@@ -46,10 +47,17 @@ local transcripts (`re/ref/rsprox/txt/`) have no barrel either. No recording exi
 wiki, the cache and the two plugins, and the layout details marked as guesses stay guesses.
 
 ## Tests
-- `FishBarrelMessagesTest` (unit): empty text, one type, several types comma separated, the split after ten types,
+- `FishBarrelMessagesTest` (unit): empty text, one type, several types comma separated, the split after eight types,
   the full and empty-destroy texts.
-- In game (desktop, branch server): Check on an empty barrel and on one holding fish (message box, no game
-  messages), Fill on a full barrel, Destroy with No then Yes on the empty and filled barrel.
+- In game (desktop RuneLite, branch server at 4e2d4562a, devtools data tools; evidence
+  `re/evidence/fish-barrel-check-and-destroy/`): Check on an empty barrel: 193:2 "The barrel is empty." with item
+  25582, chat type MESBOX only. After Fill with 3 shrimps and 2 anchovies: "The barrel contains:<br>2 x Raw
+  anchovies, 3 x Raw shrimps". Fill on a full barrel (28): GAMEMESSAGE "The barrel is full. It may be emptied at a
+  bank.". Destroy on the filled barrel: interface 584 with item 25582, "Fish barrel", the filled note; No keeps
+  the barrel and its 28 fish; Yes removes it. A new Open fish barrel (25584) then shows the empty note on Destroy
+  ("You may win another barrel from Tempoross."), so the store went with the last barrel, and Yes removes it;
+  Check on it shows "The barrel is empty." with item 25584. The first build used the plain message box
+  (interface 229); this check is what showed the official box is 193 (objectbox).
 
 ## PR split
 One fix, no dependencies.
