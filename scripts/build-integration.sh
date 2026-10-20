@@ -22,7 +22,7 @@ tools="${prefix}local/integration-tools"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 git show "$tools:integration.txt" > "$tmp/list"
-gitdir=$(git rev-parse --git-dir)
+gitdir=$(git rev-parse --git-common-dir)   # rerere reads the common dir, also in a worktree
 mkdir -p "$gitdir/rr-cache"
 if git cat-file -e "$tools:scripts/integration-rr-cache" 2>/dev/null; then
     git archive "$tools" scripts/integration-rr-cache | tar -x -C "$tmp"
