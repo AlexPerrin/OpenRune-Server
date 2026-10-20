@@ -48,7 +48,8 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   `gameframe_stone_before_fullscreen` 65447 on varp `gameframe_state` 65471; merge e551ba7ce brings in main
   829b9477d and uses #315's `Gameframe.isGameplay`, so the PR is now only the stone restore.
 - Audited rewrites (sd23, 2026-10-19, each one commit on main 731fd392a, waiting for QA and then the user's
-  approval upstream): `acc/cannon` 0d0190f3c (replaces #354; timer mcannon_fire 65535), `acc/genie` 7a2316ea9
+  approval upstream): `acc/cannon` bc243d141 (on main 829b9477d; replaces #354; timer mcannon_fire 65535; upstream gate FAIL on PR text
+  only, text fixed by sd31 2026-10-20, re-gate next), `acc/genie` 7a2316ea9
   (fork #18, replaces #355; timers 65534/65533), `fix/rune-pouch-accuracy` bee197ba9 (fork #17, follow-up to
   merged #356). #357 (plank sack) merged as is; its sourced gaps are backlog items.
 - `fix/fish-barrel-check-and-destroy` (sd26, 2 commits on main 829b9477d, head 4e2d4562a): FishBarrelScript Check opens

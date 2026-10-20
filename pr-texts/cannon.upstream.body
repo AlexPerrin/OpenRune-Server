@@ -4,7 +4,7 @@ Fork PR (same branch, for browsing): https://github.com/AlexPerrin/OpenRune-Serv
 
 The dwarf multicannon could not be set up. This adds it, in a new module `content/other/dwarf-multicannon`, and Nulodion's "I've lost my cannon." in `dwarven-mine`. Content area from #353. This push replaces the first version with a rewrite checked against the OSRS Wiki, on current `main` (`829b9477d`).
 
-New module `content/other/dwarf-multicannon`, and Nulodion's "I've lost my cannon." in `dwarven-mine`:
+What it does:
 - **Set-up** of the base, stand, barrels and furnace, 2, 2, 3 and 3 ticks apart from the click (our timing), on a free 3x3 with the player at the centre. It needs the Dwarf Cannon quest (wiki, Assembly; through `QuestRequirements`, so the default assume-completed mode allows it). The tick after the furnace, it loads up to 30 balls from the inventory ("You load the cannon with 30 cannonballs."; ours, see Caveats). The OSRS varps that client plugins read are set: `dropcannon` stage, `rockthrower` ammo, `ownedmcannon` coord, `mcannon_world` (the world number modulo 128: the varbit is 7 bits, and the client's buff bar script `buff_bar_get_value` compares it with `map_world % 128`), `mcannon_decayed`, and `mcannonmulti` = `1 << 20` while firing (our value, see Caveats).
 - **Fire** loads and starts the barrel turning one direction a tick (8 per revolution). Left-click on a firing cannon tops it up (wiki, 20 February 2014). **Load X** (wiki, 24 September 2025: a Load X option adds a custom amount, set in the settings menu; the client's settings script reads it from `option_cannonballs_load_x`): the first use asks "Set load-x cannonballs (1 - 30):" and stores the amount in that varbit with "You will now load N cannonballs when using Load-x.", then loads that many each time. **Empty** (wiki, 8 February 2018): "You unload your cannon and receive Steel cannonball x N.".
 - **Targets** (wiki, Targets and Revolutions): each direction has a target region. Straight directions cover the 3-wide column beyond the cannon, diagonals the quadrant beyond its corner. They overlap on the rows and columns one tile off the centre lines, so a monster there is shot twice a revolution: the double-hit tiles RuneLite's Cannon plugin draws. Tiles under the cannon are never shot. A target needs line of sight from the cannon's 3x3. Large monsters are targeted by their south-west tile. In single-way combat, while the owner is under attack, it fires only at the attacker.
@@ -39,9 +39,9 @@ New server-only gameval: timer `mcannon_fire`, written as `-1` and assigned by `
 
 `NulodionCannonSaleTest` (+1): a lost cannon is replaced with four parts and keeps its ball count.
 
-On this branch: `spotlessCheck` and `integration` of `dwarf-multicannon` and `dwarven-mine` after `freshCache` and `buildCache`: RESULTS_PENDING. `tools/scripts/fix_gameval_conflicts.py --check`: no conflicts.
+On this commit, on our fork's CI: `./gradlew assemble test integration` after generating the cache and gameval sources, and a boot to "Server ready", pass; `spotlessCheck` passes. `tools/scripts/fix_gameval_conflicts.py --check`: no conflicts.
 
-In game (desktop RuneLite on a branch server, members account, Lumbridge cows, on the previous commit; this one changes the XP cap and the no-ammo message): the four stage lines 2, 2, 3 and 3 ticks apart, then "You load the cannon with 30 cannonballs."; `dropcannon` 4, `rockthrower` 30, `ownedmcannon` the packed coord, `mcannon_world` = world % 128, `mcannonmulti` 1 << 20 while firing; shots at several cows when not under attack; Empty, Load X (prompt once, then that amount), Pick-up with and without room, all with the lines above.
+In game, on this commit (desktop RuneLite on a branch server, a fresh members account, Lumbridge cows, single-way): the four stage lines 2, 2, 3 and 3 ticks apart, then "You load the cannon with 30 cannonballs."; `dropcannon` 4, `rockthrower` 30, `ownedmcannon` the packed coord of the south-west tile, `mcannon_world` = world % 128; shots at several cows and calves when not under attack, at most 16 Ranged XP (before the XP rate) per shot on 8-HP cows; "Your cannon is out of ammo!" when it ran dry; Load X (prompt once, then that amount); with an empty inventory, "You don't have any ammo to load into the cannon."; Empty; the cannon kept through a logout; Nulodion's "still happily parked" branch; Pick-up; RuneLite's Cannon plugin ball count and the Timers & Buffs cannon timer. The 25-minute break, Repair, the decay and Nulodion's replacement are covered by the integration tests.
 
 Steps to repeat:
 1. Set up with the four parts and some balls: four stage messages at 2, 2, 3 and 3 ticks, then "You load the cannon with 30 cannonballs." The RuneLite Cannon plugin shows the ball count over the cannon, and Timers & Buffs starts its cannon timer.
@@ -53,12 +53,12 @@ Steps to repeat:
 
 ## Checklist
 
-- [ ] Builds and the server boots (our QA gate checks this before the PR is updated)
+- [x] Builds and the server boots
 - [x] Tests only cover complex logic and anything that moves items (no dupes)
 - [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
 - [x] State in varbits/varps, not attrs
 - [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the deviations are listed below, not in `docs/quirks.md`
-- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): we have no dumps of the official game
+- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): none of the RSProx recordings we have (rsprox.net database) shows a player cannon, so the timings and lines not on the wiki are listed as guesses below
 - [x] No unrelated or hand-edited generated changes
 
 ## Screenshots / notes for reviewers

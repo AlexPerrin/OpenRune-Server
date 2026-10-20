@@ -8,7 +8,8 @@ Breaking/Decay/Death; Prohibited areas; Changes), "Cannonball", "Cannon base", "
 cache (locs 6-9 and 14916, objs 2/6/8/10/12, varps 2-4, varbits 13672/1968/2180/6015, seq 827); RuneLite's
 Cannon, Timers & Buffs and the hub Supplies Tracker (secondary). Correction (2026-10-19): an earlier draft cited
 an rsprox capture of the official game for set-up timing, auto-load, Load X and Empty wording and
-`mcannonmulti`; no such capture exists (we never connect to Jagex servers). Those items are guesses.
+`mcannonmulti`; none of the RSProx recordings we have (rsprox.net database) shows a player cannon (swept
+2026-10-19), so these items are guesses.
 
 ## Upstream first
 `gh pr list --search cannon` (2026-10-18): #354 (ours, draft, no review comments) and #329 (merged: adds
