@@ -1,0 +1,53 @@
+## Summary
+
+Two gaps in ground item timers:
+
+- **Drops all use the loot timers.** `HeldInteractions` dropped every item with `constants.lootdrop_duration` (200 ticks) and `ObjRepository.DEFAULT_REVEAL_DELAY` (100), so a dropped item vanished after 2 minutes and untradeables became visible to other players after 1 minute. The wiki's [Drop](https://oldschool.runescape.wiki/w/Drop) page: tradeables appear to others after 60 seconds and disappear 120 seconds later; untradeables disappear after 180 seconds; clue scrolls after 61 minutes. A manual drop now gets:
+  - tradeable (the cache's Grand Exchange flag `stockmarket`; noted items use their base item): private for 100 ticks, despawns after 300;
+  - untradeable: never public, despawns after 300;
+  - clue scrolls, challenge scrolls and the Mimic ([Guide:Clue Juggling](https://oldschool.runescape.wiki/w/Guide:Clue_Juggling): "Dropped clue / challenge scrolls and Mimics despawn in exactly 61 minutes"): never public, despawns after 6100.
+  
+  `ItemServerType.tradeable` can't be used: it defaults to `true` and reads `true` at runtime even for items the cache marks untradeable (a dropped trowel came out public). `player.lootDropDuration` still overrides the duration, and the drop hooks (wilderness) still apply.
+- **OBJ_ADD sent no timers.** Every OBJ_ADD had `timeUntilPublic`, `timeUntilDespawn`, `ownershipType` and `neverBecomesPublic` at 0/false. RuneLite builds its ground item timers from these (`TileItem.getDespawnTime()`/`getVisibleTime()`: Ground Items' despawn timer, the Clue Scroll Juggling plugin), so they showed nothing. `ObjRepository` now stores the reveal and despawn cycles on the `Obj`, and `ZoneUpdateTransformer` sends them:
+  - to the receiver while the obj is private: ownership self, both timers counted down to the send tick, `neverBecomesPublic` when it has a despawn but no reveal;
+  - at the reveal (others only, as before): ownership other, the remaining despawn time;
+  - when re-sent after the reveal: ownership other, also to the original receiver;
+  - objs without a duration (map spawns): all 0, as before.
+
+## Type of change
+
+- [x] Bug fix
+- [ ] New content (skill, quest, boss, area, interface)
+- [x] Engine / API change
+- [ ] Cache / gamevals / pack data
+- [ ] Docs / tooling
+
+## How it was tested
+
+- `api:registry`: new `ObjAddTimersTest` (unit): a fresh tradeable drop is sent as 100/300/self; an untradeable one as 0/300/self/never public; a re-send 51 ticks later as 49/249; the reveal as 0/200/other; a re-send after the reveal as other with the remaining time; a server obj as all 0.
+- `api:player`: new `PlayerDropTimersTest` (unit): GE-tradeable 300/100; not GE-tradeable 300/never (even with `tradeable=true`); every clue and challenge scroll tier and the Mimic 6100/never; "Clue scroll", "Clue scroll (special)" and "Scroll box (easy)" keep the untradeable timers.
+- In game, desktop RuneLite against this branch (recorded through RSProx): dropped bronze axe and noted bronze axes were sent with `reveal=100, despawn=300, ownership=self` and deleted 299 ticks after the drop tick, as in the official recordings; a dropped Clue scroll (easy) was sent with `despawn=6100, neverturnpublic=true` and stayed. The first run sent the trowel as tradeable, which is how the `tradeable` flag problem showed up; the fix is covered by the unit test.
+
+## Checklist
+
+- [x] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes): the drop timers and the packet fields
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps: tradeability from the cache; clue items by their cache names (no param or category covers exactly the clue, challenge scrolls and Mimic, see notes)
+- [x] State in varbits/varps, not attrs: no new state besides the obj's own timers
+- [x] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): deviations are listed below; `docs/quirks.md` holds engine design notes, so none were added there
+- [x] New content checked against rsprox dumps where possible: OBJ_ADD values and despawn ticks match the recordings listed below
+
+## Screenshots / notes for reviewers
+
+RSProx recordings (rsprox.net) of the official game, rev 225-231, all OBJ_ADD/OBJ_DEL for drops (if_button7 on 149:0): tradeable drops are `reveal=100, despawn=300, ownership=self, neverturnpublic=false` and are deleted 299 ticks after the drop tick (recordings 1621, 91, 1718, 3056); untradeable drops `despawn=300, self, neverturnpublic=true` (73, 1694, 1702, 91); beginner and hard clue drops `despawn=6100, self, true` (91, 1702). A private item re-sent later has both timers counted down (73: `reveal=49, despawn=249`); after the reveal it comes back as `ownership=other` with the remaining despawn time, also to the player who dropped it (73). The owner gets no packet at the reveal. Map spawns send all fields at 0.
+
+Clue items are matched by name ("Clue scroll (tier)", "Challenge scroll (tier)", "Mimic"). The tier categories and tier params also hold the step caskets, and param 623 misses the beginner and master scrolls and the elite challenge scrolls while it matches X Marks the Spot and Song of the Elves quest scrolls.
+
+Not covered here:
+- NPC loot: the official server sends `reveal=100, despawn=200` for tradeable loot and never reveals untradeable loot (`neverturnpublic=true`). The packet now reports what the server does, but untradeable NPC loot still turns public after 100 ticks; that's a separate fix.
+- Untradeable timers pausing while logged out and following the player across worlds; the 20-hour playtime rule; table items (9 min); random event rewards (3 h).
+- A stackable drop merged into an existing private stack resets the stack's timers (existing behaviour, TODO in `ObjRepository`). OBJ_COUNT has no timer field, so the client keeps the first drop's timer.
+- `ObjRegistry.singleCopy` drops `ownerId`, and `ItemServerType.tradeable` reads true for untradeables (existing, unchanged; death drops and shops read it too).
+- OBJ_ADD opflags stay `OpFlags.ALL_SHOWN` (-1); the official server sends 31.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

@@ -15,6 +15,7 @@ it is gone 120 s later (official: 61 min), and an untradeable drop turns public 
 |---|---|---|---|
 | Tradeable drop | Wiki, Drop: "Tradeable items appear to other players 60 seconds (one minute) after being dropped, and disappear after another 120 seconds"; RSProx below: reveal=100, despawn=300 | public at 100, gone at 200 | private for 100 ticks, despawns at 300 |
 | Noted items | Cache: certs carry the base item's tradeability through `certlink`; RSProx: noted drops not recorded | as above | tradeability read from the uncerted type |
+| Tradeable = which flag | Cache: trowel 676 `tradeable=false, stockMarket=false`, bronze axe `stockMarket=true`. At runtime `ItemServerType.tradeable` read true for the trowel (field default `true`; the codec never cleared it), so the trowel was dropped as tradeable on the first in-game run | - | the cache's `stockmarket` (Grand Exchange) flag |
 | Untradeable drop | Wiki, Drop: "Untradeable items disappear after 180 seconds (three minutes)"; RSProx: despawn=300, neverturnpublic=true, no reveal | public at 100, gone at 200 | never public, despawns at 300 |
 | Clue scrolls, challenge scrolls, Mimic | Wiki, Drop: "Clue scrolls disappear after 61 minutes"; Guide:Clue Juggling: "Dropped clue / challenge scrolls and Mimics despawn in exactly 61 minutes"; RSProx: despawn=6100, neverturnpublic=true (beginner and hard clues) | gone at 200 | never public, despawns at 6100 (61 min) |
 | Which items are clue items | Cache names: "Clue scroll (beginner/easy/medium/hard/elite/master)", "Challenge scroll (medium/hard/elite)", "Mimic" (23184 `trail_mimic_casket`). No param or category covers exactly these: the tier categories (46/47/51/750) and tier params (347-350) also hold the step caskets, param 623 misses beginner/master/elite challenge and also hits X Marks the Spot and Song of the Elves quest scrolls | - | display name matches `(Clue|Challenge) scroll (<tier>)`, or is "Mimic". Leaves out 713 "Clue scroll" (`cert_display_tea`), the SotE "Clue scroll" items and "Clue scroll (special)" |
@@ -41,7 +42,9 @@ it is gone 120 s later (official: 61 min), and an untradeable drop turns public 
   displayed timer keeps the first drop's time. No recording of a merged re-drop was found.
 - Guess: scroll boxes keep the 3-minute untradeable timer (wiki, Scroll box). Step caskets ("Casket (tier)") and the
   elite puzzle box: the wiki doesn't say; they get the untradeable timer.
-- Found on the way, not fixed: `ObjRegistry.singleCopy` and `ZoneUpdateTransformer.copy` drop `ownerId`.
+- Found on the way, not fixed: `ObjRegistry.singleCopy` and `ZoneUpdateTransformer.copy` drop `ownerId`;
+  `ItemServerType.tradeable` reads true at runtime for untradeables (other users: death drops, shops); items tradeable between
+  players but not on the GE get the untradeable timers here.
 - Not covered: GIM-owned items (ownership 3); no group storage of observer ids in the protocol code.
 - Leagues recording 91 shows one area with `despawn=18000` drops (y ~6437); a league rule, ignored.
 
@@ -58,10 +61,15 @@ scroll and Mimic drops, noted drops, GIM items, another player's drop in its pri
 ## Tests
 - `ObjAddTimersTest` (api/registry, unit): fresh tradeable 100/300/self/false; untradeable 0/300/self/true; re-send
   at +51 gives 49/249; reveal gives 0/200/other; re-send after reveal 176/other; server obj 0/0/none/false.
-- `PlayerDropTimersTest` (api/player, integration, through `invDrop`): bronze axe private until 100 then public,
-  gone at 300; noted bronze axe 100/300; trowel never public, gone at 300; beginner clue never public, gone at 6100;
-  medium challenge scroll 6100.
-- In game (desktop RuneLite, branch server): see the hand-over evidence.
+- `PlayerDropTimersTest` (api/player, unit): tradeable 300/100, untradeable 300/never, each clue and challenge
+  scroll tier and the Mimic 6100/never, and the look-alike names ("Clue scroll", "Clue scroll (special)", "Scroll
+  box (easy)") stay on the untradeable timers. Noted items and the tick-by-tick despawn are checked in game.
+- In game (desktop RuneLite through RSProx, branch server at 9a93f61ef; `re/evidence/ground-item-despawn-times/`):
+  OBJ_ADD for bronze axe and noted bronze axe `reveal=100, despawn=300, ownership=self, neverturnpublic=false` at
+  tick 184, OBJ_DEL at 483 (+299, as official); Clue scroll (easy) `despawn=6100, self, true`, still on the ground
+  after the axes went. The trowel came out tradeable (`reveal=100`), which found the `tradeable` flag problem above;
+  8bc126d49 uses `stockmarket`, checked by the unit test, not re-run in game (desktop needed by other agents).
+- Seen, not changed: OBJ_ADD opflags are `OpFlags.ALL_SHOWN` (-1), official 31 (0b11111); upstream's existing value.
 
 ## PR split
 One change: the drop timers and the OBJ_ADD fields that report them (without the second the first can't be seen in
