@@ -24,6 +24,7 @@ fix/75-coal-bag-messages
 fix/76-obj-add-timers
 fix/rune-pouch-accuracy
 fix/edgeville-general-store-stock
+fix/stile-approach
 # Content
 content/dragon-specials
 content/reconnect-login
