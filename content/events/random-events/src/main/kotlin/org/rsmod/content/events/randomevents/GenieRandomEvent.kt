@@ -1,6 +1,10 @@
 package org.rsmod.content.events.randomevents
 
+import dev.openrune.ServerCacheManager
+import dev.openrune.rscm.RSCM.asRSCM
+import dev.openrune.rscm.RSCMType
 import dev.openrune.types.NpcMode
+import dev.openrune.types.aconverted.SpotanimType
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import org.rsmod.api.attr.AttributeKey
@@ -12,6 +16,7 @@ import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.random.GameRandom
 import org.rsmod.api.repo.npc.NpcRepository
 import org.rsmod.api.repo.obj.ObjRepository
+import org.rsmod.api.repo.world.WorldRepository
 import org.rsmod.api.script.onCommand
 import org.rsmod.api.script.onOpHeld1
 import org.rsmod.api.script.onOpNpc1
@@ -36,6 +41,7 @@ class GenieRandomEvent
 constructor(
     private val npcRepo: NpcRepository,
     private val objRepo: ObjRepository,
+    private val worldRepo: WorldRepository,
     private val collision: CollisionFlagMap,
     private val mapClock: MapClock,
     private val random: GameRandom,
@@ -122,7 +128,11 @@ constructor(
         npc.respawns = false
         npc.assignSpawnOwner(player, mapClock.cycle)
         npc.facePlayer(player)
+        npc.anim(WAVE)
         npc.say("Greetings, ${title(player)} ${player.displayName}!")
+        smokePuff(npc.coords)
+        worldRepo.soundArea(npc.coords, ARRIVE_SOUND, radius = SOUND_RADIUS)
+        worldRepo.soundArea(npc.coords, PUFF_SOUND, radius = SOUND_RADIUS)
         player.softTimer(GENIE_TIMER, CALL_INTERVAL)
         genies[player] = Genie(npc, mapClock.cycle + LIFETIME_TICKS)
         return npc
@@ -163,6 +173,7 @@ constructor(
             npc.teleport(collision, besideTile(owner.coords))
         }
         npc.facePlayer(owner)
+        npc.anim(WAVE)
         val name = "${title(owner)} ${owner.displayName}"
         npc.say(random.pick("Hello, $name?", "Ehem... $name?", "I'm waiting for you, $name!"))
         owner.softTimer(GENIE_TIMER, CALL_INTERVAL)
@@ -191,11 +202,8 @@ constructor(
                     "summoned me. Please take this lamp and make your wish.",
             )
         }
-        if (genies[player]?.npc === npc) genies.remove(player)
-        leave(npc)
     }
 
-    // Lamp first, leave on a timer: an interrupted dialogue must lose neither.
     fun handOver(player: Player): Boolean {
         val genie = genies[player]
         if (genie == null || genie.handedOver) return false
@@ -203,6 +211,7 @@ constructor(
         genies[player] = genie.copy(leaveCycle = leaveCycle, handedOver = true)
         player.softTimer(GENIE_TIMER, HAND_OVER_TICKS)
         player.invAddOrDrop(objRepo, LAMP, duration = FULL_INV_DROP_TICKS)
+        player.mes("Your reward is: <col=ff0000>1</col> x <col=ff0000>Lamp</col>.")
         return true
     }
 
@@ -221,11 +230,21 @@ constructor(
         val xp = statBase(stat) * LAMP_XP_PER_LEVEL
         if (invDel(inv, LAMP).failure) return
         statAdvance(stat, xp.toDouble())
-        mes("Your wish has been granted!")
+        soundSynth(WISH_SOUND)
+        val skill = ServerCacheManager.getStats(stat.asRSCM(RSCMType.STAT))?.displayName
+        mesbox("Your wish has been granted!<br>You have been awarded $xp $skill XP!")
     }
 
     private fun leave(npc: Npc) {
-        if (npc.isSlotAssigned) npcRepo.del(npc, Int.MAX_VALUE)
+        if (!npc.isSlotAssigned) return
+        val coords = npc.coords
+        npcRepo.del(npc, Int.MAX_VALUE)
+        smokePuff(coords)
+        worldRepo.soundArea(coords, PUFF_SOUND, radius = SOUND_RADIUS)
+    }
+
+    private fun smokePuff(coords: CoordGrid) {
+        worldRepo.spotanimMap(SpotanimType(SMOKE_PUFF.asRSCM(RSCMType.SPOTANIM)), coords, SMOKE_HEIGHT)
     }
 
     private fun besideTile(centre: CoordGrid): CoordGrid {
@@ -268,9 +287,17 @@ constructor(
         val NEXT_EVENT_AT = AttributeKey<Number>(persistenceKey = "random_event_next_at")
 
         const val LIFETIME_TICKS = 100
-        const val HAND_OVER_TICKS = 20
-        const val CALL_INTERVAL = 20
+        const val HAND_OVER_TICKS = 10
+        const val CALL_INTERVAL = 10
         const val LAMP_XP_PER_LEVEL = 10
+
+        const val WAVE = "seq.emote_wave"
+        const val SMOKE_PUFF = "spotanim.smokepuff"
+        const val SMOKE_HEIGHT = 124
+        const val ARRIVE_SOUND = "synth.macro_genie_appear"
+        const val PUFF_SOUND = "synth.smokepuff"
+        const val WISH_SOUND = "synth.found_gem"
+        const val SOUND_RADIUS = 7
 
         const val CHECK_INTERVAL = 500
         const val BUSY_RETRY_INTERVAL = 1
