@@ -1,8 +1,81 @@
 # QA: fix/57-gameframe-fullscreen-map
 - Branch: `fix/57-gameframe-fullscreen-map`
-- Commit: `e551ba7cea4cc638ff3c6ca6923fc45f2f519d93`
-## Upstream gate: **FAIL**
+- Commit: `113b4bbac39dd3d100658765d0281a73f536747b`
+## Upstream gate: **PASS**
 ## Internal gate: N/A (dev-checked)
+
+Re-gate by sq25 on 2026-10-19 at 113b4bbac (sd24's fix for the FAIL at e551ba7ce, kept below as history; the
+user chose option (a): write `resizable_stone_arrangement` only between `isGameplay` frames, drop the saved-state
+varbit). The commit is **not on GitHub** (the fork branch backs upstream #362, whose head and fork PR #5 are still
+d3a194b9e; it goes up only after this PASS and the user's OK): fetched read-only from sd24's clone
+(`re/agents/sd24/or`, worktree w57) into `re/agents/sq25/or`, gated in `re/agents/sq25/r-57` (`origin/main` =
+upstream `main` 829b9477d, still the tip). **No fork CI applies, so the local gate replaces it.** Text
+`pr-texts/gameframe-fullscreen-map.{title,upstream.body,comment}` read from sd24's docs worktree at aac2488f1.
+
+## Accuracy: RSProx recording 3204 (rev 232.1), re-read at the source
+`re/ref/rsprox/txt/3204.txt`:
+- `if_opentop` lines 3884 (login -> 165, welcome screen), then nine switches between 161/164 and 165: 4035
+  (165->161), 11164, 23923, 24267, 24348, 27021, 30760 (161<->165, Oculus orb), 34550 (164->165), 34610 (165->164).
+  One gameplay switch: 34437 (161->164, tick 5917).
+- `resizable_stone_arrangement` (4607, varp 1055 bit 8, cache LIVE) appears once: line 34434, tick 5917, old=0
+  new=1, after `settings_side:display_dynamic_setting_1_buttons (116:40), sub=3` at tick 5916 and just before the
+  161->164 `if_opentop`. It never changes on any switch to or from 165.
+- No interface 595 (world map) anywhere in the recording.
+- Correction to my first record: it said "eight times"; the count is nine switches between 161/164 and 165
+  (ten including the login `if_opentop`), as the commit message and PR text say.
+
+The code now matches it: `changeGameframe` writes the flag only when `dest.resizable && from.isGameplay &&
+dest.isGameplay`, so moves into and out of 165 leave it alone. Login with a saved non-gameplay frame still falls
+back by `selectFallback(ui.frameResizable, stoneArrangements)`, i.e. on the unchanged flag. Remaining gap (in the
+PR's known gap): no recording opens the fullscreen world map itself; the rule comes from the same top level 165.
+
+## Build (local gate in place of CI)
+`openrune/upstream/qa/qa.sh gate` (`GATE_VOL=sq25-gradle`), logs `re/agents/sq25/r-57.logs/` (commit file
+113b4bbac39d...): 1a-compile 17s, 1-cache 63s, 2-buildcache, 2b-rsa, 7-install 17s, 3-spotless 17s, 4-assemble
+52s, 5-test 72s (**764 tests, 0 failures**), 6-integration 102s (**79 tests, 0 failures**), all rc=0; test-results
+written 21:40-21:42 (after the gate's `clean`). Boot (sq25-or-server, 43597): "Server ready in 10.4s", no
+Exception/ERROR line through the in-game session. `fix_gameval_conflicts.py --check`: "No gameval conflicts or
+unassigned IDs found."
+
+## In game (desktop RuneLite, fresh account `sq25gf2`, branch server 43597, desktop lock 21:48-21:59)
+4607 with `get_var`, top level with `list_interfaces`, the fullscreen map via the orb (`orbs:worldmap`
+"Fullscreen World Map"), closed with 595:38, logout by the `logout:logout` CC_OP.
+- Login: 161, 4607 = 1 (account default). Map open: 165, 4607 = 1. Close: 161, 4607 = 1.
+- `::varbit resizable_stone_arrangement 0`: 4607 = 0. Map open: **165, 4607 = 0**. Close: 161, 4607 = 0.
+- `get_var_history` for 4607 over both cycles: only the login value (1) and the `::varbit` change (1 -> 0); no
+  change on any map open or close (at e551ba7ce it went 0 -> 1 -> 0).
+- 4607 = 0, map open, logout, login: 161, 4607 = 0.
+- `::varbit gameframe_toplevel 165`, logout, login: 161, 4607 = 0 (the fallback uses the kept flag).
+- Not tried: closing the map to a fixed frame (as the text says).
+
+## Scope, conventions
+Net diff against `main` 829b9477d: one line in `GameframeScript.kt`. Since e551ba7ce: `gameframe_vars.toml`, the
+two gamevals lines, `stoneBeforeFullscreen`, `restoreStoneArrangement` and the `onPlayerLogout` hook removed
+(+1/-38). On current `main` (merge commit, no rebase). `fix:` subject, Alex Perrin (noreply), Co-Authored-By. No
+test (interface wiring), no comments added. Only #362 touches the gameframe (`gh pr list --search gameframe` and
+`stone`).
+
+## PR text, title and comment (pr-text-review)
+- Title `fix: keep the classic/modern stone choice across the fullscreen world map`: true of the commit.
+- Body: every template section present; data sources (recording 3204); known gap; release note; Claude Code line.
+  Problem paragraph describes `main` correctly (map opens write 1; close to a resizable frame rewrites; fixed
+  close and logout don't). The 3204 paragraph (nine switches, 4607 unchanged on all, one change 0 -> 1 before
+  161 -> 164 after the settings pick) and "no recording opens 595" match the transcript above. History paragraph
+  (varbit, varp, logout hook gone; "the one condition in `changeGameframe`") matches the diff. Gate line
+  (764/0, 79/0, boot, `--check`) matches my local gate at this commit. Every in-game line matches this record.
+  The rsprox item is ticked with what was compared, now true.
+- Note, not a fail: the body's "Fork PR (same branch, for browsing)" link (#5) shows d3a194b9e until the branch
+  is pushed; pushing the branch updates both.
+- `.comment`: true of 113b4bbac (new commit on the merge, no rebase; the review's varbit dropped and why; nine
+  switches; the previous commit still sent 4607 = 1 while the map was open, seen in my first run; removed items
+  match the diff; 764/0, 79/0, spotlessCheck, boot, `--check`; in-game summary matches).
+
+---
+
+## Previous gate at e551ba7ce (voided by 113b4bbac; kept as history)
+
+Its header was: # QA: fix/57-gameframe-fullscreen-map / - Branch: `fix/57-gameframe-fullscreen-map` / - Commit: `e551ba7cea4cc638ff3c6ca6923fc45f2f519d93` / ## Upstream gate: FAIL / ## Internal gate: N/A (dev-checked)
+
 
 Run by sq25 on 2026-10-19 at the merge commit e551ba7ce (upstream `main` 829b9477d merged into d3a194b9e; backs
 upstream PR #362). The commit is not on GitHub: fetched read-only from sd24's clone (`re/agents/sd24/or`, worktree
