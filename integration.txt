@@ -55,3 +55,4 @@ local/skip-cs2-packs
 local/op-overrides
 local/treasure-trails
 local/integration-tools
+fix/fish-barrel-check-and-destroy
