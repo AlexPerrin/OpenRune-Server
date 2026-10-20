@@ -60,7 +60,7 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   local-auth (token logins, shared RSA key), test-commands, world-settings (members, Lumbridge
   start, 1x XP, no clans), skip-cs2-packs, treasure-trails (ours while upstream writes its own clue
   scrolls; ids renumbered, varp names unchanged; dbrow trail_emote_seq_14 63892, off fix/25's
-  60920), romeo-juliet (= fin/romeo-juliet; ours until upstream #299 merges, then drop it, since both
+  60920; Check steps names the tier, 48b320359, accuracy/clue-check-steps-tier.md), romeo-juliet (= fin/romeo-juliet; ours until upstream #299 merges, then drop it, since both
   bind Romeo, Juliet and the Apothecary), integration-tools.
 
 ## Ids and saved data
