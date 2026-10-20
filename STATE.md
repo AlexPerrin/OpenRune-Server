@@ -51,6 +51,11 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   approval upstream): `acc/cannon` 0d0190f3c (replaces #354; timer mcannon_fire 65535), `acc/genie` 7a2316ea9
   (fork #18, replaces #355; timers 65534/65533), `fix/rune-pouch-accuracy` bee197ba9 (fork #17, follow-up to
   merged #356). #357 (plank sack) merged as is; its sourced gaps are backlog items.
+- `fix/fish-barrel-check-and-destroy` (sd26, 2 commits on main 829b9477d, head 4e2d4562a): FishBarrelScript Check opens
+  the item box (objectbox 193, read by the Fish Barrel hub plugin at 193:2) instead of game messages; Destroy (op 5)
+  works (was swallowed); Fill on a full barrel sends the wiki's full message. No new ids. Spec
+  accuracy/fish-barrel-check-and-destroy.md; no RSProx recording of the barrel exists. Fork PR to be opened by the
+  orchestrator (pr-texts/fish-barrel-check-and-destroy.*).
 - `local/*`: never upstream. android (our RSProt build, Android client type, mobile toplevel),
   local-auth (token logins, shared RSA key), test-commands, world-settings (members, Lumbridge
   start, 1x XP, no clans), skip-cs2-packs, treasure-trails (ours while upstream writes its own clue
