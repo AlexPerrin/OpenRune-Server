@@ -54,3 +54,4 @@ local/skip-cs2-packs 5c7515cb90beafaede81a290dd876ec956c4f183
 local/op-overrides 46bc3ab31d147910709f4c94253add75ef5f2cb6
 local/treasure-trails 48b320359a91f9f0974c1ffc562e510c315bacf5
 fix/ground-item-despawn-times 8bc126d4937ef0c813aea42cc1d1e6e5d9d204e5
+content/goblin-diplomacy-unstacked d77ac2b76eefe47211f4d15138563c19ddf19bfd
