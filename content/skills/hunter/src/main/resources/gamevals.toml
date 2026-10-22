@@ -1,0 +1,46 @@
+[gamevals.dbtable]
+# implings
+
+# bird houses
+
+# traps
+
+# herbiboar
+
+# butterflies
+hunter_butterflies = 56012
+
+# rumours
+
+[gamevals.dbrow]
+# implings
+
+# bird houses
+
+# traps
+
+# herbiboar
+
+# butterflies
+hunter_butterfly_ruby_harvest = 60281
+hunter_butterfly_sapphire_glacialis = 60282
+hunter_butterfly_snowy_knight = 60283
+hunter_butterfly_black_warlock = 60284
+hunter_butterfly_sunlight_moth = 60285
+hunter_butterfly_moonlight_moth = 60286
+hunter_butterfly_moonlight_moth_low_wander = 60287
+
+# rumours
+
+[gamevals.timer]
+# implings
+
+# bird houses
+
+# traps
+
+# herbiboar
+
+# butterflies
+
+# rumours
