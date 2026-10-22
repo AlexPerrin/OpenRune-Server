@@ -1,0 +1,50 @@
+[gamevals.dbtable]
+# implings
+impling_types = 56002
+
+# bird houses
+
+# traps
+
+# herbiboar
+
+# butterflies
+
+# rumours
+
+[gamevals.dbrow]
+# implings
+impling_type_baby = 60152
+impling_type_young = 60153
+impling_type_gourmet = 60154
+impling_type_earth = 60155
+impling_type_essence = 60156
+impling_type_eclectic = 60157
+impling_type_nature = 60158
+impling_type_magpie = 60159
+impling_type_ninja = 60160
+impling_type_dragon = 60161
+impling_type_lucky = 60162
+
+# bird houses
+
+# traps
+
+# herbiboar
+
+# butterflies
+
+# rumours
+
+[gamevals.timer]
+# implings
+
+# bird houses
+
+# traps
+
+# herbiboar
+
+# butterflies
+
+# rumours
