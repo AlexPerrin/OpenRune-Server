@@ -59,12 +59,15 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   works (was swallowed); Fill on a full barrel sends the wiki's full message. No new ids. Spec
   accuracy/fish-barrel-check-and-destroy.md; no RSProx recording of the barrel exists. Fork PR to be opened by the
   orchestrator (pr-texts/fish-barrel-check-and-destroy.*).
-- `fix/ground-item-despawn-times` (sd28 + sd33, 4 commits on main 829b9477d, fork PR #23): player drops use
+- `fix/ground-item-despawn-times` (sd28 + sd33, 4 commits rebased by sd34 onto main e85278c9a (241), fork PR #23): player drops use
   OSRS timers (GE-tradeable 100/300, others never public 300, clue/challenge scrolls and Mimic 6100) and OBJ_ADD
   carries timeUntilPublic/timeUntilDespawn/ownership/neverBecomesPublic, matched to RSProx; the 4th commit (sd33)
   keeps `ownerId` on obj copies (`ObjRegistry.singleCopy`, `ZoneUpdateTransformer.copy`), with tests. Note:
   upstream's `ItemServerType.tradeable` reads true for untradeables at runtime; the drop rule uses `stockmarket`.
-  Spec accuracy/ground-item-despawn-times.md. Unblocks client hub-ground-items-despawn once live.
+  Spec accuracy/ground-item-despawn-times.md. Unblocks client hub-ground-items-despawn once live. CI note: a
+  branch whose game-data actions cache was saved before the 241 bump restores it (the key hashes only
+  game.example.yml) and fails `:or-cache:buildCache` with unresolved 241 CS2 symbols; delete the branch's entry
+  (`gh cache list/delete -R AlexPerrin/OpenRune-Server`) and rerun. Change ci-game-cache-key fixes the key.
 - `local/*`: never upstream. android (our RSProt build, Android client type, mobile toplevel),
   local-auth (token logins, shared RSA key), test-commands, world-settings (members, Lumbridge
   start, 1x XP, no clans), skip-cs2-packs, treasure-trails (ours while upstream writes its own clue

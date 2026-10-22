@@ -48,6 +48,9 @@ it is gone 120 s later (official: 61 min), and an untradeable drop turns public 
   now pass `ownerId`; tests `ObjRegistrySplitOwnerTest` and `ObjAddTimersTest` ("private zone prots keep the
   original owner"). No RSProx comparison: `ownerId` is server-side only (the packet's ownership byte comes from
   `receiverId`/scope and is unchanged).
+- Rebased (sd34, 2026-10-21) onto upstream main e85278c9a (revision 241) with identical patches (`git range-diff`:
+  17d6dedeb=371ea2d6e, 9a93f61ef=fdbc72604, 8bc126d49=16ca4d019, a704e582b=d0fe09c63); no file of this branch was
+  touched by upstream in between. The in-game checks above were run at the pre-rebase commits; their results stand.
 - Found on the way, not fixed: `ItemServerType.tradeable` reads true at runtime for untradeables (other users: death
   drops, shops); items tradeable between players but not on the GE get the untradeable timers here.
 - Not covered: GIM-owned items (ownership 3); no group storage of observer ids in the protocol code.
