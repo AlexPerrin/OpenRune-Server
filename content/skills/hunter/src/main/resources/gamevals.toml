@@ -1,0 +1,48 @@
+[gamevals.dbtable]
+# implings
+
+# bird houses
+birdhouse_types = 56003
+
+# traps
+
+# herbiboar
+
+# butterflies
+
+# rumours
+
+[gamevals.dbrow]
+# implings
+
+# bird houses
+birdhouse_type_normal = 60163
+birdhouse_type_oak = 60164
+birdhouse_type_willow = 60165
+birdhouse_type_teak = 60166
+birdhouse_type_maple = 60167
+birdhouse_type_mahogany = 60168
+birdhouse_type_yew = 60169
+birdhouse_type_magic = 60170
+birdhouse_type_redwood = 60171
+
+# traps
+
+# herbiboar
+
+# butterflies
+
+# rumours
+
+[gamevals.timer]
+# implings
+
+# bird houses
+
+# traps
+
+# herbiboar
+
+# butterflies
+
+# rumours
