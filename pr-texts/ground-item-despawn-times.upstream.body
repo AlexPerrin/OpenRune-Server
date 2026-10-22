@@ -13,6 +13,7 @@ Two gaps in ground item timers:
   - at the reveal (others only, as before): ownership other, the remaining despawn time;
   - when re-sent after the reveal: ownership other, also to the original receiver;
   - objs without a duration (map spawns): all 0, as before.
+- **Obj copies lost their owner.** `ObjRegistry.singleCopy` (a non-stackable drop with count > 1, split into single objs) and `ZoneUpdateTransformer.copy` (the obj kept on private zone prots) built the copy without `ownerId`, so `isOriginalOwner` was false on them. Both pass `ownerId` now.
 
 ## Type of change
 
@@ -24,7 +25,8 @@ Two gaps in ground item timers:
 
 ## How it was tested
 
-- `api:registry`: new `ObjAddTimersTest` (unit): a fresh tradeable drop is sent as 100/300/self; an untradeable one as 0/300/self/never public; a re-send 51 ticks later as 49/249; the reveal as 0/200/other; a re-send after the reveal as other with the remaining time; a server obj as all 0.
+- `api:registry`: new `ObjAddTimersTest` (unit): a fresh tradeable drop is sent as 100/300/self; an untradeable one as 0/300/self/never public; a re-send 51 ticks later as 49/249; the reveal as 0/200/other; a re-send after the reveal as other with the remaining time; a server obj as all 0; the obj on a private zone prot keeps `ownerId` and its timers.
+- `api:registry`: new `ObjRegistrySplitOwnerTest` (unit, loads the cache): three bronze axes dropped as one obj with receiver A and owner B split into three objs that each keep receiver A, owner B and the timers.
 - `api:player`: new `PlayerDropTimersTest` (unit): GE-tradeable 300/100; not GE-tradeable 300/never (even with `tradeable=true`); every clue and challenge scroll tier and the Mimic 6100/never; "Clue scroll", "Clue scroll (special)" and "Scroll box (easy)" keep the untradeable timers.
 - In game, desktop RuneLite against this branch (recorded through RSProx): dropped bronze axe and noted bronze axes were sent with `reveal=100, despawn=300, ownership=self` and deleted 299 ticks after the drop tick, as in the official recordings; a dropped Clue scroll (easy) was sent with `despawn=6100, neverturnpublic=true` and stayed. The first run sent the trowel as tradeable, which is how the `tradeable` flag problem showed up; the fix is covered by the unit test.
 
@@ -47,7 +49,7 @@ Not covered here:
 - NPC loot: the official server sends `reveal=100, despawn=200` for tradeable loot and never reveals untradeable loot (`neverturnpublic=true`). The packet now reports what the server does, but untradeable NPC loot still turns public after 100 ticks; that's a separate fix.
 - Untradeable timers pausing while logged out and following the player across worlds; the 20-hour playtime rule; table items (9 min); random event rewards (3 h).
 - A stackable drop merged into an existing private stack resets the stack's timers (existing behaviour, TODO in `ObjRepository`). OBJ_COUNT has no timer field, so the client keeps the first drop's timer.
-- `ObjRegistry.singleCopy` drops `ownerId`, and `ItemServerType.tradeable` reads true for untradeables (existing, unchanged; death drops and shops read it too).
+- `ItemServerType.tradeable` reads true for untradeables (existing, unchanged; death drops and shops read it too).
 - OBJ_ADD opflags stay `OpFlags.ALL_SHOWN` (-1); the official server sends 31.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

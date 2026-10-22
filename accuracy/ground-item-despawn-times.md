@@ -42,9 +42,14 @@ it is gone 120 s later (official: 61 min), and an untradeable drop turns public 
   displayed timer keeps the first drop's time. No recording of a merged re-drop was found.
 - Guess: scroll boxes keep the 3-minute untradeable timer (wiki, Scroll box). Step caskets ("Casket (tier)") and the
   elite puzzle box: the wiki doesn't say; they get the untradeable timer.
-- Found on the way, not fixed: `ObjRegistry.singleCopy` and `ZoneUpdateTransformer.copy` drop `ownerId`;
-  `ItemServerType.tradeable` reads true at runtime for untradeables (other users: death drops, shops); items tradeable between
-  players but not on the GE get the untradeable timers here.
+- Fixed on the way (second commit round, 2026-10-21): `ObjRegistry.singleCopy` (a non-stackable drop with count > 1
+  split into single objs) and `ZoneUpdateTransformer.copy` (the obj snapshot kept on private zone prots) built the
+  copy without `ownerId`, so the copies lost the original owner (`isOriginalOwner`, the ironman pickup check). Both
+  now pass `ownerId`; tests `ObjRegistrySplitOwnerTest` and `ObjAddTimersTest` ("private zone prots keep the
+  original owner"). No RSProx comparison: `ownerId` is server-side only (the packet's ownership byte comes from
+  `receiverId`/scope and is unchanged).
+- Found on the way, not fixed: `ItemServerType.tradeable` reads true at runtime for untradeables (other users: death
+  drops, shops); items tradeable between players but not on the GE get the untradeable timers here.
 - Not covered: GIM-owned items (ownership 3); no group storage of observer ids in the protocol code.
 - Leagues recording 91 shows one area with `despawn=18000` drops (y ~6437); a league rule, ignored.
 
