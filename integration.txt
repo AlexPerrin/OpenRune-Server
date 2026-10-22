@@ -53,3 +53,4 @@ local/skip-cs2-packs
 local/op-overrides
 local/treasure-trails
 local/integration-tools
+local/spotless-241
