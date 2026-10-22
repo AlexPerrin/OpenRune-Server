@@ -50,5 +50,5 @@ local/world-settings 9e3d5d93f91d29363b71f5ea77a14d4601d23207
 local/skip-cs2-packs 5c7515cb90beafaede81a290dd876ec956c4f183
 local/op-overrides 46bc3ab31d147910709f4c94253add75ef5f2cb6
 local/treasure-trails 48b320359a91f9f0974c1ffc562e510c315bacf5
-fix/ground-item-despawn-times 8bc126d4937ef0c813aea42cc1d1e6e5d9d204e5
+fix/ground-item-despawn-times d0fe09c630e7456433348ee273f3e9cd8353cc82
 local/spotless-241 e6afed4620d1bfecc2cf522a98e3ff00a3477d73
