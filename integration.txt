@@ -29,7 +29,7 @@ content/reconnect-login
 fin/cannon
 fin/genie
 fin/quest-test-fixture
-content/sheep-shearer
+content/quests-sheep-romeo
 local/quest-test-fixture
 local/romeo-juliet
 fin/witchs-potion
