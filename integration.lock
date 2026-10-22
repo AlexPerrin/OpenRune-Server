@@ -14,7 +14,6 @@ fix/36-giant-mole-kill-count f661701058bd8b2be46a476372e40fbf9889e69f
 fix/37-kitten-growth-and-wording e38efb40a12d9a30487f1ff42d508a230ea32f7a
 fix/54-ernest-stage-2 13544cb87384dd9cbd5a2ca4a0b301d0bca5ac2f
 fix/56-misthalin-mystery-mandy-guards 10035c3ea63a67a61588b13bf4bcee36a2b3d0b0
-fix/57-gameframe-fullscreen-map 113b4bbac39dd3d100658765d0281a73f536747b
 fix/59-gertrudes-cat-fluffs 7d4864c59b730370db6db424b8f03ce2b4a1f79d
 fix/63-gertrudes-cat-shilop-line bc1100c30ef7ad26f9dd7a9af94c1f1e537aca7f
 fix/70-missing-mesanims f38f4a79356b8bf01a170cf2cf58d0deb7e8de55
@@ -22,8 +21,6 @@ fix/71-item-config-tradeable ededdf3e65f310b806fa3497b6e8d534a942cb95
 fix/73-heldu-dispatch-order b2f2fbb297dc308a504a2d3d90841d6f824dd33d
 fix/74-bankside-view-op a86998e235e16fa332af0b6e7fc461a8aa1c4ee0
 fix/75-coal-bag-messages 0514e670446a248c5405dc433dfbaa7c77421e43
-fix/rune-pouch-accuracy bee197ba90c7cec7a56e1174651b21662c70bf08
-fix/edgeville-general-store-stock a695b985ffdbfba3fbd8de5306c103b7be61d4e5
 fix/stile-approach 513144d3dfcfcfd5613123bbe3457b952192c384
 fix/fish-barrel-check-and-destroy 4e2d4562a3eeaeeece1e9bffb6c58c36a963aa81
 content/dragon-specials d4d3dde846fa2133f8cf5d9590e8a6c97aae8c85
