@@ -44,8 +44,7 @@ No recording shows the local player doing any Hunter action. What exists:
   (1106 t5298/5300; 350 t1160/1162, t1319/1321 with `_n` 9390). Before a miss the bird teleports onto the trap tile
   (t5117), idles there, the trap fails at t5121 with area sound 2637, the bird is deleted at t5122 with the broken
   loc; the full loc comes with sound 2625. **Result**: locs and the 2-tick trapping->full match the branch; failing->
-  broken was 2 ticks and is now 1 (`FAIL_TICKS`, test "a missed attempt fails the trap and breaks it the next
-  tick"); the bird-on-the-tile sequence, the `_n`/`_s` choice and the sounds (unnamed synths 2637/2625) are caveats
+  broken was 2 ticks and is now 1 (`FAIL_TICKS`; a constant, no test per AGENTS.md); the bird-on-the-tile sequence, the `_n`/`_s` choice and the sounds (unnamed synths 2637/2625) are caveats
   in the traps PR text.
 - **Bird houses, butterflies, Herbiboar, implings, Hunters' Rumours**: no recording (only ambient NPCs, login varbits
   such as `fossil_activity_valleybirdhouse`, bank items, and 1106's clue-scroll visit to the Hunter Guild). Their
@@ -53,7 +52,7 @@ No recording shows the local player doing any Hunter action. What exists:
 - Not Hunter: 468's impling-jar crafting at the Chemist (not in these PRs), 1694's quest Hunter XP.
 
 ## Tests, in-game
-Integration suites per branch (fork CI at each commit): HunterTrapScriptTest 8, BirdHouseScriptTest 11,
+Integration suites per branch (fork CI at each commit): HunterTrapScriptTest 7, BirdHouseScriptTest 11,
 ButterflyScriptTest 6 (7 with rumours), HerbiboarScriptTest 5, ImplingScriptTest 4 + ImplingLootScriptTest 7 +
 CrystalImplingScriptTest 3, HunterRumoursTest 7 + HunterGuildScriptTest 5. Not re-checked in game on these commits:
 traps (lay/catch/Check) and the rumour dialogues were device-checked on earlier builds of the same code

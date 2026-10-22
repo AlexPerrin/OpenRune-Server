@@ -79,9 +79,9 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   60920; Check steps names the tier, 48b320359, accuracy/clue-check-steps-tier.md), romeo-juliet (= fin/romeo-juliet; ours until upstream #299 merges, then drop it, since both
   bind Romeo, Juliet and the Apothecary), integration-tools.
 - Hunter (sd32, 2026-10-21, change hunter-split-ship): `fin/hunter` is retired; the 7 split branches off main e85278c9a are
-  `content/hunter-module` c189c1969 (the shared skeleton, fork #24), `-traps` ce27fa50f (#25; failing->broken now 1 tick per
+  `content/hunter-module` c189c1969 (the shared skeleton, fork #24), `-traps` 92d435055 (#25; failing->broken now 1 tick per
   RSProx 1106), `-bird-houses` 7967d0fc5 (#26), `-butterflies` 53a52d555 (#27), `-herbiboar` 63d44a4a2 (#28; dbrows
-  63874-63891), `-implings` f89a2fd60 (#29), `-rumours` 74cd8efc8 (#30; linear module>traps>herbiboar>butterflies>rumours, no
+  63874-63891), `-implings` f89a2fd60 (#29), `-rumours` 544881bfe (#30; linear module>traps>herbiboar>butterflies>rumours, no
   octopus merge). Every feature branch carries the module commit; rumours re-picks traps/herbiboar/butterflies, so next to
   `-butterflies`/`-herbiboar` in integration it is an add/add conflict on 3 files, resolved in `scripts/integration-rr-cache/`
   (rumours' versions). Spec accuracy/hunter-split-ship.md, texts pr-texts/hunter-*.upstream.body. Upstream: #63 open, no

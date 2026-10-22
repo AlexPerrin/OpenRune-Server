@@ -21,7 +21,7 @@ Depends: `content/hunter-module` (the Hunter module skeleton PR; this branch car
 
 ## How it was tested
 
-- `HunterTrapScriptTest` (new, `content:skills:hunter` integration, 8 tests): each creature's catch curve matches its wiki chart (and Mod Ash's numbers); chinchompas respawn after 7 ticks; the trap limit grows at 20, 40, 60 and 80; lay a snare, catch a crimson swift, check it; a full inventory leaves the full trap and moves nothing; Check needs no free slot when the trap and the chinchompa stack; level 1 lays one trap only; a missed attempt fails the trap and breaks it the next tick.
+- `HunterTrapScriptTest` (new, `content:skills:hunter` integration, 7 tests): each creature's catch curve matches its wiki chart (and Mod Ash's numbers); chinchompas respawn after 7 ticks; the trap limit grows at 20, 40, 60 and 80; lay a snare, catch a crimson swift, check it; a full inventory leaves the full trap and moves nothing; Check needs no free slot when the trap and the chinchompa stack; level 1 lays one trap only.
 - Fork CI (GitHub Actions: freshCache, buildCache, assemble test integration, boot) green at the commit.
 - Not re-checked in game on this commit; the same code was checked on the Android device on an earlier build of fin/hunter (lay, catch and Check with a spawned crimson swift; box traps at Hunter 27+), see server-handoff.md on the fork's docs branch.
 
