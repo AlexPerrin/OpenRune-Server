@@ -47,7 +47,6 @@ fin/diaries
 fin/grand-exchange
 content/looting-bag
 content/fletching
-content/goblin-diplomacy-unstacked
 # Local only (never upstream)
 local/android
 local/local-auth
