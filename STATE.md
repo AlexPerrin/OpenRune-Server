@@ -26,6 +26,10 @@ details. Workflow: `docs/workflow.md` in osrs-plugins-reverse.
   fix/69 on fix/07, local/skip-cs2-packs on fix/11, content/looting-bag on fix/71,
   content/pirates-treasure on fin/quest-test-fixture, content/sheep-shearer carries the same
   QuestTalkFixture commit (35900b277), local/test-commands on local/android.
+- `fix/11-dense-clientscript-ids` (fork only, no upstream PR): custom clientscripts sit right after
+  the stock range, which `StockClientScripts` reads at cache-build time from the cache's idx12 and
+  the installed CS2 project's symbol table (10197-10209 at 241.4: quest 10197-10198, spawn menu 10199-10209); an id
+  inside the range or more than 256 above it fails the cache build with the first free id.
 - `content/sheep-shearer` (sd23, replaces #366's branch, Sheep Shearer only; ids from
   fix_gameval_conflicts.py) takes `fin/sheep-shearer`'s place in integration.txt; it needs the
   recorded resolution of its gamevals.toml lines next to content/pirates-treasure's (rr-cache
