@@ -1,0 +1,50 @@
+## Summary
+
+Part of #63 (Hunter). Hunters' Rumours were not implemented: the Hunter Guild's hunters and Verity had no dialogue and catches gave no rare parts.
+
+Depends: `content/hunter-module`, `content/hunter-traps`, `content/hunter-herbiboar` and `content/hunter-butterflies` (their catches report to the rumours). This branch carries those commits and goes in after they merge, rebased then.
+
+- Rumour state in server varps (63772-63783): one rumour per guild hunter, the current hunter, the pity count.
+- Assignment follows each hunter's list, the unboostable Hunter level, the rumour's quest (Eagles' Peak for the chinchompa and jerboa rumours, Bone Voyage and 31 Herblore for the herbiboar, through `QuestRequirements`) and no duplicate across hunters.
+- Catches of the current creature (box traps, bird snares, the herbiboar harvest, butterflies and moths) roll the rare part with the wiki's rates and pity thresholds (a held part blocks, a full inventory drops a rolled part and destroys a pity part).
+- Turn-in gives (level + 5) * 50/55/60 XP and the tier's loot sack; the quetzal whistle's Rumour op names the target; `::rumour` for testing.
+- The Burrow's guild hunters (Gilman, Cervus, Ornus, Aco, Teco, Wolf) and Verity follow the wiki transcripts: Talk-to and the Rumour op assign, remind, switch and hand in (the turn-in lines RuneLite's Hunter Rumours plugin tracks); each line says "one of its", "some of its" or "its" as its transcript does; "No." to another rumour goes back to the hunter's options; Wolf's "Never mind." option has the player say "See you later.". Verity unlocks rumours, counts them and toggles back-to-back rumours. Gilman sells Trapper's Tipple and stew.
+- Data: server-only dbtables `hunter_rumour_hunters` (56010) and `hunter_rumours` (56011; quest and Herblore columns), rows 60271-60280 and 60288-60293, own `HunterRumourPluginPack`. The ids are assigned by `tools/scripts/fix_gameval_conflicts.py` above the OSRS maximum per table, names prefixed `hunter_rumour`.
+- Touches the three dependencies lightly: `HunterTrapScript`, `HerbiboarScript` and `ButterflyScript` report their catches to the rumours (a few lines in each).
+
+## Type of change
+
+- [ ] Bug fix
+- [x] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [x] Cache / gamevals / pack data
+- [ ] Docs / tooling
+
+## How it was tested
+
+- `HunterRumoursTest` (new, `content:skills:hunter` integration, 7 tests): turn-in XP matches the wiki ranges; assignments follow each hunter's list, level and other hunters; rumours need their quest and Herblore level; catches reach the rare part by the pity threshold and the whistle names it; a pity part is destroyed when the inventory is full and comes on the next catch; turn-in swaps the part for the loot sack once; with back-to-back off the rumour just handed in is not offered again.
+- `HunterGuildScriptTest` (new, 5 tests): assignment and remember lines say "one of", "some of" or "its" as the transcripts do; Wolf's leave option is "Never mind." and the player says "See you later."; buying a stew swaps exactly 20 coins for one stew; too few coins moves nothing; a full inventory with coins left over moves nothing, exact coins free their slot.
+- `ButterflyScriptTest` gains one test (7 in all): a magic net catch counts for the rumour.
+- Fork CI (GitHub Actions: freshCache, buildCache, assemble test integration, boot) green at the commit.
+- Not re-checked in game on this commit; the same dialogues were checked on the Android device with the Hunters' Rumours hub plugin on an earlier build of fin/hunter (assign, remind, hand-in), see server-handoff.md on the fork's docs branch.
+
+## Checklist
+
+- [x] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes): the assignment rules, the pity roll, and the part, loot sack, coins and stew moving
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps: the hunters and rumours in server-only dbtables
+- [x] State in varbits/varps, not attrs: the rumours, the current hunter, the pity count, the unlock, the count and the back-to-back toggle on server varps 63772-63783
+- [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the deviations are listed under Caveats below, not in `docs/quirks.md`
+- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): no recording of Hunters' Rumours or the guild hunters (recording 1106 visits the Hunter Guild for a clue step only) exists among the 27 local RSProx transcripts, and rsprox.net's index has no topic search; the timings stay as the wiki and the caveats say
+- [x] No unrelated or hand-edited generated changes
+
+## Screenshots / notes for reviewers
+
+Data sources: OSRS Wiki: Hunters' Rumours (list of rumours and its notes, rates and pity, turn-in XP, rules), Basic quetzal whistle, Goat hunting ("one of its hooves"), Transcript: Huntmaster Gilman (Novice), Guild Hunter Cervus/Ornus (Adept), Aco/Teco (Expert), Wolf (Master), Guild Scribe Verity. Quest keys `quest_eaglespeak` and `quest_bonevoyage` are the cache dbrows.
+
+Caveats:
+- Under the default assume-completed quest mode the quest requirements count as met.
+- Guesses: the wagtail and herbiboar part wordings, the pity reset on a new rumour, the part rolling on Check, the no-rumour whistle message, the level line for hunters other than Wolf, the nothing-to-offer line, Gilman's Yes/No switch without an old rumour, the back-to-back rule.
+- Not done: guild hunter outfit pity, loot sacks opening, milestone unlocks, Wolf's At First Light requirement, Verity's spare-gear trade, the "intel reshuffle" lines, rumours for creatures the server can't catch.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

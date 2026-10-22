@@ -1,0 +1,44 @@
+## Summary
+
+Part of #63 (Hunter). Herbiboar tracking on Fossil Island was not implemented.
+
+Depends: `content/hunter-module` (the Hunter module skeleton PR; this branch carries that commit and goes in after it merges, rebased then).
+
+- Herbiboar tracking in the Mushroom Forest, driven by the client's own trail varbits (the footprint multilocs on the map), so RuneLite's Herbiboar plugin works.
+- Start locs (Hunter 80, boostable, and 31 Herblore); clue loc inspects (the wiki's messages, 50 XP and fossil rolls); the tunnel (Hunter XP by level, from the base level; the stunned herbiboar via `fossil_herbiboar_visible`); the harvest (1-3 herbs, 2-4 with magic secateurs, by Herblore level from the wiki chart, 25 Herblore XP per herb after the first, harvest count).
+- The network (dbtables `herbiboar_legs`/`spots`/`tunnels`/`herbs`, 56006-56009) is read from the map's footprints and the plugin's per-loc trail lists; server varps 63770-63771; own `HerbiboarPluginPack`.
+- Gamevals: rows 60184-60270 and 63874-63891. The ids are assigned by `tools/scripts/fix_gameval_conflicts.py` above the OSRS maximum per table, names prefixed `herbiboar_`; 18 rows that first sat at 60233-60250 were renumbered to 63874-63891 because Slayer (#312) took that range on `main` (as agreed in #353: renumber against what's on `main`; saves are keyed by name).
+
+## Type of change
+
+- [ ] Bug fix
+- [x] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [x] Cache / gamevals / pack data
+- [ ] Docs / tooling
+
+## How it was tested
+
+- `HerbiboarScriptTest` (new, `content:skills:hunter` integration, 5 tests): tunnel XP follows the wiki table; herb level ranges match the wiki table (within two levels); every leg's trail varbit is a footprint varbit and every group can be left; track from every start, stun and harvest; the wrong clue loc changes nothing.
+- Fork CI (GitHub Actions: freshCache, buildCache, assemble test integration, boot) green at the commit.
+- Not checked in game on this commit (the integration tests cover the flow); the upstream gate's in-game re-check is still to come.
+
+## Checklist
+
+- [x] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes): the XP and herb tables, the trail network's consistency, and the full track to the harvest
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps: the legs, spots, tunnels and herbs in server-only dbtables; trail varbits, multilocs and locs are the cache's
+- [x] State in varbits/varps, not attrs: the trail on the client's own varbits, the harvest count and route length on server varps 63770-63771
+- [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the deviations are listed under Caveats below, not in `docs/quirks.md`
+- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): no recording of Herbiboar tracking exists among the 27 local RSProx transcripts, and rsprox.net's index has no topic search; the timings stay as the wiki and the caveats say
+- [x] No unrelated or hand-edited generated changes
+
+## Screenshots / notes for reviewers
+
+Data sources: OSRS Wiki: Herbiboar (requirements, tunnel XP, fossil table, herb chart, messages), Tunnel (herbiboar), Muddy patch, Smelly mushroom. Trail varbits, multilocs and locs from the cache; RuneLite Herbiboar plugin (BSD) for the per-loc trail lists.
+
+Caveats:
+- Guesses: route length (3-5 legs) and which legs end a route, 50 XP on every inspect but the first and last (the wiki says "occasionally"), the seaweed and mushroom-cap messages and the other non-wiki messages, the tunnel's Search op doing the same as Attack.
+- Not done: the new-track warning dialogue, the Herbi pet, the horn of plenty's extra herbs.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

@@ -1,0 +1,48 @@
+## Summary
+
+Part of #63 (Hunter). OpenRune had no implings: no catching, no impling jar loot and no crystal implings.
+
+Depends: `content/hunter-module` (the Hunter module skeleton PR; this branch carries that commit and goes in after it merges, rebased then).
+
+- Catching implings in Puro-Puro and Gielinor with a wielded butterfly net (or 10 extra Hunter levels barehanded) and an impling jar: 12% at level 1 to 98% at 99, +8 points barehanded or with a magic net.
+- Impling data is a server-only dbtable `impling_types` (56002, rows 60152-60162) in the hunter pack: npc, Puro-Puro npc, jar, level, Puro-Puro and Gielinor XP, respawn ticks; own `ImplingPluginPack`. The ids are assigned by `tools/scripts/fix_gameval_conflicts.py` above the OSRS maximum per table, names prefixed `impling_`.
+- Looting a caught impling jar rolls the jar's loot table; the empty jar comes back except for a 10% break chance. Dragon javelin tips only drop after Monkey Madness II (checked through `QuestRequirements`, as upstream does for other quest-gated content); without it the roll is over the rest of the dragon table. A tertiary clue scroll is not given while a clue or challenge scroll of that tier is in the inventory or bank, with the "You have a sneaking suspicion that you would have received a/an [tier] clue scroll." message.
+- Crystal implings: one per world in Prifddinas, at one of 12 spots as one of the 17 named implings, a new one 3 minutes after each :00 and :30 (UTC) and one at server start; Hunter 80 (90 barehanded), 280 XP. Their catch chance is their own curve: the OSRS skilling formula with low 8 / high 141 with a butterfly net (116/256 at 80 to 142/256 at 99) and 28 / 161 barehanded or with a magic net (+20/256, the wiki's 7.8%).
+
+## Type of change
+
+- [ ] Bug fix
+- [x] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [x] Cache / gamevals / pack data
+- [ ] Docs / tooling
+
+## How it was tested
+
+- `ImplingScriptTest` (new, `content:skills:hunter` integration, 4 tests): the catch chance runs from 12 to 98 percent, plus 8 with a magic net; a catch swaps one jar for the impling jar and gives Hunter XP; no jar, nothing moves; barehanded needs ten more levels.
+- `ImplingLootScriptTest` (new, 7 tests): every caught jar has a loot table whose main table sums to one; Loot is the jars' third inventory op, which the client sends as op 3; the first main-table line comes out when every roll is zero; dragon javelin tips only drop after Monkey Madness II; a held tier's clue scroll is skipped; a clue scroll in the bank counts as held; looting swaps the jar for loot.
+- `CrystalImplingScriptTest` (new, 3 tests): a new half hour starts three minutes past; the catch curve matches the wiki chart (all 40 points: net and bonus at each level 80-99); one crystal impling at a time, on a wiki spot.
+- Fork CI (GitHub Actions: freshCache, buildCache, assemble test integration, boot) green at the commit.
+- Not checked in game on this commit (the integration tests cover the flow); the upstream gate's in-game re-check is still to come.
+
+## Checklist
+
+- [x] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes): the catch curves, the loot roll rules, and the jar swaps on catch and loot
+- [ ] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps: impling data is in the server-only dbtable; the jar loot tables are a Kotlin table generated from the wiki's jar pages (`ImplingLootTables.kt`, OSRS obj ids), not cache data
+- [x] State in varbits/varps, not attrs: no player state; the crystal impling is one server-wide npc
+- [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the deviations are listed under Caveats below, not in `docs/quirks.md`
+- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): no recording of an impling catch (only impling-jar crafting at the Chemist, recording 468, which this PR does not cover) exists among the 27 local RSProx transcripts, and rsprox.net's index has no topic search; the timings stay as the wiki and the caveats say
+- [x] No unrelated or hand-edited generated changes
+
+## Screenshots / notes for reviewers
+
+Data sources: OSRS Wiki (Impling, the impling jar pages' loot tables, the Dragon impling jar note on Monkey Madness II, Impling jar, Crystal impling and its catch-chance chart, Treasure Trails: Stacking limitations), Mod Ash's posts quoted there (impling catch chances, jar break chance, dragon javelin tips). Quest key `quest_monkeymadness2` is the cache dbrow.
+
+Caveats:
+- Not done: catching without a jar in Gielinor (immediate loot), the lucky impling's clue table, scroll boxes and the clue stack cap (X Marks the Spot), the Gielinor/Puro-Puro spawn rotation (map spawns with fixed respawns are used).
+- The sneaking-suspicion message is always shown (the Settings toggle isn't read).
+- Under the default assume-completed quest mode Monkey Madness II counts as done.
+- Guesses: the catch, level and no-jar messages, 2-tick attempts (at most 20 per click), the crystal spawn spots (read off the wiki map) and the spawn at server start.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

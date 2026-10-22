@@ -1,0 +1,47 @@
+## Summary
+
+Part of #63 (Hunter). Bird house trapping on Fossil Island was not implemented.
+
+Depends: `content/hunter-module` (the Hunter module skeleton PR; this branch carries that commit and goes in after it merges, rebased then).
+
+- The four bird house spaces are multilocs on varps 1626-1629 (the values RuneLite's Time Tracking reads): build (or use a bird house on the space), then add seeds: 10 low-level seeds, or 5 wildblood hop or ranarr-and-higher herb seeds (mixing allowed).
+- After 50 minutes, Empty or Reset gives the clockwork, 10 raw bird meat (always dropped to the ground), 30-60 feathers, nests and the Hunter XP, with the collect message RuneLite's Loot Tracker parses.
+- The seed nest chance is the skilling formula over the wiki chart (1/256 at level 1, 101/256 at 50, 201/256 at 99), then five rolls on the nest table.
+- Emptying a house early asks first, then keeps the clockwork and loses the house, seeds and loot.
+- Reset places a new house one tick later: a carried bird house first, otherwise one built from logs and the clockwork with a hammer and chisel (the bird house's Crafting level and XP).
+- Data: tier data in the server-only dbtable `birdhouse_types` (56003, rows 60163-60171; logs and Crafting level/XP columns for Reset), server varps 63762-63769, own `BirdHousePluginPack`. The ids are assigned by `tools/scripts/fix_gameval_conflicts.py` above the OSRS maximum per table, names prefixed `birdhouse_`. `::birdhouses` makes seeded houses full (testing).
+
+## Type of change
+
+- [ ] Bug fix
+- [x] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [x] Cache / gamevals / pack data
+- [ ] Docs / tooling
+
+## How it was tested
+
+- `BirdHouseScriptTest` (new, `content:skills:hunter` integration, 11 tests): the collect message matches what the Loot Tracker parses; each space is the multiloc of its transmit varp; nine tiers in order, regular first; nest chances follow the wiki's chart; every roll at zero gives a seed nest and five ring nests; build, seed, wait and empty (the raw bird meat on the ground); the seed nest follows the wiki chart; five high-level seeds fill a house, and seeds mix; emptying early keeps only the clockwork; Reset builds a new house from logs and the clockwork (an oak house at Crafting 20); a full inventory drops the loot instead of losing it.
+- Fork CI (GitHub Actions: freshCache, buildCache, assemble test integration, boot) green at the commit.
+- Not checked in game on this commit (the integration tests cover the flow); the upstream gate's in-game re-check is still to come.
+
+## Checklist
+
+- [x] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes): the nest chances, the tier/varp mapping, and build/seed/empty/Reset moving the house, seeds and loot
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps: tier data in the server-only dbtable
+- [x] State in varbits/varps, not attrs: the spaces on varps 1626-1629, the seeds and the fill time on server varps 63762-63769
+- [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the deviations are listed under Caveats below, not in `docs/quirks.md`
+- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): no recording of bird house play exists among the 27 local RSProx transcripts, and rsprox.net's index has no topic search; the timings stay as the wiki and the caveats say
+- [x] No unrelated or hand-edited generated changes
+
+## Screenshots / notes for reviewers
+
+Data sources: OSRS Wiki: Bird house trapping (levels, XP, seeds, nest charts, early emptying, Reset), Bird house trapping/Seeds, Birdhouse (scenery) (raw bird meat note, seed nest chart), the nine bird house item pages (Crafting level, XP, logs). Varps from the cache; RuneLite Time Tracking and Loot Tracker (BSD) for the values and the message.
+
+Caveats:
+- Guesses: the early-empty warning's wording, the other game messages, the op layout per state.
+- With several log types in the inventory, Reset builds the best house the player can place instead of asking for the log type.
+- Not done: clue nests, the strung rabbit foot, crafting bird houses from the inventory, building from materials on an empty space.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

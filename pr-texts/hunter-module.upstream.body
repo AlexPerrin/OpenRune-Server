@@ -1,0 +1,41 @@
+## Summary
+
+Part of #63 (Hunter). The empty `content/skills/hunter` module and its pack, so that the hunter content PRs that follow (bird snares and box traps, bird houses, butterflies, Herbiboar, implings, Hunters' Rumours) can each add to the same new module without any two of them conflicting. This follows the "one PR per row" split you asked for in #353.
+
+- `content/skills/hunter/build.gradle.kts`: the module, with `api/plugin-commons`, `api/utils/utils-skills` and `content/quest` as dependencies (the same three for its `integration` test suite).
+- `content/skills/hunter/pack/build.gradle.kts`: the pack module, with `engine/map`.
+- The two `gamevals.toml` files (`src/main/resources` with `dbtable`, `dbrow` and `timer` sections; `pack/src/main/resources` with `varp`), each section holding one anchor comment per feature (`# implings`, `# bird houses`, `# traps`, `# herbiboar`, `# butterflies`, `# rumours`). Each feature PR adds its ids under its own anchor, so they merge in any order.
+
+This commit adds no content and no gameval ids; it is the base for the hunter PRs. Each of those names this branch as its dependency.
+
+## Type of change
+
+- [ ] Bug fix
+- [ ] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [x] Cache / gamevals / pack data
+- [x] Docs / tooling
+
+## How it was tested
+
+- No tests (no code). The module builds empty.
+- Fork CI (GitHub Actions: freshCache, buildCache, assemble test integration, boot) green at the commit.
+- Nothing to see in game: the module is empty.
+
+## Checklist
+
+- [x] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes): none (no code)
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps: no ids yet, only the sections and anchors
+- [x] State in varbits/varps, not attrs: no state
+- [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the deviations are listed under Caveats below, not in `docs/quirks.md`
+- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): n/a, no content
+- [x] No unrelated or hand-edited generated changes
+
+## Screenshots / notes for reviewers
+
+Data sources: none.
+
+Caveats: none. The feature PRs that build on this (one each for bird snares and box traps, bird houses, butterflies, Herbiboar, implings, and Hunters' Rumours after the first three of those) add their gameval ids under the anchors; their ids are assigned by `tools/scripts/fix_gameval_conflicts.py` above the OSRS maximum per table, with prefixed names.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

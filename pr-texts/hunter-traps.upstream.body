@@ -1,0 +1,49 @@
+## Summary
+
+Part of #63 (Hunter). Bird snares and box traps were not implemented (the earlier attempts, #196 and #229, were closed without going in). This is a fresh implementation.
+
+Depends: `content/hunter-module` (the Hunter module skeleton PR; this branch carries that commit and goes in after it merges, rebased then).
+
+- Lay a bird snare or box trap: Hunter level per trap and creature, 1-5 traps at Hunter 1/20/40/60/80.
+- Every 3 ticks a set trap with a matching creature within 2 tiles rolls the catch on that creature's own skilling curve at the player's Hunter level, from the "Skilling success chart" on each creature's wiki page (out of 256, low at level 1 / high at 99): crimson swift 100/420, golden warbler 92/400, copper longtail 85/390, cerulean twitch 82/380, tropical wagtail 75/370, grey chinchompa 6/268, carnivorous and black chinchompa -78/228 (the values Mod Ash gave). The trap goes through the trapping/failing locs to full or broken.
+- A caught chinchompa or embertailed jerboa comes back after 7 ticks.
+- Check gives the loot, the trap and the XP ("You've caught a <creature>."; the jerboa's "...or maybe not."), and only needs room for what doesn't stack (box traps, bird snares and chinchompas stack). Dismantle, Reset and Investigate.
+- Creatures: the five birds (crimson swift to tropical wagtail), ferrets, embertailed jerboas (Hunter 39, 137 XP, jerboa tail) and grey, red and black chinchompas.
+- Data: server-only dbtables `hunter_traps` (56004) and `hunter_trap_creatures` (56005; per-creature low/high/respawn columns), rows 60172-60183, timer `hunter_traps` 436, own `HunterTrapPluginPack`. The ids are assigned by `tools/scripts/fix_gameval_conflicts.py` above the OSRS maximum per table, names prefixed `hunter_trap`. Trap locs are the ones RuneLite's Hunter plugin tracks.
+
+## Type of change
+
+- [ ] Bug fix
+- [x] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [x] Cache / gamevals / pack data
+- [ ] Docs / tooling
+
+## How it was tested
+
+- `HunterTrapScriptTest` (new, `content:skills:hunter` integration, 8 tests): each creature's catch curve matches its wiki chart (and Mod Ash's numbers); chinchompas respawn after 7 ticks; the trap limit grows at 20, 40, 60 and 80; lay a snare, catch a crimson swift, check it; a full inventory leaves the full trap and moves nothing; Check needs no free slot when the trap and the chinchompa stack; level 1 lays one trap only; a missed attempt fails the trap and breaks it the next tick.
+- Fork CI (GitHub Actions: freshCache, buildCache, assemble test integration, boot) green at the commit.
+- Not re-checked in game on this commit; the same code was checked on the Android device on an earlier build of fin/hunter (lay, catch and Check with a spawned crimson swift; box traps at Hunter 27+), see server-handoff.md on the fork's docs branch.
+
+## Checklist
+
+- [x] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes): the catch curves, the respawn, the trap limit, and Check/lay moving the trap and the loot
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps: creature and trap data in the server-only dbtables
+- [x] State in varbits/varps, not attrs: trap state is the loc and its timer; no player attrs
+- [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the deviations are listed under Caveats below, not in `docs/quirks.md`
+- [x] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): recordings 1106 (rev 237) and 350 (rev 230), other players' snares and box traps: the trap locs (9345 set, 9349/9373 trapping/full for a crimson swift, 9346/9344 failing/broken, 9380/9392/9383 for a carnivorous chinchompa) and the timings (trapping to full 2 ticks, failing to broken 1 tick) match; the divergences are in the Caveats
+- [x] No unrelated or hand-edited generated changes
+
+## Screenshots / notes for reviewers
+
+Data sources: OSRS Wiki: Bird snare, Box trap, Crimson swift, Golden warbler, Copper longtail, Cerulean twitch, Tropical wagtail, Ferret (Hunter), Chinchompa (Hunter), Carnivorous chinchompa, Black chinchompa (Hunter), Embertailed jerboa (levels, XP, loot, charts, respawn times, the jerboa message), and the Mod Ash posts quoted there (bird rates 15 Feb 2022, chinchompa rates 23 Sep 2015, 3-tick attempts). Trap locs from the cache; RuneLite Hunter plugin (BSD).
+
+Caveats:
+- RSProx 1106 (ticks 5117-5122): the bird teleports onto the trap tile 4 ticks before the trap goes failing and is removed the tick after, with area sounds 2637 (trapping/failing) and 2625 (full). Here the creature despawns on the attempt tick, and the sounds are not played (2637 and 2625 have no gameval name).
+- A box trap's trapping loc is always the `_n` variant; the recordings show `_n` and `_s` (350: both; 1106: `_s`), the rule behind the choice is unknown.
+- XP where the wiki disagrees with itself (unsourced, needs a game check): cerulean twitch 64.5 (creature page; the Bird snare page says 64.6), tropical wagtail 95.2 (creature page; Bird snare 95), ferret 115.2 (creature page; Box trap 115). The creature pages' values are used.
+- Guesses: the ferret and jerboa catch curves (no wiki chart; the crimson swift curve shifted to their level: 15/335 and -24/296), the 50-tick respawn of birds and ferrets, the snare attempt cadence (3 ticks, as the wiki gives for box traps), the 200-tick collapse, most trap messages, traps dropped on logout.
+- Not done: the Eagles' Peak requirement, smoking and baiting, the extra Wilderness trap, the baby chinchompa pet.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

@@ -1,0 +1,45 @@
+## Summary
+
+Part of #63 (Hunter). Butterflies and moths could not be caught.
+
+Depends: `content/hunter-module` (the Hunter module skeleton PR; this branch carries that commit and goes in after it merges, rebased then).
+
+- Catching butterflies and moths with a wielded butterfly net or magic butterfly net, or barehanded at 10 levels above the requirement; the OSRS 256 roll with the wiki's skilling success charts (black warlock, sunlight and moonlight moths; the other butterflies copy the black warlock).
+- A butterfly jar keeps the catch; without one it is released and its effect applies.
+- Jarred butterflies get their Release op (Attack/Defence/Strength boosts, Hitpoints, the sunlight moth's restore, the moonlight moth's prayer).
+- The sunlight moth restores drained stats except Prayer and, as in OSRS, not Sailing; caught without a jar it also restores 5% run energy (the jarred moth does not).
+- Data: server-only dbtable `hunter_butterflies` (56012, rows 60281-60287), own `ButterflyPluginPack`. The ids are assigned by `tools/scripts/fix_gameval_conflicts.py` above the OSRS maximum per table, names prefixed `hunter_butterfl`.
+
+## Type of change
+
+- [ ] Bug fix
+- [x] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [x] Cache / gamevals / pack data
+- [ ] Docs / tooling
+
+## How it was tested
+
+- `ButterflyScriptTest` (new, `content:skills:hunter` integration, 6 tests): a catch with a jar swaps exactly one jar for the butterfly; without a jar the butterfly is released and its boost applies; a sunlight moth caught without a jar restores 5% run energy; a jarred sunlight moth restores drained stats but not Sailing or run energy; releasing a jarred moth gives the empty jar back once; barehanded below ten extra levels always fails.
+- Fork CI (GitHub Actions: freshCache, buildCache, assemble test integration, boot) green at the commit.
+- Not checked in game on this commit (the integration tests cover the flow); the upstream gate's in-game re-check is still to come.
+
+## Checklist
+
+- [x] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes): the jar swap, the release effects, and the barehanded level rule
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps: butterfly data in the server-only dbtable; the Release op is the cache item op
+- [x] State in varbits/varps, not attrs: no state
+- [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the deviations are listed under Caveats below, not in `docs/quirks.md`
+- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): no recording of a butterfly or moth catch exists among the 27 local RSProx transcripts, and rsprox.net's index has no topic search; the timings stay as the wiki and the caveats say
+- [x] No unrelated or hand-edited generated changes
+
+## Screenshots / notes for reviewers
+
+Data sources: OSRS Wiki: Ruby harvest, Sapphire glacialis, Snowy knight, Black warlock (and its item page), Sunlight Moth (effects, run energy, the Sailing bug note), Moonlight moth (levels, XP, effects, success charts); cache item ops (Release).
+
+Caveats:
+- Guesses: the ruby harvest, sapphire glacialis and snowy knight curves (no chart; the black warlock's is used), one 2-tick swing per click, the barehanded animation, the 7-tick respawn, the messages, failing silently below the level, which moonlight moth variants are catchable.
+- Not done: sharing effects in multicombat, butterfly mixes.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
