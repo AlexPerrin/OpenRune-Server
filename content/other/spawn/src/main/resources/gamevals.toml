@@ -2,10 +2,10 @@
 spawn_menu = 1099
 
 [gamevals.clientscript]
-spawn_menu_init = 9975
-spawn_menu_buttons = 9981
-spawn_menu_labels = 9983
-spawn_menu_search_stop = 9985
+spawn_menu_init = 10199
+spawn_menu_buttons = 10205
+spawn_menu_labels = 10207
+spawn_menu_search_stop = 10209
 
 [gamevals.inv]
 spawn_results = 1100
