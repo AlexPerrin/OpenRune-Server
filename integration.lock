@@ -6,7 +6,7 @@ fix/06-varrock-single-juliet d5cea8a961393c8b4fe18f993e46005fa54c1c27
 fix/07-juliet-house-stairs 2e39d2189c86fc168cf5c9fce7b6db9c9377ac25
 fix/69-blue-moon-inn-stairs 0e558f9db976dc09d9b04aa63194eb6b1491f3a8
 fix/10-login-welcome-message 520b573c273e00dedf68488b742e963b9db42c18
-fix/11-dense-clientscript-ids 339d0f3fa8a96606e7846937c702af57503f3e66
+fix/11-dense-clientscript-ids c2f528fca73e316fe1a58e5f7124bb402e8f21cd
 fix/22-music-tab-play 8b3cfaca4049161085dfb53c37e2ef2eae439e40
 fix/25-ice-mountain-music-area 7f22b2064f7b38b4af017af1948cb7512de86cc8
 fix/31-friend-add-update f397f8f7af2faa15d38be06b7308c470b4cfeb9c
@@ -47,7 +47,7 @@ local/android 9e41d0e62aa8492aac0e53409c6d7cd180887084
 local/local-auth a8cae097981071a6c2c187db49369b91daa7e279
 local/test-commands 6ca12a50bbacf48da7fd865e6165ded030322ab7
 local/world-settings 9e3d5d93f91d29363b71f5ea77a14d4601d23207
-local/skip-cs2-packs 5c7515cb90beafaede81a290dd876ec956c4f183
+local/skip-cs2-packs e493480549e6088494b3f44d6d2b4f8adf18b651
 local/op-overrides 46bc3ab31d147910709f4c94253add75ef5f2cb6
 local/treasure-trails 48b320359a91f9f0974c1ffc562e510c315bacf5
 fix/ground-item-despawn-times d0fe09c630e7456433348ee273f3e9cd8353cc82
