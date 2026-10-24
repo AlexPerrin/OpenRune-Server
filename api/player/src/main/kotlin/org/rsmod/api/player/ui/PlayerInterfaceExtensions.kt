@@ -360,6 +360,10 @@ private fun Player.closeModal(interf: UserInterface, target: Component, eventBus
     eventBus.publish(CloseSub(this, interf, target))
 
     closeOverlayChildren(interf, eventBus)
+
+    if (mobileClient && target == chatModalComponent) {
+        setMobileChatModalUnclamp(0)
+    }
 }
 
 private fun Player.closeOverlay(interf: String, eventBus: EventBus) {
@@ -413,6 +417,10 @@ public fun Player.closeSubs(from: Component, eventBus: EventBus) {
         eventBus.publish(CloseSub(this, remove, from))
 
         closeOverlayChildren(remove, eventBus)
+
+        if (mobileClient && from == chatModalComponent) {
+            setMobileChatModalUnclamp(0)
+        }
     }
 }
 
@@ -662,9 +670,42 @@ internal fun Player.ifChatNpcSpecific(
 private fun chatLogText(text: String): String = text.replace("<br>", " ").take(200)
 
 internal fun Player.ifOpenChat(interf: String, widthAndHeightMode: Int, eventBus: EventBus) {
+    if (mobileClient) {
+        topLevelChatboxResetBackground(this)
+        openModal(interf, "component.chatbox:chatmodal", eventBus)
+        val unclamp = interf == "interface.chatmenu" && widthAndHeightMode != 0
+        setMobileChatModalUnclamp(if (unclamp) widthAndHeightMode else 0)
+        return
+    }
     chatModalUnclamp = widthAndHeightMode
     topLevelChatboxResetBackground(this)
     openModal(interf, "component.chatbox:chatmodal", eventBus)
+}
+
+/**
+ * osrs-plugins-reverse: on the mobile client chatbox:chatmodal is 479x96, too short for chatmenu
+ * (219), whose 3rd and 4th rows were clipped and mis-hit. Varbit chatmodal_unclamp makes
+ * [proc,chat_onsetupchange] (113) size the modal to fill its parent, but the varbit alone does not
+ * re-run the layout, so 113 runs here. Only chatmenu is unclamped, as on our test server; chat_left
+ * and chat_right keep the stock size, and closing the modal resets it.
+ *
+ * An unclamp always re-runs 113, even when the varbit already holds the value: the varbit can be
+ * stale against the client's layout (it survives relogs, and SkillingMenu sets it for skillmulti
+ * without running 113), and a skipped layout left the quest-start Yes/No chatmenu clamped.
+ */
+private fun Player.setMobileChatModalUnclamp(value: Int) {
+    if (chatModalUnclamp == value && value == 0) {
+        return
+    }
+    chatModalUnclamp = value
+    runClientScript(CHAT_ONSETUPCHANGE)
+}
+
+private const val CHAT_ONSETUPCHANGE = 113
+
+private val chatModalComponent: Component by lazy {
+    ServerCacheManager.fromComponent("component.chatbox:chatmodal".asRSCM(RSCMType.COMPONENT))
+        .toIdComponent()
 }
 
 private fun Player.ifSetPauseText(component: String, text: String) {
