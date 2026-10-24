@@ -21,7 +21,6 @@ fix/73-heldu-dispatch-order
 fix/74-bankside-view-op
 fix/75-coal-bag-messages
 fix/stile-approach
-fix/fish-barrel-check-and-destroy
 fix/ground-item-despawn-times
 # Content
 content/dragon-specials
@@ -29,7 +28,6 @@ content/reconnect-login
 fin/cannon
 fin/genie
 fin/quest-test-fixture
-content/quests-sheep-romeo
 local/quest-test-fixture
 local/romeo-juliet
 fin/witchs-potion
