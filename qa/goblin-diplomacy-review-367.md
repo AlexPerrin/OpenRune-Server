@@ -1,18 +1,22 @@
 # QA: fix/goblin-diplomacy-handin-367 (for content/goblin-diplomacy, #367)
 - Branch: `fix/goblin-diplomacy-handin-367`
-- Commit: `1a610f8e42e80ddb9f47c8a88fe7e2e686ae3f99`
-## Upstream gate: **FAIL**
+- Commit: `405e38601278b51a9dc38d75ff6315d2f856c90f`
+## Upstream gate: **PASS**
 
-Run by sq50 on 2026-10-24. Stopped at the first failing item (the gate stops at the first failure); a new commit voids the CI and in-game checks anyway, so they were not run.
+Run by sq51 on 2026-10-24. All checks run to the end; findings collected, none open.
 
-### Must change
-1. AGENTS.md "Comments - less is more" violated by the commit. It adds a KDoc on `commitHandIn` (a ~25 line method; KDoc only for methods that are genuinely complex AND large), a mid-method comment in `handIn` ("Orange and blue commit before the generals react; brown commits after the last page...") and one in the brown branch ("The look is written by the commit below, so the brown head is explicit here."), the last being narration about the change. Remove all three (names carry the meaning). The #367 PR comment also says "The KDoc is removed and the helpers are private", which the commit would contradict.
+### Findings
+None blocking.
+- Note (not a defect): `fix_gameval_conflicts.py --check` was run locally on the scratch tree and is clean; spotlessCheck was not run (the dispatched ci.yml has no Formatting step); the diff is one file in the surrounding style, no comments.
 
-### Checked, fine (by source review of d77ac2b76..1a610f8e4, one file)
-- Head regression fixed: the brown try-on page calls `grubfoot(quiz, "What do you think?", GRUBFOOT_BROWN_HEAD)`; the other brown pages use no Grubfoot line; orange and blue pages still read the look, written by the commit before them, so their heads are unchanged.
-- Orange and blue commit right after "I have some ... armour here."; `invDel` then look and stage are written with no dialogue page between. Brown commits armour (`invDel`) and `completeQuest` in one call after the last page; walking away earlier leaves both untouched, no page lies between the two writes. A failed completion re-adds the armour and shows the room message; failure of `invDel` returns early without changes.
-- Scope: the 3-file removal and gamevals line are the PR's earlier content; this fix is `GoblinDiplomacy.kt` only; no test files anywhere in the net diff against the merge base 829b9477d.
-- PR text (docs e3e64719a): atomic hand-in and brown refund stated, the room message listed under Guesses.
-
-### Not run (stopped at first failure)
-CI on a scratch merge with upstream main, in-game orange/blue/brown hand-ins. Re-run both on the corrected commit.
+### Checks
+1. Source review (d77ac2b76..405e38601, GoblinDiplomacy.kt only): the brown try-on page passes `GRUBFOOT_BROWN_HEAD` explicitly; orange and blue commit (`commitHandIn`: `invDel`, look, stage) right after "I have some ... armour here."; brown commits armour and `completeQuest` together after the last page; a failed brown completion re-adds the armour and shows the room message; a failed `invDel` returns with no change.
+2. Scope: this commit changes one file (+36/-11). Net diff vs merge base 829b9477d is the quest script, the removal of #328's GoblinGenerals.kt and Grubfoot.kt and one gamevals.toml line (the PR's earlier content). No test files. No comment lines added (grep of the diff and of the whole file: none). AGENTS.md checked: state in varbit (`intVarBit`), gamevals symbols, SCREAMING_SNAKE constants, no tests for dialogue wiring, no comments. CONTRIBUTING.md (Alter text) adds nothing further.
+3. CI on the fork, scratch branch `gate/goblin-diplomacy-367` = 405e38601 + upstream main 5c4c9c106 (82eda6054), merged cleanly: run 40141034687 success (cache, compile and tests, boot to ready). Own build of the same tree with `qa.sh gate-run`: server ready in 9s.
+4. PR text and spec (docs pr-texts/goblin-diplomacy.upstream.body, .comment, accuracy/goblin-diplomacy.md row 14): atomic hand-in, brown refund and the room-message guess are stated and true of the commit; the PR-text description of CI refers to the earlier head, to be re-stated by the dev when the update is pushed.
+5. In game (branch server on 82eda6054, own desktop client, fresh account; cheats `::varbit gobdip_main 3`, `::item`, `::tele`), chathead model ids 671 brown, 672 orange, 673 blue:
+   - Orange: armour held and stage 3 until the "Grubfoot!" page; there stage 4, look 1, armour gone. Walking away on that page leaves both changed.
+   - Blue: same, stage 5, look 2. Grubfoot try-on head 673 (blue).
+   - Brown: stage 5, look 2, armour held through the last page; walking away on the try-on page and on "Thanks... I think..." changed nothing. The try-on "What do you think?" showed head 671 (brown). After the last page: stage 6, look 0, gold bar, armour gone, quest complete.
+   - Not played: the brown completion failure (a full inventory cannot trigger it, since the armour slot frees room for the bar); source-reviewed only.
+   Evidence: re/evidence/goblin-diplomacy-review-367/sq51-ingame.txt.
