@@ -19,7 +19,7 @@ Nulodion, which this change extends). No multicannon code on `main`.
 | Audit | Mechanic | On this branch | Status |
 |---|---|---|---|
 | D1 / rows 23 | No broken state | breaks after 25 min: loc 14916, "<col=ef1020>Your cannon has broken!", stops firing; Repair: "You repair your cannon, restoring it to working order." restarts 25 min | fixed |
-| D2 / row 24 | Decay to the bank | gone 10 min after breaking (35 min after set-up when part-built), "Your cannon has decayed. Speak to Nulodion to get a new one!", `mcannon_decayed` = 1; Nulodion's "I've lost my cannon." (Transcript:Nulodion branches: still set up, < 4 free slots, replace) gives four parts; the balls come back loaded on the next set-up | fixed |
+| D2 / row 24 | Decay to the bank | gone 10 min after breaking (35 min after set-up when part-built), "Your cannon has decayed. Speak to Nulodion to get a new one!", `mcannon_decayed` = 1; Nulodion's "I've lost my cannon." (Transcript:Nulodion branches: still set up, too few free slots, replace) gives the first k parts for the saved stage k (`dropcannon`) and needs k free slots; the wiki has no rule for a part-built cannon, so this is our divergence; the balls come back loaded on the next set-up | fixed |
 | D3 / row 25 | Removed on logout | the cannon stays in the world through logout and death; its timers are the loc's own despawn timers; the owner gets it back on login; one recorded but missing after a restart counts as lost | fixed |
 | D4 / row 19 | Accuracy | the owner's roll for the current weapon and style (ranged; melee per stab/slash/crush; powered staves the higher of ranged and crush) with equipment and prayers, against heavy ranged defence; no target-conditional effects | fixed (powered-staff comparison approximated: caveat) |
 | D5 / row 18 | Single-way | in single-way combat, while the owner is under attack, only the attacker | fixed (attacker = `aggressive_npc` while in combat; the cannon tile decides single/multi: caveat) |
@@ -41,7 +41,7 @@ Rows 1, 3-6, 8, 10, 11, 15, 17, 20-22, 26 and 28 matched in the audit and are un
 - Messages not on the wiki: the quest refusal, "You cannot construct more than one cannon
   at a time.", "There isn't enough space to set up here.", "This isn't your cannon!", "Your cannon is already
   full.", "You don't have any ammo to load into the cannon.", "Your cannon is empty.", the inventory-space
-  lines. Firing stops when the owner logs out. Nulodion gives four parts even for a part-built cannon.
+  lines. Firing stops when the owner logs out. Nulodion's stage-based return for a part-built cannon is ours (the wiki is silent).
 
 ## LostCity (2004 reference, re/ref/Content `quests/quest_mcannon/scripts/cannon_setup.rs2`, `cannon_fire.rs2`)
 - Agrees with ours: "You load the cannon with N cannonballs.", "There isn't enough space to set up here.", "Your

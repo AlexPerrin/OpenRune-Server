@@ -13,8 +13,8 @@ What it does:
 - **Logout and death**: the cannon stays where it is, and its timers keep running (they are the loc's own despawn timers). On login the owner gets it back. A cannon recorded on the player but missing from the world, after a restart, counts as lost.
 - **Nulodion**, "I've lost my cannon." (Transcript:Nulodion):
   - still set up: "Hmmm. I think you'll find it's still happily parked on the spot where you put it." and the rest of that branch;
-  - lost, with fewer than 4 free slots: the "free up some inventory space" line;
-  - lost: the four parts ("The dwarf gives you a new cannon."). The balls that were in it come back loaded when it is next set up (wiki);
+  - lost, with fewer free slots than parts owed: the "free up some inventory space" line;
+  - lost: the first k parts (base, stand, barrels, furnace) for the saved set-up stage k (`dropcannon`, 1 to 4), needing k free slots ("The dwarf gives you a new cannon."). The balls that were in it come back loaded when it is next set up (wiki);
   - otherwise: his "stolen in action" refusal.
 - Pick-up (cannon, broken cannon or part-built) returns the parts and balls: "You pick up the cannon. It's really heavy.". The Grand Exchange refuses a cannon with the wiki's message.
 
@@ -37,7 +37,7 @@ New server-only gameval: timer `mcannon_fire`, written as `-1` and assigned by `
 - surviving a logout; lost after a restart;
 - single-way attacker targeting; the target regions and their double-hit overlap; Ranged XP capped at the target's hitpoints (a 30 roll on an 8-HP target gives 16 XP).
 
-`NulodionCannonSaleTest` (+1): a lost cannon is replaced with four parts and keeps its ball count.
+`NulodionCannonSaleTest` (+1): a lost full cannon is replaced with four parts and keeps its ball count. Reclaim of a part-built cannon (stages 1 to 3) was checked in game, not in a test.
 
 On this commit, on our fork's CI: `./gradlew assemble test integration` after generating the cache and gameval sources, and a boot to "Server ready", pass; `spotlessCheck` passes. `tools/scripts/fix_gameval_conflicts.py --check`: no conflicts.
 
@@ -48,7 +48,7 @@ Steps to repeat:
 2. Fire next to monsters: the barrel turns one step a tick, shots hit, Ranged XP is 2 per damage. In a single-way area, get attacked by one monster with others around: only the attacker is shot.
 3. Load X: the prompt the first time, then the chosen amount each time. Empty: "You unload your cannon and receive Steel cannonball x N."
 4. Log out and back in: the cannon is still there and still yours.
-5. After 25 minutes: "Your cannon has broken!" in red, the broken cannon model, firing stops. Repair: the message, and it works again. Leave it broken 10 more minutes: the decay message. Talk to Nulodion, "I've lost my cannon.": four parts back.
+5. After 25 minutes: "Your cannon has broken!" in red, the broken cannon model, firing stops. Repair: the message, and it works again. Leave it broken 10 more minutes: the decay message. Talk to Nulodion, "I've lost my cannon.": the parts for the stage it reached (all four for a full cannon).
 6. Talk to Nulodion with the cannon still set up: "...still happily parked on the spot where you put it."
 
 ## Checklist
@@ -73,7 +73,7 @@ Deviations, guesses and gaps:
 - Approximated: the single-way rule uses the owner's current attacker (`aggressive_npc` while in combat) and the cannon's own tile for single/multi. In single-way it can still shoot a monster another player is fighting.
 - Approximated: powered staves compare ranged accuracy with crush accuracy.
 - Guesses (not on the wiki or in the cache): the set-up timing (2, 2, 3, 3 ticks), the automatic load the tick after the furnace and its "You load the cannon with N cannonballs." line (the line's wording matches LostCity's 2004 content scripts, `quests/quest_mcannon/scripts/cannon_setup.rs2`; the timing has no reference, since 2004 set-up was one part per click), `mcannonmulti` = `1 << 20` while firing, the Load X prompt ("Set load-x cannonballs (1 - 30):", asked on first use; OSRS sets the amount in the settings menu, which this change does not add) and its confirmation line, and the Empty line "You unload your cannon and receive Steel cannonball x N.".
-- Guesses: "You need to complete the Dwarf Cannon quest before you can set up a cannon." (the real refusal is not on the wiki); "You cannot construct more than one cannon at a time.", "There isn't enough space to set up here." (also LostCity's), "This isn't your cannon!", "Your cannon is already full." (only when it holds 30), "You don't have any ammo to load into the cannon.", "Your cannon is empty.", and the inventory-space lines. Firing stops when the owner logs out. Nulodion gives all four parts even when only part of the cannon was set up.
+- Guesses: "You need to complete the Dwarf Cannon quest before you can set up a cannon." (the real refusal is not on the wiki); "You cannot construct more than one cannon at a time.", "There isn't enough space to set up here." (also LostCity's), "This isn't your cannon!", "Your cannon is already full." (only when it holds 30), "You don't have any ammo to load into the cannon.", "Your cannon is empty.", and the inventory-space lines. Firing stops when the owner logs out. Divergence: the wiki gives Nulodion no rule for a part-built cannon (Transcript:Nulodion says only "fewer than 4" free slots), so he returns the first k parts for the saved stage k and needs k free slots; this is ours.
 - Not implemented: granite cannonballs (35 max hit, loaded first); the Combat Achievement capacities (35/45/60); prohibited areas other than the Grand Exchange; bosses destroying cannons, and monsters the cannon can't hit (sand and ammonite crabs, demonic gorillas, kurasks); the 2019 chance of 1 damage instead of 0 at very low accuracy; the ornament kit; the "push" from the south-west tile after loading and walking away; `mcannon_setuptime` and the buff bar's decay timer (`buff_bar_get_value` also reads `%buff_cannon_decay_start`, which is never set, so the client's buff bar shows no decay timer); the player saying "I'm currently under attack" when firing in single-way combat (wiki, Trivia).
 - LostCity's 2004 scripts mark some refusal lines as OSRS wording that differs from ours ("This is not your cannon.", "The cannon is already full of ammo.", the pick-up space lines); neither the wiki nor RuneLite settles them, so ours stay as declared guesses.
 
