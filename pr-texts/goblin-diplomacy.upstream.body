@@ -32,7 +32,7 @@ Played end to end in game (desktop RuneLite, fresh account). Cheats: `::tele` fo
 
 Not tried in game: the other dye colours and mixes (same handler), the wrong-colour lines, the crate with a full inventory, the third crate.
 
-No unit tests: the earlier version's dialogue tests needed a separate test fixture, and as with #366 they are left out. The item moves are one `invTransaction` each (dye, mix) or a single add / delete checked before any state changes (crate, hand-in).
+No unit tests: the earlier version's dialogue tests needed a separate test fixture, and as with #366 they are left out. The item moves are one `invTransaction` each (dye, mix) or a single add / delete checked before any state changes (crate). In the hand-in the armour and the quest progress commit together with no dialogue page between them, so walking away on any page keeps both or neither; the brown hand-in returns the armour when the quest cannot complete (no room for the gold bar).
 
 ## Checklist
 
@@ -56,7 +56,7 @@ Guesses:
 - The start value 3 (Quest Helper treats 0 and 3 as one step; nothing shows the write).
 - "Human! Get us <colour> armour!" when asking for a different colour mid-quest.
 - The talk option "I have some <colour> armour here." (the transcript only shows using the armour on a general).
-- The crate's full-inventory message, and "Nothing interesting happens." for armour used on a general outside the quest.
+- The crate's full-inventory message, the brown hand-in's "You don't have enough room for the reward." when the gold bar does not fit, and "Nothing interesting happens." for armour used on a general outside the quest.
 - The dye message for red, green and pink (same wording as the recorded colours), and the dye-mixing message (no sound is played; none is documented or recorded).
 - The journal text, the quest scroll item and chathead expressions.
 
