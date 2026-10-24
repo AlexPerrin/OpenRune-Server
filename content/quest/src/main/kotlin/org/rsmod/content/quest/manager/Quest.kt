@@ -65,6 +65,9 @@ data class Quest(
     private val attributeRegistry = mutableMapOf<String, QuestAttribute<*>>()
     private val itemRewards = rewards.items.map { (item, amount) -> InvObj(item, amount) }
 
+    /** osrs-plugins-reverse: the stage `::quest name start` sets. */
+    var debugStartStage: Int = 1
+
     companion object {
         private val logger = InlineLogger()
         private val questsByKey = mutableMapOf<String, Quest>()
@@ -129,6 +132,18 @@ data class Quest(
         val clampedStage = stage.coerceIn(0, maxSteps)
         val stages = access.player.attr.getOrPut(QUEST_STAGE_MAP_ATTR) { mutableMapOf() }
         stages[key] = clampedStage
+    }
+
+    /**
+     * osrs-plugins-reverse: sets the stage for `::quest` device tests, without rewards, the quest
+     * scroll or quest points.
+     */
+    fun debugSetStage(player: Player, stage: Int) {
+        val clamped = stage.coerceIn(0, maxSteps)
+        if (questVarbit == null) {
+            player.attr.getOrPut(QUEST_STAGE_MAP_ATTR) { mutableMapOf() }[key] = clamped
+        }
+        player.questState = clamped
     }
 
     fun questState(player: Player): QuestProgressState =
