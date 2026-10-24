@@ -1,0 +1,26 @@
+Review fixes for upstream #355 (Genie random event), on current `main` (5c4c9c106). To be pushed onto the #355 head `content/genie` after the maintainer-side OK; #355 stays draft until then.
+
+**Problem.** Two review findings (eaglepurerocketgrape, 2026-10-22) and two findings of our own gate:
+- P1: `::randomevent` had no `requiredRights`, so any account could summon Genies and farm lamps.
+- P2: `talk()` removed the Genie from `genies` before the dialogue and gave the lamp after it; a cancelled dialogue or a logout at the open page left an orphan Genie and no lamp.
+- Our gate: he left Talk-to + 10 ticks instead of on his next call tick (RSProx 1718, 3056); the Rub message said 10 x level while the world XP rate gave x150.
+
+**Change.**
+- `::randomevent` requires `Rights.ADMINISTRATOR`.
+- Talk-to hands the lamp over first (`invAddOrDrop`, so a full inventory drops it at the player's feet; message "Your reward is: 1 x Lamp."), then opens the dialogue. The Genie stays tracked, marked handed over, and leaves on his next call tick with no call; logout still removes him. A second Talk-to says "Have a nice day".
+- The lamp gives exactly 10 x the base level in XP, unscaled, and the message states that number.
+
+**Tests.** `GenieRandomEventTest` gains 4 (integration): each guards a reported regression or an item flow: a cancelled dialogue keeps the lamp and he still leaves; logout at the open dialogue leaves no orphan and keeps the lamp; a full inventory drops the lamp instead of discarding it; he leaves on the next call tick, not before. The Rub message is not unit tested (interface flow).
+
+**Data sources.** OSRS Wiki (CC BY-NC-SA 3.0): Genie, Lamp, Random events, Transcript:Genie; RSProx recordings 3056 and 1718 (packet and tick facts only). Spec: `accuracy/genie-review-355.md` on the fork's docs branch.
+
+**Caveats.** The Rub result is a chat line, not the official message box. Logout removing the Genie is a guess. The message-box and zone work of our fuller build is not part of this PR.
+
+**Release note.** Genie random event: admin-only summon command, the lamp can no longer be lost, correct lamp XP.
+
+**Checklist**
+- [x] Compiles; tests for the change pass (CI)
+- [x] No documentation change needed
+- [x] No unrelated formatting or dependency changes
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
