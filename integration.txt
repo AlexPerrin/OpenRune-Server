@@ -1,0 +1,54 @@
+# integration = main + these branches, merged in this order by scripts/build-integration.sh.
+# One branch per line; '#' starts a comment. Recorded conflict resolutions: scripts/integration-rr-cache/.
+# Upstream fixes
+fix/06-varrock-single-juliet
+fix/07-juliet-house-stairs
+fix/69-blue-moon-inn-stairs
+fix/10-login-welcome-message
+fix/11-dense-clientscript-ids
+fix/22-music-tab-play
+fix/25-ice-mountain-music-area
+fix/31-friend-add-update
+fix/36-giant-mole-kill-count
+fix/37-kitten-growth-and-wording
+fix/54-ernest-stage-2
+fix/56-misthalin-mystery-mandy-guards
+fix/59-gertrudes-cat-fluffs
+fix/63-gertrudes-cat-shilop-line
+fix/70-missing-mesanims
+fix/71-item-config-tradeable
+fix/73-heldu-dispatch-order
+fix/74-bankside-view-op
+fix/75-coal-bag-messages
+fix/stile-approach
+fix/ground-item-despawn-times
+# Content
+content/dragon-specials
+content/reconnect-login
+fin/cannon
+fin/genie
+fin/quest-test-fixture
+local/quest-test-fixture
+local/romeo-juliet
+fin/witchs-potion
+fin/goblin-diplomacy
+fin/vampyre-slayer
+content/pirates-treasure
+fin/farming
+fin/hunter
+fin/fairy-rings
+fin/jewellery
+fin/diaries
+fin/grand-exchange
+content/looting-bag
+content/fletching
+# Local only (never upstream)
+local/android
+local/local-auth
+local/test-commands
+local/world-settings
+local/skip-cs2-packs
+local/op-overrides
+local/treasure-trails
+local/integration-tools
+local/spotless-241

@@ -1,0 +1,52 @@
+# Pins: the handed-over commit of each branch in integration.txt, merged by build-integration.sh instead of
+# the branch tip. Written by tools/harness/integrate.py (osrs-plugins-reverse) at each train; a branch
+# without a pin merges its tip with a warning. local/integration-tools is never pinned.
+# Seeded 2026-10-20 from the fork tips, all equal to what integration f9cc1618c merged.
+fix/06-varrock-single-juliet d5cea8a961393c8b4fe18f993e46005fa54c1c27
+fix/07-juliet-house-stairs 2e39d2189c86fc168cf5c9fce7b6db9c9377ac25
+fix/69-blue-moon-inn-stairs 0e558f9db976dc09d9b04aa63194eb6b1491f3a8
+fix/10-login-welcome-message 520b573c273e00dedf68488b742e963b9db42c18
+fix/11-dense-clientscript-ids c2f528fca73e316fe1a58e5f7124bb402e8f21cd
+fix/22-music-tab-play 8b3cfaca4049161085dfb53c37e2ef2eae439e40
+fix/25-ice-mountain-music-area 7f22b2064f7b38b4af017af1948cb7512de86cc8
+fix/31-friend-add-update f397f8f7af2faa15d38be06b7308c470b4cfeb9c
+fix/36-giant-mole-kill-count f661701058bd8b2be46a476372e40fbf9889e69f
+fix/37-kitten-growth-and-wording e38efb40a12d9a30487f1ff42d508a230ea32f7a
+fix/54-ernest-stage-2 13544cb87384dd9cbd5a2ca4a0b301d0bca5ac2f
+fix/56-misthalin-mystery-mandy-guards 10035c3ea63a67a61588b13bf4bcee36a2b3d0b0
+fix/59-gertrudes-cat-fluffs 7d4864c59b730370db6db424b8f03ce2b4a1f79d
+fix/63-gertrudes-cat-shilop-line bc1100c30ef7ad26f9dd7a9af94c1f1e537aca7f
+fix/70-missing-mesanims f38f4a79356b8bf01a170cf2cf58d0deb7e8de55
+fix/71-item-config-tradeable ededdf3e65f310b806fa3497b6e8d534a942cb95
+fix/73-heldu-dispatch-order b2f2fbb297dc308a504a2d3d90841d6f824dd33d
+fix/74-bankside-view-op a86998e235e16fa332af0b6e7fc461a8aa1c4ee0
+fix/75-coal-bag-messages 0514e670446a248c5405dc433dfbaa7c77421e43
+fix/stile-approach 68ddd1b6c0de78e18788b22dc52ff6df2909d348
+content/dragon-specials d4d3dde846fa2133f8cf5d9590e8a6c97aae8c85
+content/reconnect-login b748199b4fed7f146a388dd65f066d630f5068fb
+fin/cannon 7b62ce683414f32db711edcca240e6ebebba215f
+fin/genie 1d9b6fa49fe2d2f073f86813e7176be064030070
+fin/quest-test-fixture 35900b2779131a8201f0302f2beeefea77d4e1ab
+local/quest-test-fixture dfdd87590606be9ae30de8dcc1bbbfe46fca9137
+local/romeo-juliet 67dbb95e790330aff35e1efc62db48a8be47374e
+fin/witchs-potion fddf71474ecbdab1beb071421f909824dd67efeb
+fin/goblin-diplomacy c23023014e7a5664cacce616c362bca5560406bf
+fin/vampyre-slayer db97ed3102e4c6b68a1c27b1bdab3daaa9a68ab6
+content/pirates-treasure ca5b0d335cbfa4d503a15b686f6bb5d67af2c4eb
+fin/farming 1788d0561e255580814a5c7d3897714958fd3aad
+fin/hunter a4a74b5a9ea2b2256c24d2bf231b73a7fbbc3efc
+fin/fairy-rings 140f9d393f98f912b3551fde6dbf5e0f5e23c36c
+fin/jewellery eb28c879bffa20d17d9d68cb6761d861baa5e4c6
+fin/diaries c4229107663505bc23a3b89e768a6b12fe9202da
+fin/grand-exchange a9a8d1adede140e478b3a23dbb24979ab8326602
+content/looting-bag 8c16a3073a7cd5a6d7965f158a5d76508aa3f25b
+content/fletching 7e1f7b4bef43fab2a1030b63f607efec758cbf00
+local/android 9e41d0e62aa8492aac0e53409c6d7cd180887084
+local/local-auth a8cae097981071a6c2c187db49369b91daa7e279
+local/test-commands 6ca12a50bbacf48da7fd865e6165ded030322ab7
+local/world-settings 9e3d5d93f91d29363b71f5ea77a14d4601d23207
+local/skip-cs2-packs e493480549e6088494b3f44d6d2b4f8adf18b651
+local/op-overrides 46bc3ab31d147910709f4c94253add75ef5f2cb6
+local/treasure-trails 48b320359a91f9f0974c1ffc562e510c315bacf5
+fix/ground-item-despawn-times d0fe09c630e7456433348ee273f3e9cd8353cc82
+local/spotless-241 e6afed4620d1bfecc2cf522a98e3ff00a3477d73
