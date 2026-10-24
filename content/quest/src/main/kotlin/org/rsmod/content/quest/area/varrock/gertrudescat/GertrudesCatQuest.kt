@@ -113,8 +113,8 @@ class GertrudesCatQuest :
     suspend fun Dialogue.gertrudeDialogue(): Boolean {
         when (stage(player)) {
             0 -> beforeQuest()
-            STAGE_STARTED,
-            STAGE_PAID_KIDS -> lookingForFluffs()
+            STAGE_STARTED -> lookingForFluffs()
+            STAGE_PAID_KIDS -> afterPayingKids()
             STAGE_GAVE_MILK -> sardineAdvice()
             STAGE_GAVE_SARDINE -> afterSardine()
             else -> return false
@@ -161,6 +161,23 @@ class GertrudesCatQuest :
         chatNpc(quiz, "What about Shilop?")
         chatPlayer(neutral, "No sign of him either.")
         chatNpc(confused, "Hmmm... strange. He should be at the market.")
+    }
+
+    /** After paying the boys (stage 2), from the wiki transcript ("Talking to Gertrude again"). */
+    private suspend fun Dialogue.afterPayingKids() {
+        if (player.metFluffs) {
+            sardineAdvice()
+            return
+        }
+        chatPlayer(happy, "Hello Gertrude.")
+        chatNpc(
+            quiz,
+            "Hello again, did you manage to find Shilop? I can't keep an eye on him for the life of me.",
+        )
+        chatPlayer(neutral, "He does seem quite a handful.")
+        chatNpc(angry, "You have no idea! Did he help at all?")
+        chatPlayer(happy, "I think so, I'm just going to look now.")
+        chatNpc(happy, "Thanks again, adventurer.")
     }
 
     private suspend fun Dialogue.sardineAdvice() {

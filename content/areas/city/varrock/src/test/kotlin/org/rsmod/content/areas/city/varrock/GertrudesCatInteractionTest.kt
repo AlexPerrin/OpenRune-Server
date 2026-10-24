@@ -250,6 +250,18 @@ class GertrudesCatInteractionTest {
         assertEquals(3, f.stage())
     }
 
+    @Test fun `after paying the boys Gertrude asks about Shilop, not Fluffs`() {
+        val f = Fixture(2)
+        f.talkToGertrude()
+        f.finish()
+        assertTrue(f.output().contains("did you manage to find Shilop?"), f.output())
+        assertFalse(f.output().contains("What about Shilop?"), f.output())
+        val before = Fixture(1)
+        before.talkToGertrude()
+        before.finish()
+        assertTrue(before.output().contains("What about Shilop?"), before.output())
+    }
+
     @Test fun `the journal follows the stage`() {
         val f = Fixture(2)
         f.player.metFluffs = true
