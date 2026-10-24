@@ -1,5 +1,6 @@
 package org.rsmod.content.events.randomevents
 
+import jakarta.inject.Inject
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -9,12 +10,11 @@ import org.junit.jupiter.api.parallel.ExecutionMode
 import org.rsmod.api.invtx.invAdd
 import org.rsmod.api.player.ui.ifClose
 import org.rsmod.api.repo.obj.ObjRepository
-import org.rsmod.game.entity.player.SessionStateEvent
-import jakarta.inject.Inject
 import org.rsmod.api.testing.GameTestState
 import org.rsmod.content.events.randomevents.GenieRandomEvent.Companion.CALL_INTERVAL
 import org.rsmod.content.events.randomevents.GenieRandomEvent.Companion.LAMP
 import org.rsmod.content.events.randomevents.GenieRandomEvent.Companion.LIFETIME_TICKS
+import org.rsmod.game.entity.player.SessionStateEvent
 import org.rsmod.map.CoordGrid
 
 @Execution(ExecutionMode.SAME_THREAD)

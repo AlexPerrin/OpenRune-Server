@@ -9,8 +9,8 @@ import org.rsmod.api.npc.owner.assignSpawnOwner
 import org.rsmod.api.player.output.mes
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.random.GameRandom
-import org.rsmod.api.repo.obj.ObjRepository
 import org.rsmod.api.repo.npc.NpcRepository
+import org.rsmod.api.repo.obj.ObjRepository
 import org.rsmod.api.script.onCommand
 import org.rsmod.api.script.onOpHeld1
 import org.rsmod.api.script.onOpNpc1
