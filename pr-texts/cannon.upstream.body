@@ -30,18 +30,11 @@ New server-only gameval: timer `mcannon_fire`, written as `-1` and assigned by `
 
 ## How it was tested
 
-`DwarfMulticannonTest` (15, integration), on the item flows, the timers and the targeting (AGENTS.md):
-- set-up stages and varps; the auto-load after the furnace; a second cannon refused with its part kept;
-- firing and running dry; Load X; Empty; pick-up and pick-up without room;
-- breaking at 25 min and Repair; disappearing 10 min after breaking;
-- surviving a logout; lost after a restart;
-- single-way attacker targeting; the target regions and their double-hit overlap; Ranged XP capped at the target's hitpoints (a 30 roll on an 8-HP target gives 16 XP).
+No tests are included; the change was checked in game.
 
-`NulodionCannonSaleTest` (+1): a lost full cannon is replaced with four parts and keeps its ball count. Reclaim of a part-built cannon (stages 1 to 3) was checked in game, not in a test.
+On our fork's CI: `./gradlew assemble` after generating the cache and gameval sources, and a boot to "Server ready", pass; `spotlessCheck` passes. `tools/scripts/fix_gameval_conflicts.py --check`: no conflicts.
 
-On this commit, on our fork's CI: `./gradlew assemble test integration` after generating the cache and gameval sources, and a boot to "Server ready", pass; `spotlessCheck` passes. `tools/scripts/fix_gameval_conflicts.py --check`: no conflicts.
-
-In game, on this commit (desktop RuneLite on a branch server, a fresh members account, Lumbridge cows, single-way): the four stage lines 2, 2, 3 and 3 ticks apart, then "You load the cannon with 30 cannonballs."; `dropcannon` 4, `rockthrower` 30, `ownedmcannon` the packed coord of the south-west tile, `mcannon_world` = world % 128; shots at several cows and calves when not under attack, at most 16 Ranged XP (before the XP rate) per shot on 8-HP cows; "Your cannon is out of ammo!" when it ran dry; Load X (prompt once, then that amount); with an empty inventory, "You don't have any ammo to load into the cannon."; Empty; the cannon kept through a logout; Nulodion's "still happily parked" branch; Pick-up; RuneLite's Cannon plugin ball count and the Timers & Buffs cannon timer. The 25-minute break, Repair, the decay and a full cannon's replacement are covered by the integration tests.
+In game (desktop RuneLite on a branch server, a fresh members account, Lumbridge cows, single-way): the four stage lines 2, 2, 3 and 3 ticks apart, then "You load the cannon with 30 cannonballs."; `dropcannon` 4, `rockthrower` 30, `ownedmcannon` the packed coord of the south-west tile, `mcannon_world` = world % 128; shots at several cows and calves when not under attack, at most 16 Ranged XP (before the XP rate) per shot on 8-HP cows; "Your cannon is out of ammo!" when it ran dry; Load X (prompt once, then that amount); with an empty inventory, "You don't have any ammo to load into the cannon."; Empty; the cannon kept through a logout; the break after 25 minutes ("Your cannon has broken!", loc 14916) and Repair; Nulodion's "still happily parked" branch and the reclaim of a part-built cannon; Pick-up; RuneLite's Cannon plugin ball count and the Timers & Buffs cannon timer. Not run in game: the 10-minute decay after a break, the 35-minute decay of a part-built cannon, and Nulodion's replacement of a lost full cannon.
 
 Steps to repeat:
 1. Set up with the four parts and some balls: four stage messages at 2, 2, 3 and 3 ticks, then "You load the cannon with 30 cannonballs." The RuneLite Cannon plugin shows the ball count over the cannon, and Timers & Buffs starts its cannon timer.
@@ -54,7 +47,7 @@ Steps to repeat:
 ## Checklist
 
 - [x] Builds and the server boots
-- [x] Tests only cover complex logic and anything that moves items (no dupes)
+- [x] Tests: none are included; verified in game
 - [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
 - [x] State in varbits/varps, not attrs
 - [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the deviations are listed below, not in `docs/quirks.md`

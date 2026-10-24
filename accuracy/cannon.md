@@ -56,8 +56,7 @@ Exchange; bosses destroying cannons and immune monsters; the 1-damage floor at v
 the ornament kit; the south-west "push"; `mcannon_setuptime`.
 
 ## Tests
-`DwarfMulticannonTest` (15, integration, incl. the XP overkill case; AGENTS.md: item flows, timers, targeting) and `NulodionCannonSaleTest`
-(+1): see the PR text.
+None are included in the PR. Verification was in game: set-up stages and varps, firing and XP, Load X, Empty, pick-up, the logout, the break at 25 minutes and Repair, Nulodion's "still happily parked" branch and the reclaim of a part-built cannon (see the PR text). Not run in game: the 10-minute decay, the 35-minute part-built decay and the replacement of a lost full cannon.
 
 ## Ids
 Timer `mcannon_fire` 65535 (written as -1, assigned by `fix_gameval_conflicts.py`; timers have no OSRS
