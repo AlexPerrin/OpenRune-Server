@@ -1,0 +1,8 @@
+data
+build
+.gradle
+.kotlin
+rsprot/**/build
+rsprot/.gradle
+rsprot/.git
+!data/rsa.properties

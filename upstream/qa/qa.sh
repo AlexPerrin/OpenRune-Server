@@ -2,7 +2,7 @@
 # QA gate helper for OpenRune-Server branches (openrune/upstream/QA.md). Builds, tests and runs a
 # branch's own server from a fresh clone, beside (never instead of) the live osrs-openrune containers.
 #
-#   qa.sh clone  <slug> <commit> [merge-base]  fresh `git clone --shared` of re/upstream-pr/or at <commit>
+#   qa.sh clone  <slug> <commit> [merge-base]  fresh `git clone --shared` of the fork clone at <commit>
 #                                              into $QA_ROOT/<slug>-<commit7>; with merge-base (e.g. main),
 #                                              also <slug>-<commit7>-run = <merge-base> + <commit> (merge)
 #   qa.sh gate   <dir>                         section 1 in ONE container and one build-queue ticket
@@ -44,11 +44,13 @@
 # still built per gate). split-build/gradle: the old uncached runs (--no-build-cache), one per step.
 # Replace this file with mv, never edit it in place: running qa.sh processes read it as they go.
 set -euo pipefail
-REPO=/home/alex/osrs-plugins-reverse
-SRC=$REPO/re/upstream-pr/or
-QA_ROOT=${QA_ROOT:-$REPO/re/harness/qa}
+REPO=$(cd "$(dirname "$0")/../.." && pwd)   # this checkout (the fork's local/server-tools branch)
+SERVER_HOME=${HD_SERVER_HOME:-$HOME/src}
+WORK=$SERVER_HOME/openrune-work
+SRC=${INTEGRATION_CLONE:-$SERVER_HOME/OpenRune-Server}
+QA_ROOT=${QA_ROOT:-$WORK/qa}
 # Gradle home volume locks, shared by every qa.sh caller whatever its QA_ROOT.
-LOCKDIR=$REPO/re/harness/qa
+LOCKDIR=$WORK/qa
 mkdir -p "$LOCKDIR"
 GAME_PORT=${QA_GAME_PORT:-43596}
 HTTP_PORT=${QA_HTTP_PORT:-8083}
@@ -82,7 +84,7 @@ prep_clone() {
   local d=$1
   [ -f "$d/game.yml" ] || cp "$d/game.example.yml" "$d/game.yml"
   if grep -q 'm2-rsprot' "$d/settings.gradle.kts" 2>/dev/null && [ ! -d "$d/.m2-rsprot" ]; then
-    cp -a "$REPO/openrune/src/.m2-rsprot" "$d/.m2-rsprot"
+    cp -a "$REPO/src/.m2-rsprot" "$d/.m2-rsprot"
     grep -qx '/.m2-rsprot/' "$d/.git/info/exclude" 2>/dev/null || echo '/.m2-rsprot/' >> "$d/.git/info/exclude"
     echo "qa: copied .m2-rsprot into $d" >&2
   fi
@@ -110,7 +112,7 @@ dev_container_up() {
     --cpus=4 --memory=${QA_DEV_MEM:-4g} -u 1000:1000 $("$REPO/tools/gradle-cache.sh" args) \
     -e GRADLE_USER_HOME=/gradle -e GRADLE_OPTS=-Xmx256m -e QA_CLONE="$d" -e DEV_IDLE_MIN="${DEV_IDLE_MIN:-45}" \
     -v $v:/gradle -v $DLVOL:/dl -v "$d":"$d" -v "$d.logs":"$d.logs" $(git_mounts "$d") \
-    -v "$REPO/tools/gradle":/qa-init:ro -v "$REPO/openrune/upstream/qa":/qa-bin:ro \
+    -v "$REPO/tools/gradle":/qa-init:ro -v "$REPO/upstream/qa":/qa-bin:ro \
     -w "$d" eclipse-temurin:21 bash -c '
       touch /gradle/.qa-dev-activity
       while sleep 60; do
@@ -240,7 +242,7 @@ _gate)  # _gate <qa|dev:<volume>> <dir> <steps...>: one container running gate-s
     ${QA_INT_WORKERS:+-e QA_INT_WORKERS=$QA_INT_WORKERS} \
     ${GRADLE_REMOTE_CACHE_URL:+-e GRADLE_REMOTE_CACHE_URL=$GRADLE_REMOTE_CACHE_URL} \
     -v $v:/gradle -v $DLVOL:/dl -v "$d":"$d" -v "$L":"$L" $(git_mounts "$d") \
-    -v "$REPO/tools/gradle":/qa-init:ro -v "$REPO/openrune/upstream/qa/gate-steps.sh":/qa-steps.sh:ro \
+    -v "$REPO/tools/gradle":/qa-init:ro -v "$REPO/upstream/qa/gate-steps.sh":/qa-steps.sh:ro \
     -w "$d" eclipse-temurin:21 bash /qa-steps.sh "$L" "$@" &
   wait $! && rc=0 || rc=$?
   exit $rc
@@ -380,7 +382,7 @@ start)
   # jav_config.ws / slr.ws for the desktop client: the same read-only sidecar image as
   # osrs-openrune-http-desktop, on its own port. RSProx forwards the game connection to
   # 127.0.0.1:<game_server_port> from the proxy target, so the sidecar's own /rsa is not used.
-  docker run -d --name qa-or-http -p $HTTP_PORT:8080 -v $REPO/server/data:/data:ro \
+  docker run -d --name qa-or-http -p $HTTP_PORT:8080 -v $REPO/sidecar/data:/data:ro \
     -e WORLD_HOST=127.0.0.1 -e HTTP_PUBLIC_PORT=$HTTP_PORT -e WORLD_ID=255 -e SAVE_DIR=/tmp/saves \
     -e JAV_CONFIG_TEMPLATE=/app/protocol/jav_config.ws.template -e LOCAL_AUTH=false \
     -e PROOF_OF_WORK=false -e VALIDATE_CRCS=false osrs-rsps-test:241 >/dev/null
