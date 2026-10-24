@@ -1,0 +1,26 @@
+[gamevals.dbtable]
+fletching_knife = 56017
+
+[gamevals.dbrow]
+fletching_knife_shafts_logs = 60855
+fletching_knife_shortbow = 60856
+fletching_knife_longbow = 60857
+fletching_knife_shafts_oak = 60858
+fletching_knife_oak_shortbow = 60859
+fletching_knife_oak_longbow = 60860
+fletching_knife_shafts_willow = 60861
+fletching_knife_willow_shortbow = 60862
+fletching_knife_willow_longbow = 60863
+fletching_knife_shafts_maple = 60864
+fletching_knife_maple_shortbow = 60865
+fletching_knife_maple_longbow = 60866
+fletching_knife_shafts_yew = 60867
+fletching_knife_yew_shortbow = 60868
+fletching_knife_yew_longbow = 60869
+fletching_knife_shafts_magic = 60870
+fletching_knife_magic_shortbow = 60871
+fletching_knife_magic_longbow = 60872
+fletching_knife_shafts_redwood = 60873
+
+[gamevals.queue]
+fletching_knife = 61
