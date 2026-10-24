@@ -1,0 +1,7 @@
+# The cache's looting bag inventory is client-scoped; the server keeps its contents across logins.
+[[inventory]]
+isServerOnly = true
+id = "inv.looting_bag"
+inherit = "inv.looting_bag"
+scope = "Perm"
+protect = false

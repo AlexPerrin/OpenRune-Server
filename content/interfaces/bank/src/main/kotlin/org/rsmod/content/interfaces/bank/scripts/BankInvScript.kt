@@ -89,6 +89,8 @@ constructor(
         onIfModalButton("component.bankside:items") { sideInvOp(it.comsub, it.op) }
         onIfModalButton("component.bankmain:items") { mainInvOp(it.comsub, it.op) }
         onIfModalButton("component.bankside:wornops") { wornInvOp(it.comsub, it.op) }
+        onIfModalButton("component.bankside:lootingbag_items") { lootingBagOp(it.comsub, it.op) }
+        onIfModalButton("component.bankside:lootingbag_bankall") { depositLootingBag() }
         onIfModalButton("component.bankmain:depositinv") { depositInv() }
         onIfModalButton("component.bankmain:depositworn") { depositWorn() }
         onIfModalButton("component.bankmain:tabs") { selectTab(it.comsub, it.op) }
@@ -214,6 +216,39 @@ constructor(
                 else -> throw IllegalStateException("Invalid main inv op: $op")
             }
         invDeposit(slot, count, inv)
+    }
+
+    private suspend fun ProtectedAccess.lootingBagOp(slot: Int, op: IfButtonOp) {
+        val bag = inv("inv.looting_bag")
+        if (op == IfButtonOp.Op10) {
+            objExamine(bag, slot)
+            return
+        }
+        val count =
+            when (op) {
+                IfButtonOp.Op1 -> resolveLeftClickQty()
+                IfButtonOp.Op2 -> 1
+                IfButtonOp.Op3 -> 5
+                IfButtonOp.Op4 -> 10
+                IfButtonOp.Op5 -> resolveLastDepositQty()
+                IfButtonOp.Op6 -> {
+                    val input = countDialog()
+                    lastQtyInput = input
+                    input
+                }
+                IfButtonOp.Op7 -> Int.MAX_VALUE
+                else -> return
+            }
+        invDeposit(slot, count, bag)
+    }
+
+    private fun ProtectedAccess.depositLootingBag() {
+        val bag = inv("inv.looting_bag")
+        if (bag.isEmpty()) {
+            mes("You have nothing to deposit.")
+            return
+        }
+        depositInventory(bag)
     }
 
     public fun ProtectedAccess.invDeposit(slot: Int, count: Int, inventory: Inventory): Boolean {
