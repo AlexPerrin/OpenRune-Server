@@ -86,6 +86,7 @@ gertrudes_cat_state = 63711
 daddyshome_state = 64064
 waterfall_state = 64310
 sheep_shearer_state = 65472
+pirates_treasure_state = 64083
 
 [gamevals.varbit]
 vampyre_slayer_progress = 63720
@@ -113,6 +114,11 @@ waterfall_met_golrie = 64312
 waterfall_pillar_runes = 64313
 sheep_shearer_progress = 65449
 sheep_shearer_saw_thing = 65448
+pirates_treasure_employed = 63722
+pirates_treasure_crate_bananas = 63723
+pirates_treasure_crate_rum = 63724
+pirates_treasure_gardener_met = 63725
+pirates_treasure_progress = 63726
 
 [gamevals.bas]
 waterfall_wading = 1

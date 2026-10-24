@@ -5,6 +5,9 @@ import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.script.onOpNpc1
 import org.rsmod.api.script.onOpNpc3
 import org.rsmod.api.shops.Shops
+import org.rsmod.content.quest.area.portsarim.piratestreasure.PiratesTreasureState
+import org.rsmod.content.quest.area.portsarim.piratestreasure.wydinEmployeeTalk
+import org.rsmod.content.quest.area.portsarim.piratestreasure.wydinJobOffer
 import org.rsmod.content.quest.manager.QuestRequirements
 import org.rsmod.game.entity.Player
 import org.rsmod.plugin.scripts.PluginScript
@@ -55,8 +58,28 @@ class PortSarimShopkeepersScript @Inject constructor(private val shops: Shops) :
     }
 
     private suspend fun Dialogue.wydin() {
+        if (PiratesTreasureState.employedAtWydin(player)) {
+            if (wydinEmployeeTalk()) player.openShop(PortSarimShop.Food)
+            return
+        }
         chatNpc(happy, "Welcome to my food store! Would you like to buy anything?")
-        when (choice3("Yes please.", 1, "No, thank you.", 2, "What can you recommend?", 3)) {
+        val choice =
+            if (PiratesTreasureState.stage(player) == PiratesTreasureState.FETCH_RUM) {
+                choice4(
+                    "Yes please.",
+                    1,
+                    "No, thank you.",
+                    2,
+                    "What can you recommend?",
+                    3,
+                    "Can I get a job here?",
+                    4,
+                )
+            } else {
+                choice3("Yes please.", 1, "No, thank you.", 2, "What can you recommend?", 3)
+            }
+        when (choice) {
+            4 -> wydinJobOffer("Can I get a job here?")
             1 -> {
                 chatPlayer(happy, "Yes please.")
                 player.openShop(PortSarimShop.Food)
