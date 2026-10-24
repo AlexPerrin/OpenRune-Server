@@ -10,6 +10,7 @@ import org.rsmod.api.player.events.interact.LocCategoryEvents
 import org.rsmod.api.player.events.interact.LocContentEvents
 import org.rsmod.api.player.events.interact.LocDefaultEvents
 import org.rsmod.api.player.events.interact.LocEvents
+import org.rsmod.api.player.events.interact.LocOverrideEvents
 import org.rsmod.api.player.events.interact.LocUnimplementedEvents
 import org.rsmod.api.player.events.interact.OpEvent
 import org.rsmod.api.route.BoundValidator
@@ -25,7 +26,11 @@ import org.rsmod.utils.bits.getBits
 
 public class LocInteractions
 @Inject
-constructor(private val boundValidator: BoundValidator, private val eventBus: EventBus) {
+constructor(
+    private val boundValidator: BoundValidator,
+    private val eventBus: EventBus,
+    private val overrides: LocOpOverrides = LocOpOverrides(),
+) {
     public fun interact(
         player: Player,
         loc: BoundLocInfo,
@@ -62,6 +67,13 @@ constructor(private val boundValidator: BoundValidator, private val eventBus: Ev
         type: ObjectServerType = ServerCacheManager.getObject(loc.id)!!,
         base: BoundLocInfo = loc,
     ): OpEvent? {
+        if (base === loc && overrides.claims(player, loc, type.id, op)) {
+            val overrideEvent = LocOverrideEvents.Op(loc, type, op)
+            if (eventBus.contains(overrideEvent::class.java, overrideEvent.id)) {
+                return overrideEvent
+            }
+        }
+
         val multiLoc = multiLoc(loc, type, player.vars)
         if (multiLoc != null) {
             val multiLocType = ServerCacheManager.getObject(multiLoc.id)!!

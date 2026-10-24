@@ -608,3 +608,17 @@ public class LocUCategoryEvents {
         category: Int = type.category,
     ) : ApEvent(EventBus.composeLongKey(category, objType.id))
 }
+
+/** A loc op taken over through [org.rsmod.api.player.interact.LocOpOverrides]. */
+public class LocOverrideEvents {
+    public class Op(
+        public val loc: BoundLocInfo,
+        public val type: ObjectServerType,
+        public val op: org.rsmod.game.interact.InteractionOp,
+    ) : OpEvent(key(type.id, op))
+
+    public companion object {
+        public fun key(locType: Int, op: org.rsmod.game.interact.InteractionOp): Long =
+            EventBus.composeLongKey(locType, op.slot)
+    }
+}
