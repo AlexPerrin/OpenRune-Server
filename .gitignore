@@ -1,0 +1,7 @@
+src/
+rsprot/
+sidecar/data/
+sidecar/rsprot/
+sidecar/build/
+sidecar/.gradle/
+__pycache__/
