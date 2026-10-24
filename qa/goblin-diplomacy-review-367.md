@@ -7,7 +7,8 @@ Run by sq51 on 2026-10-24. All checks run to the end; findings collected, none o
 
 ### Findings
 None blocking.
-- Note (not a defect): `fix_gameval_conflicts.py --check` was run locally on the scratch tree and is clean; spotlessCheck was not run (the dispatched ci.yml has no Formatting step); the diff is one file in the surrounding style, no comments.
+- Formatting: the upstream Formatting workflow (format.yml, `spotlessCheck`, ratchet from main; fork main equals upstream main 5c4c9c106) dispatched on the scratch branch: run 40142381815 success, nothing to format. `fix_gameval_conflicts.py --check` run locally on the scratch tree: clean.
+- Must be updated when the head moves: the PR text's CI line ("On the branch head (current `main` 829b9477d + the quest), the fork's GitHub Actions run ...") describes an earlier head; restate it for the pushed head and the current main when the update is posted.
 
 ### Checks
 1. Source review (d77ac2b76..405e38601, GoblinDiplomacy.kt only): the brown try-on page passes `GRUBFOOT_BROWN_HEAD` explicitly; orange and blue commit (`commitHandIn`: `invDel`, look, stage) right after "I have some ... armour here."; brown commits armour and `completeQuest` together after the last page; a failed brown completion re-adds the armour and shows the room message; a failed `invDel` returns with no change.
