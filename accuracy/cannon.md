@@ -1,21 +1,18 @@
-# Dwarf multicannon (acc/cannon, upstream PR #354)
+# Dwarf multicannon (content/cannon, upstream PR #354)
 
-Spec for the audited rewrite on `acc/cannon` (one commit bc243d141 on main 829b9477d: the
-feature, the timer id, the `mcannon_world` fix, the capture-citation removal, the AGENTS.md trim, and sq24's fixes (XP capped at the target's hitpoints, the no-ammo message), squashed). Reuses the 2026-10-18 audit of the first version (osrs-plugins-reverse
+Spec for the dwarf multicannon (`content/cannon`). It follows the 2026-10-18 audit (osrs-plugins-reverse
 `openrune/upstream/accuracy/cannon.md`: 29 rows, D1-D10), with each row's status on this branch. Its sources:
 OSRS Wiki "Dwarf multicannon" (Assembly; Mechanics: Damage and experience, Accuracy, Revolutions, Targets,
 Breaking/Decay/Death; Prohibited areas; Changes), "Cannonball", "Cannon base", "Transcript:Nulodion"; the
 cache (locs 6-9 and 14916, objs 2/6/8/10/12, varps 2-4, varbits 13672/1968/2180/6015, seq 827); RuneLite's
-Cannon, Timers & Buffs and the hub Supplies Tracker (secondary). Correction (2026-10-19): an earlier draft cited
-an rsprox capture of the official game for set-up timing, auto-load, Load X and Empty wording and
-`mcannonmulti`; none of the RSProx recordings we have (rsprox.net database) shows a player cannon (swept
-2026-10-19), so these items are guesses.
+Cannon, Timers & Buffs and the hub Supplies Tracker (secondary). None of the RSProx recordings we have (rsprox.net database) shows a player cannon (swept
+2026-10-19), so set-up timing, auto-load, Load X and Empty wording and `mcannonmulti` are guesses.
 
 ## Upstream first
-`gh pr list --search cannon` (2026-10-18): #354 (ours, draft, no review comments) and #329 (merged: adds
+`gh pr list --search cannon`: #354 (this change) and #329 (merged: adds
 Nulodion, which this change extends). No multicannon code on `main`.
 
-## Status of the audit's divergences on acc/cannon
+## Status of the audit's divergences on content/cannon
 | Audit | Mechanic | On this branch | Status |
 |---|---|---|---|
 | D1 / rows 23 | No broken state | breaks after 25 min: loc 14916, "<col=ef1020>Your cannon has broken!", stops firing; Repair: "You repair your cannon, restoring it to working order." restarts 25 min | fixed |
@@ -52,7 +49,7 @@ Rows 1, 3-6, 8, 10, 11, 15, 17, 20-22, 26 and 28 matched in the audit and are un
   inventory spaces to pick that up."), the one-cannon line's capital "Cannon", and pick-up as two lines.
 
 ## Scope gaps (PR caveats)
-Also (sq24, 2026-10-19): the buff bar's decay timer (`%buff_cannon_decay_start`, never set) and the trivia's "I'm
+Also: the buff bar's decay timer (`%buff_cannon_decay_start`, never set) and the trivia's "I'm
 currently under attack" line.
 Granite cannonballs; Combat Achievement capacities (35/45/60); prohibited areas other than the Grand
 Exchange; bosses destroying cannons and immune monsters; the 1-damage floor at very low accuracy (2019);
@@ -64,8 +61,8 @@ the ornament kit; the south-west "push"; `mcannon_setuptime`.
 
 ## Ids
 Timer `mcannon_fire` 65535 (written as -1, assigned by `fix_gameval_conflicts.py`; timers have no OSRS
-max). The first version's 431/432 are gone.
+max).
 
 ## PR split
-One change (`acc/cannon`, force-pushed onto #354's branch). It touches `content/areas/misc/dwarven-mine`
+One change (`content/cannon`, #354's branch). It touches `content/areas/misc/dwarven-mine`
 (Nulodion's "I've lost my cannon.") because the reclaim is part of the cannon's decay rules. No `Depends:`.
