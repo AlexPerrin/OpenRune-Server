@@ -107,10 +107,15 @@ constructor(
         client.write(HideObjOps(false))
     }
 
+    private val OSRS_WELCOME = "Welcome to Old School RuneScape."
+
     private fun Player.sendWelcomeMessage() {
         val message = realm.config.loginMessage
         message?.let {
-            mes(it.replace("RS Mod", config.name), ChatType.Welcome)
+            // RuneLite's Chat History restores the chat only after "Welcome to Old School RuneScape".
+            val text =
+                if (it.startsWith("Welcome to ")) OSRS_WELCOME else it.replace("RS Mod", config.name)
+            mes(text, ChatType.Welcome)
         }
 
         val broadcast = realm.config.loginBroadcast
