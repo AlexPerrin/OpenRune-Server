@@ -10897,6 +10897,7 @@ inherit = "npc.castlewars_imp"
 id = "npc.mole_giant"
 inherit = "npc.mole_giant"
 [npc.params]
+"param.killcount_varp"="varp.total_mole_kills"
 "param.elemental_weakness_type"=2
 "param.elemental_weakness_percent"=50
 
