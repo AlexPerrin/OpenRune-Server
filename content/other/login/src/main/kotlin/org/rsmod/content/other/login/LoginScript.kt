@@ -56,12 +56,26 @@ constructor(
 
     override fun ScriptContext.startup() {
         onEvent<SessionStateEvent.EngineLogin>(0L) { player.engineLogin() }
+        onEvent<SessionStateEvent.Reconnect> { player.reconnectResync() }
     }
 
     private fun Player.engineLogin() {
         sendHighPriority()
         sendLowPriority()
         VarPlayerIntMapSetter.set(this, "varbit.player_in_instance", 0)
+    }
+
+    /**
+     * Packets written while the old connection was gone were lost, so the state that may have
+     * changed in the meantime is sent again: varps, stats, run energy and every transmitted
+     * inventory (in full). Whether OSRS resends anything after a reconnect is not known.
+     */
+    private fun Player.reconnectResync() {
+        sendVars()
+        transmittedInvAddQueue.addAll(transmittedInvs)
+        transmittedInvs.clear()
+        sendStats()
+        sendRun()
     }
 
     private fun Player.sendHighPriority() {
