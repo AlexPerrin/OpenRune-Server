@@ -65,7 +65,7 @@ rsprot)
     fi
     git -C rsprot checkout -q -f "$RSPROT_COMMIT"
     git -C rsprot clean -q -fdx -e build -e .gradle
-    git -C rsprot apply "$ROOT/server/rsprot.patch"
+    git -C rsprot apply "$PWD/sidecar/rsprot.patch"
     sed -i "s/version = \"1.0.0-ALPHA-20261001\"/version = \"$RSPROT_VERSION\"/" rsprot/build.gradle.kts
     sed -i 's/-Xmx8G/-Xmx4G/' rsprot/gradle.properties
     mkdir -p src/.m2-rsprot
