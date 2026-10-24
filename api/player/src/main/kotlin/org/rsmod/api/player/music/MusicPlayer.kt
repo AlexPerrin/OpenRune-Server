@@ -3,7 +3,6 @@ package org.rsmod.api.player.music
 import dev.openrune.rscm.RSCM
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
-import dev.openrune.types.aconverted.AreaType
 import jakarta.inject.Inject
 import org.rsmod.api.music.Music
 import org.rsmod.api.music.MusicRepository
@@ -121,6 +120,17 @@ internal constructor(private val random: GameRandom, private val repo: MusicRepo
         VarPlayerIntMapSetter.set(player, varp, unlockValue)
     }
 
+    /** Whether the jukebox may play [musicRow]: tracks with no unlock variable are always open. */
+    public fun isUnlocked(player: Player, musicRow: MusicRow): Boolean {
+        val music = repo.forRow(musicRow) ?: return false
+        return !music.canUnlock || hasUnlocked(player, music)
+    }
+
+    public fun isPlaying(player: Player, musicRow: MusicRow): Boolean {
+        val music = repo.forRow(musicRow) ?: return false
+        return player.currMusicId == music.id
+    }
+
     public fun hasUnlocked(player: Player, musicRow: MusicRow): Boolean {
         val music = getOrThrow(musicRow)
         return hasUnlocked(player, music)
@@ -168,7 +178,7 @@ internal constructor(private val random: GameRandom, private val repo: MusicRepo
         if (player.currMusicArea == 0) {
             return
         }
-        val area = RSCM.getReverseMapping(RSCMType.AREA,player.currMusicArea - 1)
+        val area = RSCM.getReverseMapping(RSCMType.AREA, player.currMusicArea - 1)
         when (player.areaMode) {
             MusicAreaMode.Modern -> {
                 val modernMusic = repo.getModernArea(area)
