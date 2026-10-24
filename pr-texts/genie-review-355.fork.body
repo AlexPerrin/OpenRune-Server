@@ -10,7 +10,7 @@ Review fixes for upstream #355 (Genie random event), on current `main` (5c4c9c10
 - Talk-to hands the lamp over first (`invAddOrDrop`, so a full inventory drops it at the player's feet; message "Your reward is: 1 x Lamp."), then opens the dialogue. The Genie stays tracked, marked handed over, and leaves on his next call tick with no call; logout still removes him. A second Talk-to says "Have a nice day".
 - The lamp gives exactly 10 x the base level in XP, unscaled, and the message states that number.
 
-**Tests.** `GenieRandomEventTest` gains 4 (integration): each guards a reported regression or an item flow: a cancelled dialogue keeps the lamp and he still leaves; logout at the open dialogue leaves no orphan and keeps the lamp; a full inventory drops the lamp instead of discarding it; he leaves on the next call tick, not before. The Rub message is not unit tested (interface flow).
+**Tests.** None added: the review fix ships without new tests; `GenieRandomEventTest` is unchanged from the #355 head. The behaviour is checked in game against the spec.
 
 **Data sources.** OSRS Wiki (CC BY-NC-SA 3.0): Genie, Lamp, Random events, Transcript:Genie; RSProx recordings 3056 and 1718 (packet and tick facts only). Spec: `accuracy/genie-review-355.md` on the fork's docs branch.
 
@@ -19,7 +19,7 @@ Review fixes for upstream #355 (Genie random event), on current `main` (5c4c9c10
 **Release note.** Genie random event: admin-only summon command, the lamp can no longer be lost, correct lamp XP.
 
 **Checklist**
-- [x] Compiles; tests for the change pass (CI)
+- [x] Compiles; existing tests pass (CI)
 - [x] No documentation change needed
 - [x] No unrelated formatting or dependency changes
 
