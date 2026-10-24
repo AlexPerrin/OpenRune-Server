@@ -84,6 +84,7 @@ class GenieRandomEventTest {
             val center = CoordGrid(0, 50, 50, 20, 20)
             allocZoneCollision(center)
             player.teleport(center)
+            player.observerUUID = 795L
             player.invAdd(player.inv, "obj.logs", 28)
             val genie = deps.script.spawn(player)
             player.opNpc1(genie)
