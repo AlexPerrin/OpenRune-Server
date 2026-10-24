@@ -1,9 +1,0 @@
-id = "Jaguar Drops"
-npcs = ["npc.varlamore_jaguar"]
-
-[[guaranteed]]
-obj = "obj.varlamore_jaguar_fur"
-count = 1
-
-
-# Unknown wiki drop rate: Clue scroll (medium) [tertiary/Tertiary/Rare]

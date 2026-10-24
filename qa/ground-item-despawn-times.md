@@ -1,41 +1,38 @@
 # QA: fix/ground-item-despawn-times
 - Branch: `fix/ground-item-despawn-times`
-- Commit: `5ae6a3aebae311e4dc336acd974ee1f1a44039fa`
-## Upstream gate: **FAIL**
+- Commit: `7e3e0dc2b` (gated with upstream main 5c4c9c106 merged: scratch merge b1b8997e6, fork branch gate/ground-item-despawn-times)
+## Upstream gate: **PASS**
 ## Internal gate: N/A (dev-checked)
 
-Gate by sq49, 2026-10-24, at 5ae6a3aeb (previous: sq45 PASS at d0fe09c63, sq48 FAIL at 83a64ba7e on scope).
+Upstream gate by sq54 on 2026-10-24. History: sq45 PASSED d0fe09c63 (in game); sq48 FAILED scope; sq49 FAILED 5ae6a3aeb on spotless.
 
-## Why it fails: Formatting (spotlessCheck)
-Branch merged with current upstream main 5c4c9c106 (clean merge, 130430a0d in my scratch clone; diff vs upstream main is the same
-8 files, 106+/24-, no test file). `spotlessCheck` (`ratchetFrom origin/main`, set to 5c4c9c106) fails:
-`:api:repo:spotlessKotlinCheck`, `api/repo/src/main/kotlin/org/rsmod/api/repo/obj/ObjRepository.kt`: the import
-`java.util.concurrent.ConcurrentLinkedQueue` must be sorted into the block (after `jakarta.inject.Inject`), not at the end.
-That is the "stray import-reorder hunk" sq48 asked to revert; it is not stray: the file is touched by the change, so the
-ratchet checks it and the unsorted import fails the Formatting workflow (it was green at d0fe09c63 with the move in place).
-Reverting it in 5ae6a3aeb broke the format check. Upstream's Formatting CI would be red.
+## Scope
+Net diff vs merge base e85278c9a (`git merge-base 7e3e0dc2b upstream/main`): 8 files, +108/-27, no test file, no build file:
+PlayerZoneUpdateProcessor, HeldInteractions, PlayerDropTimers (new), ObjRegistry, ZoneUpdateMap, ZoneUpdateTransformer, ObjRepository, Obj.kt.
+`git diff --stat upstream/main b1b8997e6` is the same 8 files (+108/-27): the merge is clean. One change.
+Whitespace/import hunks (`?: return` spacing in HeldInteractions, import order in ObjRepository, a blank line in Obj.kt) judged by the
+formatter: `./gradlew :api:game-process:spotlessCheck :api:player:spotlessCheck :api:registry:spotlessCheck :api:repo:spotlessCheck
+:engine:game:spotlessCheck` on the merge: rc=0, clean. They are what spotless requires, not stray edits.
 
-Note on sq48's other point: the Obj.kt blank-line removal is gone and spotless does not flag Obj.kt.
+## Build / CI
+Fork CI run 40142485323 (CI) on b1b8997e6: completed success. Formatting run 40142514802: completed success.
+(Cancelled run 40142438077 was a mistaken bare tip: ignored.)
 
-## What must change
-Put the `ConcurrentLinkedQueue` import back in sorted position in ObjRepository.kt (run `./gradlew :api:repo:spotlessApply`
-and keep exactly what it changes; check the diff vs merge base afterwards: that import move is then a required part of the
-change, keep it), then `spotlessCheck` must pass at the new commit. Re-gate.
+## Accuracy
+Spec accuracy/ground-item-despawn-times.md (docs 5297c65bc) vs wiki Drop page, as re-read by sq45 on this logic (same main code):
+tradeable public at 60 s, gone 120 s later (100/300), untradeable 180 s (300, never public), clue scrolls 61 min (6100). The code
+(PlayerDropTimers: 100/300/6100, stockmarket flag, clue name regex + Mimic) matches the spec table. Spec Tests section is true
+(no unit tests; in-game checks recorded).
 
-## Checked at 5ae6a3aeb (stand unless the next commit changes them)
-- Scope: net diff vs merge base e85278c9a: 8 files, no test file, no whitespace-only hunk; only the ObjRepository import
-  position is wrong for spotless (above). Diff content = PlayerDropTimers, HeldInteractions, Obj timers, ObjRepository,
-  ObjRegistry (reveal cycle, singleCopy ownerId), ZoneUpdateMap/Transformer (OBJ_ADD fields, copy ownerId),
-  PlayerZoneUpdateProcessor.
-- Accuracy: wiki Drop re-read (WebFetch; osrs-mcp not available in this session): tradeables public after 60 s and gone after
-  another 120 s, untradeables 180 s, clue scrolls 61 min = 100/300, 300 never public, 6100. Constants in the diff match;
-  RSProx values as in the spec (sq45 re-read them at source).
-- Build with upstream main merged, local `qa.sh gate` (compile, cache, buildCache, rsa, installDist, assemble: rc=0;
-  `test` 790 tests and `integration` 110 tests: 0 failures); only spotless rc=1. Fork CI on a scratch branch was NOT run: my hook
-  denies any push except onto `docs`, so `gate/ground-item-despawn-times` could not be pushed (reported to the caller).
-- PR text (cc24ebd8c): "Three gaps", three bullets, no test bullets, in-game bullet kept, constants and behaviour true of
-  the commit. The spec `accuracy/...md` still has a stale "Tests" section naming the removed tests (docs only, not upstream).
-- In game: not re-run (verdict fixed by the format failure; a new commit voids it). sq45's in-game result at d0fe09c63 stands for
-  the code, which is unchanged apart from the removed tests.
+## In game
+Not re-run. `git diff d0fe09c63 7e3e0dc2b --stat` is 4 files: PlayerDropTimersTest, ObjRegistrySplitOwnerTest, ObjAddTimersTest (removed)
+and the `game-cache-test-conventions` plugin line in api/registry/build.gradle.kts (removed with the tests). No main-source file differs, so
+no logic change; sq45's in-game PASS at d0fe09c63 (bronze axe 100/300, trowel 300 never public, clue 6100, delete at +299) stands.
 
-## Verdict: **FAIL**
+## PR text review
+pr-texts/ground-item-despawn-times.upstream.body at cc24ebd8c: "Three gaps" and three bullets (drop timers, OBJ_ADD timers, owner copy);
+no test bullets or test claims remain; the How it was tested section states only the in-game run; checklist has no tests line. Every claim
+(constants, stockmarket flag, lootDropDuration override, ObjRepository/ZoneUpdateTransformer behaviour, singleCopy/copy ownerId) is
+true of the diff. CONTRIBUTING sections present, scope one change.
+
+## Verdict: **PASS**

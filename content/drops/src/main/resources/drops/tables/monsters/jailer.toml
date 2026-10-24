@@ -1,6 +1,0 @@
-id = "Jailer Drops"
-npcs = ["npc.jailer"]
-
-[[guaranteed]]
-obj = "obj.jail_key"
-count = 1
