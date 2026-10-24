@@ -99,7 +99,7 @@ constructor(
         onIfModalDrag("component.bankside:wornops") { dragSideInv(it) }
         onIfModalDrag("component.bankmain:items", "component.bankmain:tabs") { dragIntoTab(it) }
 
-        val wornComponents = bank_equipment_tab_to_slots_map.filterValuesNotNull().map { it.key to RSCM.getReverseMapping(RSCMType.COMPONENT,it.value.packed) }
+        val wornComponents = bank_equipment_tab_to_slots_map.filterValuesNotNull().map { it.key to RSCM.getReverseMapping(RSCMType.COMPONENT, it.value.packed) }
         for ((slot, component) in wornComponents) {
             onIfModalButton(component) { wornOp(slot, it.op) }
         }
@@ -188,6 +188,10 @@ constructor(
     private suspend fun ProtectedAccess.sideInvOp(slot: Int, op: IfButtonOp) {
         if (op == IfButtonOp.Op10) {
             objExamine(inv, slot)
+            return
+        }
+        // Op 1 is "View"/"Configure" (looting bag, rune pouches): the client switches the panel.
+        if (op == IfButtonOp.Op1) {
             return
         }
         val count =
