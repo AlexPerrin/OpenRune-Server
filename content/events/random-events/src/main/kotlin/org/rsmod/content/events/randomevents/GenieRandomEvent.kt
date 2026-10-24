@@ -1,6 +1,7 @@
 package org.rsmod.content.events.randomevents
 
 import dev.openrune.types.NpcMode
+import dev.or2.central.account.Rights
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import org.rsmod.api.config.Constants
@@ -8,6 +9,7 @@ import org.rsmod.api.npc.owner.assignSpawnOwner
 import org.rsmod.api.player.output.mes
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.random.GameRandom
+import org.rsmod.api.repo.obj.ObjRepository
 import org.rsmod.api.repo.npc.NpcRepository
 import org.rsmod.api.script.onCommand
 import org.rsmod.api.script.onOpHeld1
@@ -39,6 +41,7 @@ class GenieRandomEvent
 @Inject
 constructor(
     private val npcRepo: NpcRepository,
+    private val objRepo: ObjRepository,
     private val collision: CollisionFlagMap,
     private val mapClock: MapClock,
     private val random: GameRandom,
@@ -57,6 +60,7 @@ constructor(
         onOpNpc5(GENIE) { dismiss(it.npc) }
         onOpHeld1(LAMP) { rub() }
         onCommand("randomevent") {
+            requiredRights = Rights.ADMINISTRATOR
             desc = "Spawn the Genie random event beside you"
             cheat(::summon)
         }
@@ -93,6 +97,11 @@ constructor(
             return
         }
         val npc = genie.npc
+        if (genie.handedOver) {
+            genies.remove(owner)
+            leave(npc)
+            return
+        }
         if (mapClock.cycle >= genie.leaveCycle) {
             npc.say("Maybe later.")
             genies.remove(owner)
@@ -111,8 +120,8 @@ constructor(
     }
 
     private suspend fun ProtectedAccess.talk(npc: Npc) {
-        val owner = genies.entries.firstOrNull { it.value.npc === npc }?.key
-        if (owner !== player) {
+        val entry = genies.entries.firstOrNull { it.value.npc === npc }
+        if (entry == null || entry.key !== player) {
             startDialogue(npc) {
                 chatNpc(
                     neutral,
@@ -121,7 +130,17 @@ constructor(
             }
             return
         }
-        genies.remove(player)
+        val genie = entry.value
+        if (genie.handedOver) {
+            startDialogue(npc) { chatNpc(happy, "Have a nice day, ${title(player)}.") }
+            return
+        }
+        // The lamp is handed over before the dialogue opens: cancelling the dialogue or logging out
+        // while it is open cannot lose it. The Genie stays tracked and leaves on his next call tick
+        // (or on logout), so no step after the suspension is needed for cleanup.
+        genie.handedOver = true
+        invAddOrDrop(objRepo, LAMP, 1, inv = inv)
+        mes("Your reward is: <col=ff0000>1</col> x <col=ff0000>Lamp</col>.")
         startDialogue(npc) {
             chatNpc(
                 happy,
@@ -129,12 +148,6 @@ constructor(
                     "summoned me. Please take this lamp and make your wish.",
             )
         }
-        leave(npc)
-        if (inv.isFull()) {
-            mes("You don't have enough inventory space for the lamp.")
-            return
-        }
-        invAdd(inv, LAMP)
     }
 
     private fun ProtectedAccess.dismiss(npc: Npc) {
@@ -151,8 +164,10 @@ constructor(
         val stat = chooseLampSkill("Choose the stat you wish to be advanced!") ?: return
         val xp = statBase(stat) * LAMP_XP_PER_LEVEL
         if (invDel(inv, LAMP).failure) return
-        statAdvance(stat, xp.toDouble())
-        mes("Your wish has been granted!")
+        // Unscaled: the message and the XP are the same number, as in the official game.
+        statAdvance(stat, xp.toDouble(), rate = 1.0, globalRate = 1.0)
+        val skill = stat.substringAfter('.').replaceFirstChar { it.uppercase() }
+        mes("Your wish has been granted! You have been awarded $xp $skill XP!")
     }
 
     private fun leave(npc: Npc) {
@@ -174,7 +189,7 @@ constructor(
 
     private fun nextEventDelay(): Int = random.of(MIN_EVENT_DELAY, MAX_EVENT_DELAY)
 
-    private data class Genie(val npc: Npc, val leaveCycle: Int)
+    private data class Genie(val npc: Npc, val leaveCycle: Int, var handedOver: Boolean = false)
 
     companion object {
         const val GENIE = "npc.macro_geni"
