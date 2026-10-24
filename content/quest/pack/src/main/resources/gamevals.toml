@@ -80,6 +80,7 @@ restless_ghost_return_tile = 63704
 misthalin_return_tile = 63700
 misthalin_mirror_blocker = 63701
 misthalin_puzzle_state = 63702
+vampyre_slayer_state = 63713
 cooks_assistant_ingredients = 63705
 gertrudes_cat_state = 63711
 daddyshome_state = 64064
@@ -87,6 +88,8 @@ waterfall_state = 64310
 sheep_shearer_state = 65472
 
 [gamevals.varbit]
+vampyre_slayer_progress = 63720
+vampyre_asked_harlow = 63721
 restless_ghost_progress = 63702
 imp_catcher_progress = 63703
 misthalin_reflections = 63700
