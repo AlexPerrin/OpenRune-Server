@@ -5,6 +5,7 @@ plugins {
 }
 
 dependencies {
+    implementation(projects.content.interfaces.achievementDiary)
     implementation(projects.api.attr)
     implementation(projects.api.combat.combatCommons)
     implementation(projects.api.areaChecker)

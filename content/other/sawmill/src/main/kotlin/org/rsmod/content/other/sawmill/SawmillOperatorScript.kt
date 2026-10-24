@@ -16,6 +16,7 @@ import org.rsmod.api.script.onOpNpc4
 import org.rsmod.api.shops.Shops
 import org.rsmod.api.table.SawmillOperatorsRow
 import org.rsmod.api.table.SawmillPlanksRow
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import org.rsmod.content.skills.SkillMultiConfig
 import org.rsmod.content.skills.SkillMultiEntry
 import org.rsmod.content.skills.SkillingActionType
@@ -151,7 +152,7 @@ constructor(private val shops: Shops, private val hooks: SawmillHooks) : PluginS
             )
             return
         }
-        player.invTransaction(access.inv) {
+        val result = player.invTransaction(access.inv) {
             val from = select(access.inv)
             delete {
                 this.from = from
@@ -169,6 +170,7 @@ constructor(private val shops: Shops, private val hooks: SawmillHooks) : PluginS
                 this.strictCount = amount
             }
         }
+        if (result.success) DiaryHooks.planksMade(player, plank.plank.internalName, amount)
     }
 
     private fun openSupplies(player: Player) {

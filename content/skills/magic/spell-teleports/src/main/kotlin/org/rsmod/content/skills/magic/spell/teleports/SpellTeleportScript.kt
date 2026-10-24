@@ -25,6 +25,7 @@ import org.rsmod.api.script.onPlayerQueueWithArgs
 import org.rsmod.api.server.config.ServerConfig
 import org.rsmod.api.spells.MagicSpellRegistry
 import org.rsmod.api.utils.time.epochMinute
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import org.rsmod.content.quest.manager.QuestRequirements
 import org.rsmod.game.inv.isType
 import org.rsmod.map.CoordGrid
@@ -106,6 +107,7 @@ constructor(
             return
         }
         telejump(landingSquare(CoordGrid(task.destination), task.teleport.landingRadius))
+        DiaryHooks.spellTeleport(player, task.teleport.name.lowercase())
         val endAnim = task.teleport.style.endAnim
         if (endAnim != null) anim(endAnim) else resetAnim()
         statAdvance("stat.magic", spell.castXp)
