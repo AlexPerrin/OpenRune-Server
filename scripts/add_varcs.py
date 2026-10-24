@@ -17,7 +17,7 @@ import sys
 import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "..", "tools", "openrune"))
+sys.path.insert(0, os.path.join(HERE, "..", "tools", "openrune"))
 from cachediff import Disk, decompress  # noqa: E402
 from hybridcache import write_group  # noqa: E402
 import reftable  # noqa: E402
