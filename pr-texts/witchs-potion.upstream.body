@@ -1,10 +1,10 @@
 ## Summary
 
-Witch's Potion (Hetty, Rimmington), on current `main`. Its net diff against `main` is this quest only; the branch history still holds the earlier stacked commits, which a squash merge drops.
+Witch's Potion (Hetty, Rimmington), on current `main`. The branch is one commit off `main`; its net diff is this quest only (no Sheep Shearer or Romeo & Juliet files).
 
 On `main`, Hetty only has her after-quest lines and no rat drops a rat's tail, so the quest can't be started or finished.
 
-- Progress is on varp 67 (`varp.hetty`, which the quest list and Quest Helper read) through a new server-only varbit `witchs_potion_progress` (bits 0-1), as Doric's Quest does: 1 started, 2 ingredients given, 3 complete (checked at startup against the `quest_witchspotion` dbrow). The id was assigned by `tools/scripts/fix_gameval_conflicts.py` (65449; 63718 in the first version of this PR).
+- Progress is on varp 67 (`varp.hetty`, which the quest list and Quest Helper read) through a new server-only varbit `witchs_potion_progress` (bits 0-1), as Doric's Quest does: 1 started, 2 ingredients given, 3 complete (checked at startup against the `quest_witchspotion` dbrow). The id was assigned by `tools/scripts/fix_gameval_conflicts.py` (65447, renumbered against current `main`; 63718 and 65449 in earlier versions of this PR).
 - Hetty's dialogue follows the wiki transcript: the opening and witch branch, the offer and start prompt, the ingredient list, "I'm afraid I don't have any of them yet.", the player's line for each of the 14 partial combinations, and the hand-in.
 - The hand-in takes one eye of newt, rat's tail, onion and burnt meat in one inventory transaction (all or nothing), then shows the single message box "You pass the ingredients to Hetty...". Drinking from the cauldron (`loc.hettycauldron`) shows its message box and completes the quest; before the hand-in the player says "As nice as that looks, I think I'll give it a miss for now.". Rewards: 1 QP, 325 Magic XP.
 - Rat's tail: every rat the wiki lists as a source (Rat, the Stronghold of Security rats, Dungeon rat, the level-26 Stronghold giant rats; 13 npc types) drops one for its killer while the quest is in progress. This is an `NpcDeathKillHook` reading the quest's own stage, not a drop-table entry: a `quest_mode = "during"` entry never passes under the default `assume-completed` requirements mode, which would make the quest impossible to finish on a default server.
@@ -20,7 +20,7 @@ On `main`, Hetty only has her after-quest lines and no rat drops a rat's tail, s
 
 ## How it was tested
 
-On the branch head (current `main` 829b9477d + the quest), the fork's GitHub Actions run of upstream's CI workflow: `freshCache`, `buildCache` (packs `witchs_potion_vars.toml`), `generateRsa`, `assemble test integration`, and the server boots to "Server ready" (the startup check against the quest dbrow passes); `Formatting` (`spotlessCheck`) and `tools/scripts/fix_gameval_conflicts.py --check` are clean.
+On the branch head (current `main` 5c4c9c106 + the quest), the fork's GitHub Actions run of upstream's CI workflow: `freshCache`, `buildCache` (packs `witchs_potion_vars.toml`), `generateRsa`, `assemble test integration`, and the server boots to "Server ready" (the startup check against the quest dbrow passes); `Formatting` (`spotlessCheck`) and `tools/scripts/fix_gameval_conflicts.py --check` are clean.
 
 Played end to end in game twice (desktop RuneLite, a fresh account each time). Cheats: `::tele` for travel (to Hetty's house, and into the neighbouring house where the indoor rats spawn), and `::item` for the eye of newt, onion and burnt meat, whose shop and cooking aren't part of this PR. The rat's tail came from killing a rat.
 - Before the quest, a Lumbridge rat dropped only bones.
@@ -52,7 +52,7 @@ The rat list is a list of npc symbols in the hook: the cache has no category for
 
 Data sources: OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): Witch's Potion, Transcript:Witch's Potion, Transcript:Hetty, Rat's tail (Item sources; "100% chance to drop once you begin the quest"), Rat, Dungeon rat, Giant rat; the dialogue follows the transcripts. Quest Helper `WitchsPotion` (BSD): varp 67 step values, cauldron loc 2024. Cache: npc names and ids, the quest dbrow.
 
-Ids: varbit 65449 is also taken by `sheep_shearer_progress` in #366. Whichever of the two merges second needs `tools/scripts/fix_gameval_conflicts.py` re-run (or upstream's CI reassignment).
+Ids: varbit 65447 is unique on current `main` (`tools/scripts/fix_gameval_conflicts.py --check` is clean).
 
 Guesses:
 - The tail also drops at stage 2 (ingredients given, potion not drunk): the wiki says only "during the quest".

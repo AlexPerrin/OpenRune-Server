@@ -66,8 +66,7 @@ strict count of 1 per ingredient (all or nothing).
 
 ## Ids
 New server-only varbit `witchs_potion_progress`, assigned by `tools/scripts/fix_gameval_conflicts.py` from `-1`:
-65449 (`--check` clean on the branch). On our integration tree it collides with content/sheep-shearer's
-`sheep_shearer_progress` 65449; integration's `--check` reassigns the later branch.
+65447 against main 5c4c9c106, after #366 merged and took 65449 (`--check` clean on the branch).
 
 ## PR split
-No `Depends:`. Replaces #368's contents as a fast-forward: `content/witchs-potion-unstacked` = the PR head + a merge commit whose tree is `main` + this quest (after the user approves).
+No `Depends:`. Replaces #368's contents (after the user approves): fork branch `content/witchs-potion-368` is one commit on `main` 5c4c9c106 (cherry-pick of 4dc1ac9c7, id renumbered); net diff is Witch's Potion only. Rat's tail gate works in assume-completed mode via the kill hook (no drop-table gate).
