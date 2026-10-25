@@ -26,7 +26,12 @@ fix/cannon-drop-tests
 # Content
 content/dragon-specials
 content/reconnect-login
-fin/goblin-diplomacy
+content/goblin-diplomacy-unstacked
+content/goblin-diplomacy
+content/cannon
+content/witchs-potion
+content/genie
+feat/hunter
 fin/vampyre-slayer
 content/pirates-treasure
 fin/farming
@@ -36,12 +41,6 @@ fin/diaries
 fin/grand-exchange
 content/looting-bag
 content/fletching
-content/goblin-diplomacy-unstacked
-content/goblin-diplomacy
-content/cannon
-content/witchs-potion
-content/genie
-feat/hunter
 fin/quest-test-fixture
 local/quest-test-fixture
 local/romeo-juliet
