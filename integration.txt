@@ -47,6 +47,9 @@ acc/cannon
 content/goblin-diplomacy-unstacked
 content/goblin-diplomacy
 content/cannon
+content/witchs-potion
+content/genie
+feat/hunter
 # Local only (never upstream)
 local/android
 local/local-auth
