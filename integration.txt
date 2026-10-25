@@ -49,6 +49,7 @@ dev/cannon-review-354
 dev/goblin-diplomacy-review-367
 dev/hunter-feat-pr
 dev/genie-review-355-fbftoua
+dev/goblin-diplomacy-review-367-fftgsrq
 # Local only (never upstream)
 local/android
 local/local-auth
