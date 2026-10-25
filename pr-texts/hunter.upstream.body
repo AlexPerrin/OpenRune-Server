@@ -1,0 +1,56 @@
+## Summary
+
+Part of #63 (Hunter). There is no Hunter content on `main`. This adds the `content/skills/hunter` module with the Hunter techniques below. It is opened as a draft because most of it has not been checked in game on this commit.
+
+In this PR:
+- Bird snares and box traps: lay, wait, catch or lose the trap; five birds, ferrets, embertailed jerboas, grey/red/black chinchompas; trap limit by level; Check, Dismantle, Reset and Investigate.
+- Bird house trapping on Fossil Island: four spaces, build, seeds, empty and reset, nests.
+- Herbiboar tracking on Fossil Island, driven by the client's own trail varbits so RuneLite's Herbiboar plugin works; tunnel, stun and harvest.
+- Butterfly and moth netting with butterfly jars and Release effects.
+- Implings: catching with a net or barehanded, jar loot, crystal implings in Prifddinas.
+- Hunters' Rumours: the Burrow's guild hunters, Guild Scribe Verity, rare parts with pity, turn-in, the quetzal whistle's Rumour op, Gilman's shop.
+
+Not in this PR: Razor-backed kebbit tracking, deadfalls, net traps, falconry, drift nets, pitfalls, and the items listed under Not done below.
+
+## Type of change
+
+- [ ] Bug fix
+- [x] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [x] Cache / gamevals / pack data
+- [ ] Docs / tooling
+
+## How it was tested
+
+- Compile and `spotlessCheck` of `content:skills:hunter` and `content:skills:hunter:pack`, and `fix_gameval_conflicts.py --check`, run locally on this commit.
+- No tests are in this PR.
+- Not verified in game on this commit. Bird snares and box traps (lay, catch, Check) and the Hunters' Rumours dialogues were checked on the Android device on earlier builds of the same code. Bird houses, Herbiboar, butterflies, implings and the crystal impling spawn have not been played through in game.
+- The same code had integration suites passing on fork branches (traps 7, bird houses 11, butterflies 7, Herbiboar 5, implings 14, Hunters' Rumours 12); those test files are left out of this PR and not re-run on this commit.
+
+## Checklist
+
+- [ ] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes)
+- [ ] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
+- [x] State in varbits/varps, not attrs
+- [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`)
+- [ ] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings)
+- [x] No unrelated or hand-edited generated changes
+
+## Screenshots / notes for reviewers
+
+Checklist notes:
+- Builds and the server boots: the module compiles locally; the server was not booted on this commit.
+- Tests: none are included.
+- Gamevals and cache data: new data is in server-only dbtables and gamevals with names prefixed by the feature. `ImplingLootTables.kt` still keys the jar loot by raw object and npc ids in a Kotlin map, and the crystal impling spawn tiles are Kotlin constants; these do not follow the convention.
+- State: trap, bird house, Herbiboar and rumour state is in varps, varbits and controllers.
+- Wiki: the content follows the wiki where a source is named below; the guesses are listed below and are not in `docs/quirks.md`.
+- rsprox: only traps have recordings (1106, rev 237; 350, rev 230). Their loc sequence and the 2-tick trapping to full match; failing to broken was changed to one tick to match. No recording was found for bird houses, Herbiboar, butterflies, implings or Hunters' Rumours, so the item is not ticked.
+
+Data sources: OSRS Wiki pages for each creature, Bird snare, Box trap, Bird house trapping, Herbiboar, Butterfly (Hunter), Impling and the impling jar pages, Hunters' Rumours and the guild hunters' transcripts; Mod Ash's catch-rate posts (snares, chinchompas, implings); cache locs, varps and varbits; RuneLite's Herbiboar, Hunter and Hunter Rumours plugins for trail data and messages.
+
+Guesses: the ferret and jerboa catch curves; the 50-tick bird and ferret respawn, the 200-tick trap collapse, the snare attempt cadence, traps dropped on logout; the bird house early-empty wording and Reset's log choice; the herbiboar route lengths, 50 XP on every inspect but the first and last, and non-wiki messages; the butterfly curves without a wiki chart, swing cadence, respawn and messages; implings' 2-tick attempts, crystal spawn spots and the spawn at server start; the rumour pity reset, part rolling on Check and several dialogue lines. Under the default assume-completed quest mode the Hunters' Rumours and Monkey Madness II requirements count as met. Wiki XP values that disagree between pages use the creature page (cerulean twitch 64.5, tropical wagtail 95.2, ferret 115.2).
+
+Not done: Eagles' Peak requirement for traps, smoking and baiting, the extra Wilderness trap, the baby chinchompa pet; clue nests, the strung rabbit foot, crafting bird houses from the inventory; the Herbiboar new-track warning, the Herbi pet, horn of plenty; butterfly sharing in multicombat and mixes; catching implings without a jar, the lucky impling clue table, scroll boxes, the Gielinor and Puro-Puro spawn rotation; guild hunter outfit pity, loot sack opening, milestone unlocks, Wolf's At First Light requirement, Verity's spare-gear trade, the intel reshuffle lines, rumours for creatures the server cannot catch.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
