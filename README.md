@@ -36,7 +36,8 @@ Everything that compiles or runs OpenRune runs in Docker (Gradle as uid 1000 in
   build. Verified on the device 2026-10-16. The quest pack's scripts (9973/9974 and the
   `questlist_hide_quest`/`quest_is_complete` overrides) are in again; only the dev spawn menu stays
   out (`OPENRUNE_SKIP_CS2_PACKS`, default `spawn`). `PluginPacks` fails the build on custom ids
-  above 9999, and `scripts/check_cache.py` checks the packed cache.
+  above 9999, and `scripts/check_cache.py` checks the packed cache: custom ids must follow the stock
+  maximum (derived from the cache; 10196 in 241.4) with no gap.
 - **Mobile chatmenu:** chatbox:chatmodal is unclamped (varbit 10670 + script 113) for chatmenu only,
   and reset for chat_left/chat_right and on close, as on our server. Without it the 3rd and 4th
   options were clipped on mobile.
