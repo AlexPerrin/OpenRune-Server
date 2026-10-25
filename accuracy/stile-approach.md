@@ -44,11 +44,6 @@ player at all before the climb.
 - The forced one-tile moves are `teleport(Exempt)` calls; player info sends them as walk steps, as in 1718 (our
   transcript). The climb's tile change goes out as a teleport (1718: walk), from `exactMove` on main.
 
-## Tests
-`StileScriptTest` (integration, 6): the climb 1 tick after the step on and the step off 3 ticks after the climb; from the south, from the north, from beside the stile along the fence, from
-4 tiles away, and a north-facing stile crossed east to west; each ends on the tile beyond the far footprint
-tile. In game: the pen stile from both sides, in line, beside and diagonal.
-
 ## PR split
 One fix, no dependencies. #366 (Sheep Shearer) doesn't depend on it: the bug is on `main` without the quest.
 

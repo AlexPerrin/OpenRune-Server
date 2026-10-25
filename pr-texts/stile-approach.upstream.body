@@ -22,17 +22,17 @@ The forced moves and the climb's exactmove use `TeleportType.Exempt`: crossing a
 
 ## How it was tested
 
-- `StileScriptTest` (new, `content:generic:generic-locs` integration): the climb comes 1 tick after the step on and the step off 3 ticks after the climb; from the south, from the north, from beside the stile along the fence, from four tiles away, and a north-facing stile crossed east to west; each ends on the tile beyond the far footprint tile. The module's integration suite passes (10 tests, 0 failures) with `spotlessCheck`, after `freshCache`.
-- In game on this commit (desktop RuneLite through RSProx on a branch server, the Sheep Shearer pen stile at 3197,3276), from 2 tiles south and 1 tile north in line, from beside the stile along the fence on both sides, from a diagonal tile on both sides, from 4-6 tiles south-west, from 3 tiles north-east, and standing on the in-line tile. In our own RSProx transcript of that session every crossing went: the in-line tile on the player's side, the next tick onto the near stile tile, the tick after that the climb (seq 839, exactmove 30/94), three ticks later onto the tile beyond the stile, the same ticks as the official recording below. No server errors.
+- The `content:generic:generic-locs` integration suite passes with `spotlessCheck`, after `freshCache`.
+- In game at 513144d3d, whose production code is identical to this head (only the test file was dropped since) (desktop RuneLite through RSProx on a branch server, the Sheep Shearer pen stile at 3197,3276), from 2 tiles south and 1 tile north in line, from beside the stile along the fence on both sides, from a diagonal tile on both sides, from 4-6 tiles south-west, from 3 tiles north-east, and standing on the in-line tile. In our own RSProx transcript of that session every crossing went: the in-line tile on the player's side, the next tick onto the near stile tile, the tick after that the climb (seq 839, exactmove 30/94), three ticks later onto the tile beyond the stile, the same ticks as the official recording below. No server errors.
 
 ## Checklist
 
 - [x] Builds and the server boots
-- [x] Tests only cover complex logic and anything that moves items (no dupes): the stile's side and tile geometry
+- [x] Tests only cover complex logic and anything that moves items (no dupes)
 - [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
-- [x] State in varbits/varps, not attrs: no state
-- [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the deviations are in the notes below, not in `docs/quirks.md`
-- [x] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): recording 1718, the pen stile crossed from the north
+- [x] State in varbits/varps, not attrs
+- [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`)
+- [x] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings)
 - [x] No unrelated or hand-edited generated changes
 
 ## Screenshots / notes for reviewers
@@ -44,5 +44,11 @@ Caveats:
 - Clicking from beside the stile or from a diagonal tile: the recording only shows an in-line approach. We walk the player to the in-line tile first (a guess).
 - The step on and step off are one-tile non-jump teleports; they go out as walk steps, as in the recording. The climb's own tile change goes out as a teleport (the recording: a walk step); that comes from `exactMove`, which the stile already used.
 - Clicking from beside the stile, the walk to the in-line tile starts the tick after the interaction; standing on the in-line tile already, the step on comes on the interaction's tick. The recording shows neither case.
+
+Checklist notes:
+- Tests only cover complex logic and anything that moves items: no new tests, this is movement timing and geometry
+- State in varbits/varps, not attrs: no state
+- Matches the OSRS wiki: the deviations are in the caveats above, not in `docs/quirks.md`
+- New content checked against rsprox dumps where possible: recording 1718, the pen stile crossed from the north
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
