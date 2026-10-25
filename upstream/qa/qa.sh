@@ -43,6 +43,7 @@
 #                                              proxy target (<dir>.logs/proxy-targets.yaml, game port 43596,
 #                                              <dir>'s own .data/game.key modulus)
 #   qa.sh stop                                 stop + remove qa-or-server and qa-or-http (nothing else)
+#   QA_NAME=<run> with start/stop/log: containers qa-or-server-<run>, qa-or-http-<run>; set QA_GAME_PORT/QA_HTTP_PORT too
 #   qa.sh log [n]                              tail of the branch server log
 #
 # Limits (QA.md): docker --cpus=4 --memory=4g, Gradle --max-workers=2 (test, integration: 1), -Xmx2g
@@ -65,6 +66,7 @@ LOCKDIR=$WORK/qa
 mkdir -p "$LOCKDIR"
 GAME_PORT=${QA_GAME_PORT:-43596}
 HTTP_PORT=${QA_HTTP_PORT:-8083}
+SRV=qa-or-server${QA_NAME:+-$QA_NAME}; HTTPC=qa-or-http${QA_NAME:+-$QA_NAME}   # QA_NAME: one branch server per agent
 VOL=upstream-pr-gradle-qa
 DLVOL=${QA_DLVOL:-openrune-dl-cache}   # QA_DLVOL / GRADLE_REMOTE_CACHE_URL: an isolated store/node (measurements)
 
@@ -482,23 +484,23 @@ tests) test_counts "$(cd "$2" && pwd)" ;;
 start)
   d=$2; L=$d.logs; mkdir -p "$L"
   [ -x "$d/server/app/build/install/app/bin/app" ] || { echo "no installDist in $d" >&2; exit 1; }
-  docker rm -f qa-or-server qa-or-http >/dev/null 2>&1 || true
-  docker run -d --name qa-or-server --cpus=4 --memory=4g -u 1000:1000 -e HOME="$d" \
+  docker rm -f $SRV $HTTPC >/dev/null 2>&1 || true
+  docker run -d --name $SRV --cpus=4 --memory=4g -u 1000:1000 -e HOME="$d" \
     -e JAVA_OPTS=-Xmx2g -p $GAME_PORT:43594 -v "$d":"$d" -w "$d" \
     eclipse-temurin:21-jre "$d/server/app/build/install/app/bin/app" >/dev/null
   # jav_config.ws / slr.ws for the desktop client: the same read-only sidecar image as
   # osrs-openrune-http-desktop, on its own port. RSProx forwards the game connection to
   # 127.0.0.1:<game_server_port> from the proxy target, so the sidecar's own /rsa is not used.
-  docker run -d --name qa-or-http -p $HTTP_PORT:8080 -v $REPO/sidecar/data:/data:ro \
+  docker run -d --name $HTTPC -p $HTTP_PORT:8080 -v $REPO/sidecar/data:/data:ro \
     -e WORLD_HOST=127.0.0.1 -e HTTP_PUBLIC_PORT=$HTTP_PORT -e WORLD_ID=255 -e SAVE_DIR=/tmp/saves \
     -e JAV_CONFIG_TEMPLATE=/app/protocol/jav_config.ws.template -e LOCAL_AUTH=false \
     -e PROOF_OF_WORK=false -e VALIDATE_CRCS=false osrs-rsps-test:241 >/dev/null
   for _ in $(seq 150); do
-    docker logs qa-or-server 2>&1 | grep -q "Server ready in" && break
-    docker ps --format '{{.Names}}' | grep -qx qa-or-server || { docker logs --tail 40 qa-or-server; exit 1; }
+    docker logs $SRV 2>&1 | grep -q "Server ready in" && break
+    docker ps --format '{{.Names}}' | grep -qx $SRV || { docker logs --tail 40 $SRV; exit 1; }
     sleep 2
   done
-  docker logs qa-or-server 2>&1 | grep -o "Server ready in [0-9.]*s" || { echo "not ready" >&2; exit 1; }
+  docker logs $SRV 2>&1 | grep -o "Server ready in [0-9.]*s" || { echo "not ready" >&2; exit 1; }
   mod=$(openssl rsa -in "$d/.data/game.key" -noout -modulus | cut -d= -f2 | tr A-F a-f)
   cat > "$L/proxy-targets.yaml" <<YAML
 # QA branch server ($(git -C "$d" rev-parse --short=9 HEAD)), written by openrune/upstream/qa/qa.sh start.
@@ -514,7 +516,7 @@ YAML
   echo "proxy target: $L/proxy-targets.yaml"
   echo "desktop: DESKTOP_TARGET_YAML=$L/proxy-targets.yaml tools/multiclient/desktop.sh start"
   ;;
-stop) docker rm -f qa-or-server qa-or-http 2>&1 | sed 's/^/removed /' ;;
-log) docker logs --tail "${2:-60}" qa-or-server 2>&1 ;;
+stop) docker rm -f $SRV $HTTPC 2>&1 | sed 's/^/removed /' ;;
+log) docker logs --tail "${2:-60}" $SRV 2>&1 ;;
 *) sed -n 2,60p "$0"; exit 1 ;;
 esac
