@@ -55,3 +55,4 @@ local/op-overrides
 local/treasure-trails
 local/integration-tools
 local/spotless-241
+local/drop-stale-goblin-test
