@@ -47,6 +47,7 @@ local/romeo-juliet
 acc/cannon
 dev/genie-review-355
 dev/cannon-review-354
+dev/goblin-diplomacy-review-367
 # Local only (never upstream)
 local/android
 local/local-auth
