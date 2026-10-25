@@ -21,7 +21,7 @@ fix/71-item-config-tradeable ededdf3e65f310b806fa3497b6e8d534a942cb95
 fix/73-heldu-dispatch-order b2f2fbb297dc308a504a2d3d90841d6f824dd33d
 fix/74-bankside-view-op a86998e235e16fa332af0b6e7fc461a8aa1c4ee0
 fix/75-coal-bag-messages 0514e670446a248c5405dc433dfbaa7c77421e43
-fix/stile-approach 68ddd1b6c0de78e18788b22dc52ff6df2909d348
+fix/stile-approach caacbf4cefa6f8491c8afa2d3fc7fc624d581a57
 content/dragon-specials d4d3dde846fa2133f8cf5d9590e8a6c97aae8c85
 content/reconnect-login b748199b4fed7f146a388dd65f066d630f5068fb
 fin/cannon 7b62ce683414f32db711edcca240e6ebebba215f
@@ -54,3 +54,5 @@ acc/cannon bc243d141fc27d5128d29d8266cf51e89a4f6c08
 content/goblin-diplomacy-unstacked d77ac2b76eefe47211f4d15138563c19ddf19bfd
 content/goblin-diplomacy 405e38601278b51a9dc38d75ff6315d2f856c90f
 local/drop-stale-goblin-test 96f4e49be27a0e77b2fba72a87b89f0d97159f2a
+fix/cannon-drop-tests 0df5c63a009b75fffb33f8ead897b432f55fcead
+content/cannon 0df5c63a009b75fffb33f8ead897b432f55fcead

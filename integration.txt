@@ -22,6 +22,7 @@ fix/74-bankside-view-op
 fix/75-coal-bag-messages
 fix/stile-approach
 fix/ground-item-despawn-times
+fix/cannon-drop-tests
 # Content
 content/dragon-specials
 content/reconnect-login
@@ -45,6 +46,7 @@ content/fletching
 acc/cannon
 content/goblin-diplomacy-unstacked
 content/goblin-diplomacy
+content/cannon
 # Local only (never upstream)
 local/android
 local/local-auth
