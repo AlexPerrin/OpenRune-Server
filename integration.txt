@@ -38,6 +38,7 @@ fin/farming
 fin/fairy-rings
 fin/jewellery
 fin/diaries
+fin/grand-exchange
 content/looting-bag
 content/fletching
 fin/quest-test-fixture
