@@ -50,3 +50,6 @@ local/op-overrides 46bc3ab31d147910709f4c94253add75ef5f2cb6
 local/treasure-trails 48b320359a91f9f0974c1ffc562e510c315bacf5
 fix/ground-item-despawn-times d0fe09c630e7456433348ee273f3e9cd8353cc82
 local/spotless-241 e6afed4620d1bfecc2cf522a98e3ff00a3477d73
+acc/cannon bc243d141fc27d5128d29d8266cf51e89a4f6c08
+content/goblin-diplomacy-unstacked d77ac2b76eefe47211f4d15138563c19ddf19bfd
+content/goblin-diplomacy 405e38601278b51a9dc38d75ff6315d2f856c90f
