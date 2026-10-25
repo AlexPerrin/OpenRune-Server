@@ -24,6 +24,7 @@ fix/stile-approach
 fix/ground-item-despawn-times
 fix/cannon-drop-tests
 # Content
+content/witchs-potion
 content/dragon-specials
 content/reconnect-login
 fin/quest-test-fixture
@@ -42,7 +43,6 @@ content/fletching
 content/goblin-diplomacy-unstacked
 content/goblin-diplomacy
 content/cannon
-content/witchs-potion
 content/genie
 feat/hunter
 # Local only (never upstream)
