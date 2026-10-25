@@ -2,20 +2,31 @@
 # QA gate helper for OpenRune-Server branches (openrune/upstream/QA.md). Builds, tests and runs a
 # branch's own server from a fresh clone, beside (never instead of) the live osrs-openrune containers.
 #
-#   qa.sh clone  <slug> <commit> [merge-base]  fresh `git clone --shared` of the fork clone at <commit>
+#   qa.sh clone  <slug> <commit> [merge-base]  fresh `git clone --shared` of the fork clone at <commit> (remotes named as `remotes`)
 #                                              into $QA_ROOT/<slug>-<commit7>; with merge-base (e.g. main),
 #                                              also <slug>-<commit7>-run = <merge-base> + <commit> (merge)
-#   qa.sh gate   <dir>                         section 1 in ONE container and one build-queue ticket
-#                                              (priority): clean + freshCache + mergePluginGamevals,
-#                                              buildCache, generateRsa, :server:app:installDist (then
-#                                              <dir>.logs/runnable), spotlessCheck, assemble, test,
-#                                              integration; one log per step, <dir>.logs/summary (rc,
-#                                              time, tasks from cache), <dir>.logs/tests (counts)
-#   qa.sh build  <dir>                         = gate (split-build: the old uncached run, one container
-#                                              per step, the fallback when the cache node is broken)
-#   qa.sh gate-run <dir>                       only what a server run needs (freshCache, mergePluginGamevals,
-#                                              generateRsa, installDist), one container, for the -run tree
-#   qa.sh runbuild <dir>                       = gate-run (split-runbuild: the old one)
+#   qa.sh gate   <dir> [module...] [--dry-run]  the TARGETED gate (default), ONE container and one build-queue
+#                                              ticket (priority): clean + freshCache + mergePluginGamevals,
+#                                              buildCache, generateRsa, then only the touched modules'
+#                                              spotlessCheck, testClasses/integrationClasses, test and
+#                                              integration. Modules = directories or :project paths; none
+#                                              given = the modules changed since merge-base with
+#                                              DEV_BASE (upstream/main). One log per step, <dir>.logs/
+#                                              summary, <dir>.logs/tests. --dry-run prints the steps.
+#   qa.sh gate   <dir> --full                  the whole suite (the fork CI's job): ... :server:app:installDist,
+#                                              spotlessCheck, assemble, test, integration on every module
+#   qa.sh build  <dir>                         = gate
+#   qa.sh gate-run <dir> [--dry-run]           only what a server run needs (freshCache, mergePluginGamevals,
+#                                              generateRsa, installDist), one container, for the -run tree;
+#                                              runs no tests
+#   qa.sh runbuild <dir>                       = gate-run
+#   qa.sh cs2-check <dir>                      exit 0 when <dir>'s last freshCache failed with cs2 SYNTAX_ERRORs
+#                                              in scripts the change does not edit (a stale shared volume);
+#                                              gate and gate-run print this verdict on a failure
+#   qa.sh refresh-cs2                          clear the shared OpenRS2 download volume (openrune-dl-cache) and
+#                                              the warm dev containers' cs2 dirs; the next freshCache refetches
+#   qa.sh remotes <clone>                      name a clone's remotes: the shared local clone is `local`, plus
+#                                              `fork` and `upstream`; origin/main and upstream/main = upstream main
 #   qa.sh dev <owner> <clone> [tasks...]       dev lane (evidence, never a gate): the build runs in the
 #                                              owner's warm container qa-dev-<owner> (persistent Gradle
 #                                              daemon, own Gradle home <owner>-dev-gradle, remote build
@@ -88,6 +99,69 @@ prep_clone() {
     grep -qx '/.m2-rsprot/' "$d/.git/info/exclude" 2>/dev/null || echo '/.m2-rsprot/' >> "$d/.git/info/exclude"
     echo "qa: copied .m2-rsprot into $d" >&2
   fi
+}
+
+# Gradle tasks for the modules owning the given files or module directories (or :project paths).
+# Sets ctasks (testClasses, integrationClasses), ttasks (test, integration), stasks (spotlessCheck),
+# mods (project paths) and cache=1 when a file is cache data.
+module_tasks() {
+  local d=$1 f p proj; shift
+  declare -A seen=(); ctasks=(); ttasks=(); stasks=(); mods=(); cache=
+  for f in "$@"; do
+    f=${f#:}; f=${f//://}; f=${f%/}
+    case $f in */pack/*|.data/raw-cache/*|or-cache/*|*gamevals.toml) cache=1 ;; esac
+    p=$(dirname "$f"); [ -d "$d/$f" ] && p=$f
+    while [ "$p" != . ] && [ ! -f "$d/$p/build.gradle.kts" ]; do p=$(dirname "$p"); done
+    [ "$p" = . ] && continue
+    case $p in build-logic*) continue ;; esac
+    proj=":${p//\//:}"
+    [ "$(basename "$p")" = pack ] && proj="${proj%:pack}:$(basename "$(dirname "$p")")-pack"
+    [ -n "${seen[$proj]:-}" ] && continue; seen[$proj]=1
+    mods+=("$proj"); ctasks+=("$proj:testClasses"); ttasks+=("$proj:test"); stasks+=("$proj:spotlessCheck")
+    if grep -q 'integration-test-suite' "$d/$p/build.gradle.kts"; then
+      ctasks+=("$proj:integrationClasses"); ttasks+=("$proj:integration")
+    fi
+  done
+}
+
+# The files changed since the merge-base with DEV_BASE (default upstream/main), committed or not.
+changed_files() {
+  local d=$1 base
+  base=$(git -C "$d" merge-base HEAD "${DEV_BASE:-upstream/main}") || return 1
+  { git -C "$d" diff --name-only "$base"; git -C "$d" ls-files --others --exclude-standard; } | sort -u
+}
+
+# Remotes of a clone made from the shared local clone: that clone is `local`, never `origin`; `fork`
+# and `upstream` are the real URLs; refs/remotes/origin/main and upstream/main are upstream's main
+# (spotless's ratchet reads origin/main), taken from the shared clone's copy.
+name_remotes() {
+  local d=$1 up fk u
+  up=$(git -C "$SRC" rev-parse -q --verify refs/remotes/upstream/main || git -C "$SRC" rev-parse -q --verify refs/remotes/origin/main) \
+    || { echo "qa: $SRC has no upstream main ref" >&2; return 1; }
+  u=$(git -C "$d" remote get-url origin 2>/dev/null || true)
+  if [ -n "$u" ] && [ -e "$u" ]; then git -C "$d" remote rename origin local >/dev/null; fi
+  fk=$(git -C "$SRC" remote get-url fork 2>/dev/null || echo git@github.com:AlexPerrin/OpenRune-Server.git)
+  git -C "$d" remote get-url fork >/dev/null 2>&1 || git -C "$d" remote add fork "$fk"
+  git -C "$d" remote get-url upstream >/dev/null 2>&1 || git -C "$d" remote add upstream https://github.com/OpenRune/OpenRune-Server.git
+  git -C "$d" update-ref refs/remotes/upstream/main "$up"
+  git -C "$d" update-ref refs/remotes/origin/main "$up"
+}
+
+# A gate whose freshCache failed with cs2 SYNTAX_ERRORs in scripts the change does not touch has a
+# stale shared download volume (fork CI, which downloads fresh, is green on the same merge). Judged
+# by that failure shape only. Prints the verdict; returns 0 when stale.
+cs2_stale() {
+  local d=$1 log=$2 own bad
+  [ -f "$log" ] && grep -q 'SYNTAX_ERROR' "$log" || return 1
+  own=$(changed_files "$d" 2>/dev/null | sed -n 's#.*/##p' | grep '\.cs2$' || true)
+  bad=$(grep -o 'cs2/script/[^:]*\.cs2:[0-9]*:[0-9]*: SYNTAX_ERROR' "$log" | sed 's#cs2/script/##; s#:[0-9]*:[0-9]*: SYNTAX_ERROR##' | sort -u)
+  [ -n "$bad" ] || return 1
+  if [ -n "$own" ] && echo "$bad" | grep -qxFf <(echo "$own"); then
+    echo "qa: cs2 SYNTAX_ERRORs include scripts this change edits; not a stale volume" >&2; return 1
+  fi
+  echo "qa: STALE cs2/download volume: freshCache failed with cs2 SYNTAX_ERRORs in $(echo "$bad" | wc -l) scripts outside the change ($log)." >&2
+  echo "qa: if fork CI is green on the same merge, run: qa.sh refresh-cs2   then rerun the gate" >&2
+  return 0
 }
 
 # Dev lane: one warm container per server dev, qa-dev-<owner> (docker run -d, 4 GB, its own Gradle
@@ -193,12 +267,12 @@ _run)  # _run <dir> <workers> <gradle args...>: one Gradle container on a free Q
 clone)
   slug=$2; c=$(git -C "$SRC" rev-parse "$3"); d=$QA_ROOT/$slug-${c:0:9}
   [ -e "$d" ] && { echo "exists: $d" >&2; exit 1; }
-  git clone -q --shared --no-checkout "$SRC" "$d"; git -C "$d" checkout -q --detach "$c"
+  git clone -q --shared --no-checkout "$SRC" "$d"; name_remotes "$d"; git -C "$d" checkout -q --detach "$c"
   cp "$d/game.example.yml" "$d/game.yml"
   echo "$d"
   if [ -n "${4:-}" ]; then
     b=$(git -C "$SRC" rev-parse "$4"); r=$d-run
-    git clone -q --shared --no-checkout "$SRC" "$r"; git -C "$r" checkout -q --detach "$b"
+    git clone -q --shared --no-checkout "$SRC" "$r"; name_remotes "$r"; git -C "$r" checkout -q --detach "$b"
     git -C "$r" -c user.name=qa -c user.email=qa@localhost merge -q --no-edit --no-ff "$c"
     cp "$r/game.example.yml" "$r/game.yml"
     echo "$r ($4 ${b:0:9} + ${c:0:9})"
@@ -248,19 +322,48 @@ _gate)  # _gate <qa|dev:<volume>> <dir> <steps...>: one container running gate-s
   exit $rc
   ;;
 gate|build)
-  d=$(cd "$2" && pwd); L=$d.logs; mkdir -p "$L"
+  shift; full=; mods_in=(); dry=
+  for a in "$@"; do
+    case $a in --full) full=1 ;; --dry-run) dry=1 ;; -*) echo "gate: unknown option '$a'" >&2; exit 2 ;; *) mods_in+=("$a") ;; esac
+  done
+  [ ${#mods_in[@]} -gt 0 ] || { echo "usage: qa.sh gate <dir> [--full] [--dry-run] [module...]" >&2; exit 2; }
+  d=$(cd "${mods_in[0]}" && pwd); mods_in=("${mods_in[@]:1}")
+  steps=("${GATE_STEPS[@]}")
+  if [ -z "$full" ]; then
+    if [ ${#mods_in[@]} -gt 0 ]; then module_tasks "$d" "${mods_in[@]}"
+    else
+      mapfile -t files < <(changed_files "$d") || { echo "gate: no merge-base with ${DEV_BASE:-upstream/main}; pass the touched modules, or --full" >&2; exit 2; }
+      module_tasks "$d" "${files[@]}"
+    fi
+    [ ${#mods[@]} -gt 0 ] || { echo "gate: no touched modules found; pass them (directories or :project paths), or --full for the whole suite" >&2; exit 2; }
+    ts=(); is=()
+    for t in "${ttasks[@]}"; do case $t in *:integration) is+=("$t") ;; *) ts+=("$t") ;; esac; done
+    steps=(
+      "1a-compile=clean :or-cache:qaCacheToolsClasspath"
+      "1-cache=:or-cache:freshCache :or-cache:mergePluginGamevals"
+      "2-buildcache=:or-cache:buildCache"
+      "2b-rsa=generateRsa"
+      "3-spotless=${stasks[*]}"
+      "4-assemble=${ctasks[*]}"
+      "5-test=${ts[*]} --continue"
+    )
+    [ ${#is[@]} -eq 0 ] || steps+=("6-integration=${is[*]} --continue")
+  fi
+  if [ -n "$dry" ]; then printf 'gate steps (%s):\n' "${full:+full}$([ -n "$full" ] || echo targeted)"; printf '  %s\n' "${steps[@]}"; exit 0; fi
+  L=$d.logs; mkdir -p "$L"
   git -C "$d" rev-parse HEAD > "$L/commit"
   prep_clone "$d"
   rm -f "$L/runnable"
   t0=$(date +%s)
   # GATE_VOL=<volume>: a Gradle home of your own instead of the QA pair (e.g. a dev's own gate).
   mode=qa; [ -n "${GATE_VOL:-}" ] && mode=dev:$GATE_VOL
-  BUILDQ_CLASS=${BUILDQ_CLASS:-gate} BUILDQ_PRIO=${BUILDQ_PRIO:-1} "$REPO/tools/buildq.sh" "${GATE_OWNER:-qa}" -- "$0" _gate "$mode" "$d" "${GATE_STEPS[@]}" \
+  BUILDQ_CLASS=${BUILDQ_CLASS:-gate} BUILDQ_PRIO=${BUILDQ_PRIO:-1} "$REPO/tools/buildq.sh" "${GATE_OWNER:-qa}" -- "$0" _gate "$mode" "$d" "${steps[@]}" \
     > "$L/gate.log" 2>&1 && rc=0 || rc=$?
   git -C "$d" status --short > "$L/status-after"
   test_counts "$d" > "$L/tests"
   { echo "total $(( $(date +%s) - t0 ))s wall (queue wait included), rc=$rc"; } >> "$L/summary"
   cat "$L/summary" "$L/tests"
+  [ $rc -eq 0 ] || cs2_stale "$d" "$L/1-cache.log" || true
   exit $rc
   ;;
 split-build)
@@ -283,12 +386,19 @@ split-build)
   exit $rc
   ;;
 gate-run|runbuild)
-  d=$(cd "$2" && pwd); L=$d.logs; mkdir -p "$L"
+  shift; dry=; args=()
+  for a in "$@"; do case $a in --dry-run) dry=1 ;; --full) ;; -*) echo "gate-run: unknown option '$a'" >&2; exit 2 ;; *) args+=("$a") ;; esac; done
+  [ ${#args[@]} -gt 0 ] || { echo "usage: qa.sh gate-run <dir> [--dry-run]" >&2; exit 2; }
+  [ ${#args[@]} -eq 1 ] || echo "gate-run: runs no tests; the module arguments are ignored" >&2
+  if [ -n "$dry" ]; then printf 'gate-run steps:\n'; printf '  %s\n' "${RUN_STEPS[@]}"; exit 0; fi
+  d=$(cd "${args[0]}" && pwd); L=$d.logs; mkdir -p "$L"
   git -C "$d" rev-parse HEAD > "$L/commit"
   prep_clone "$d"
   BUILDQ_PRIO=${BUILDQ_PRIO:-1} "$REPO/tools/buildq.sh" qa -- "$0" _gate qa "$d" "${RUN_STEPS[@]}" \
     > "$L/runbuild.log" 2>&1 && rc=0 || rc=$?
-  cat "$L/summary"; exit $rc
+  cat "$L/summary"
+  [ $rc -eq 0 ] || cs2_stale "$d" "$L/1-cache.log" || true
+  exit $rc
   ;;
 split-runbuild)
   own_vol; d=$2; L=$d.logs; mkdir -p "$L"
@@ -309,21 +419,7 @@ dev)
   else
     base=$(git -C "$d" merge-base HEAD "${DEV_BASE:-upstream/main}") || { echo "dev: no merge-base with ${DEV_BASE:-upstream/main}; pass tasks" >&2; exit 2; }
     mapfile -t files < <( { git -C "$d" diff --name-only "$base"; git -C "$d" ls-files --others --exclude-standard; } | sort -u)
-    declare -A seen=(); ctasks=(); ttasks=(); cache=
-    for f in "${files[@]}"; do
-      case $f in */pack/*|.data/raw-cache/*|or-cache/*|*gamevals.toml) cache=1 ;; esac
-      p=$(dirname "$f")
-      while [ "$p" != . ] && [ ! -f "$d/$p/build.gradle.kts" ]; do p=$(dirname "$p"); done
-      [ "$p" = . ] && continue
-      case $p in build-logic*) continue ;; esac
-      proj=":${p//\//:}"
-      [ "$(basename "$p")" = pack ] && proj="${proj%:pack}:$(basename "$(dirname "$p")")-pack"
-      [ -n "${seen[$proj]:-}" ] && continue; seen[$proj]=1
-      ctasks+=("$proj:testClasses"); ttasks+=("$proj:test")
-      if grep -q 'integration-test-suite' "$d/$p/build.gradle.kts"; then
-        ctasks+=("$proj:integrationClasses"); ttasks+=("$proj:integration")
-      fi
-    done
+    module_tasks "$d" "${files[@]}"
     # Data-only changes (packs, raw-cache, gamevals) still rebuild the cache.
     if [ -n "$cache" ]; then
       [[ " ${steps[*]} " == *" 1a-compile="* ]] || steps+=("1a-compile=:or-cache:qaCacheToolsClasspath")
@@ -371,6 +467,17 @@ dev-status)
   docker ps --filter label=qa.dev=1 --format '{{.Names}}\t{{.Status}}\t{{.Label "qa.clone"}}'
   docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' $(docker ps -q --filter label=qa.dev=1) 2>/dev/null
   ;;
+cs2-check)  # cs2-check <dir>: is <dir>'s last freshCache failure the stale-volume shape? (exit 0 = stale)
+  d=$(cd "$2" && pwd); cs2_stale "$d" "$d.logs/1-cache.log" ;;
+refresh-cs2)  # the one command that refreshes the shared download volume (and the warm dev containers' cs2 dirs)
+  docker volume inspect $DLVOL >/dev/null 2>&1 || { echo "refresh-cs2: no volume $DLVOL; nothing to refresh"; exit 0; }
+  exec 9>"$LOCKDIR/.refresh-cs2.lock"; flock 9
+  docker run --rm -v $DLVOL:/dl alpine:3.20 sh -c 'rm -rf /dl/caches /dl/.lock' && echo "cleared $DLVOL/caches: the next freshCache downloads the OpenRS2 cache again"
+  for c in $(docker ps -q --filter label=qa.dev=1); do
+    docker exec "$c" rm -rf /home/ubuntu/.local/share/OpenRune/cs2 /home/ubuntu/.openrune/caches 2>/dev/null && echo "cleared cs2 + caches in $(docker inspect -f '{{.Name}}' "$c")"
+  done
+  ;;
+remotes) name_remotes "$(cd "$2" && pwd)" && git -C "$2" remote -v ;;
 tests) test_counts "$(cd "$2" && pwd)" ;;
 start)
   d=$2; L=$d.logs; mkdir -p "$L"
@@ -409,5 +516,5 @@ YAML
   ;;
 stop) docker rm -f qa-or-server qa-or-http 2>&1 | sed 's/^/removed /' ;;
 log) docker logs --tail "${2:-60}" qa-or-server 2>&1 ;;
-*) sed -n 2,45p "$0"; exit 1 ;;
+*) sed -n 2,60p "$0"; exit 1 ;;
 esac

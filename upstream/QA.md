@@ -57,9 +57,14 @@ The helper is `openrune/upstream/qa/qa.sh`. Clones live in the QA agent's scratc
 branch commit, with logs beside them in `<clone>.logs/`.
 
 1. **Clone.** `qa.sh clone <slug> <commit> main` makes two fresh `git clone --shared` trees of
-   `re/upstream-pr/or`: `<slug>-<commit9>` at the branch commit (sections 1 and 2) and `<slug>-<commit9>-run`
+   `re/upstream-pr/or` (their remotes: the shared clone is `local`, never `origin`; `fork`, `upstream`; `origin/main` =
+   `upstream/main` for spotless's ratchet; `qa.sh remotes <clone>` does the same to any clone): `<slug>-<commit9>` at the branch commit (sections 1 and 2) and `<slug>-<commit9>-run`
    = upstream `main` + the branch, merged (section 3). A merge conflict there is a FAIL in itself.
-2. **Build and tests.** `qa.sh gate <clone>` (`qa.sh build` is the same) takes one priority ticket in
+2. **Build and tests.** `qa.sh gate <clone> [module...]` (`qa.sh build` is the same) runs the targeted gate by
+   default: the cache steps below, then only the touched modules' `spotlessCheck`, `testClasses`/`integrationClasses`,
+   `test` and `integration` (modules given as directories or `:project` paths, else the modules changed since the merge-base
+   with `upstream/main`; no `installDist`). The full suite is the fork CI's job; `qa.sh gate <clone> --full` runs it here
+   (every step below). `--dry-run` prints the steps. It takes one priority ticket in
    the agents' build queue (`tools/buildq.sh`, class gate: 2 slots, starts at 5.5 GB MemAvailable) and
    runs every step in one container (`--cpus=4 --memory=5g`, Gradle home volume `upstream-pr-gradle-qa`,
    or `-qa2` when the first is busy: Gradle's locks don't work across containers sharing a volume), each
@@ -77,6 +82,9 @@ branch commit, with logs beside them in `<clone>.logs/`.
    JVMs at `-Xmx1536m`), `integration` (1 test JVM at `-Xmx2048m`: 2 peaked at 4.7-4.9 GB of the 5 GB). A failed cache step skips the rest.
    `<clone>.logs/` holds one log per step, `summary` (rc, seconds, peak container memory, tasks
    executed / from cache) and `tests` (counts per suite). Typical: about 17 min cold, 9-12 min warm.
+   A freshCache failure with cs2 `SYNTAX_ERROR`s in scripts the change does not edit means the shared download volume is
+   stale (fork CI, which downloads fresh, is green on the same merge): gate prints that verdict (`qa.sh cs2-check <clone>`
+   gives it again); `qa.sh refresh-cs2` clears the volume and the dev containers' cs2 dirs, then rerun.
    `qa.sh gate-run <clone>-run` (= `runbuild`) builds only what a server run needs. `qa.sh split-build`
    (the old uncached run, one container per step) is the fallback when the cache node is broken.
 3. **Branch server.** `qa.sh start <clone>-run` runs the installDist in `eclipse-temurin:21-jre` as

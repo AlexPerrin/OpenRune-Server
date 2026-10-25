@@ -145,6 +145,18 @@ To change OpenRune: edit `src/`, build, test, then `openrune/scripts/openrune.sh
 cache does not see new projects. Integration tests: `openrune.sh gradle --no-configuration-cache
 :content:skills:hunter:integration`. After a change to `server/rsprot.patch`, run `openrune/scripts/openrune.sh rsprot`.
 
+## QA gate (upstream/qa/qa.sh)
+
+- `qa.sh gate <clone> [module...]` is targeted: cache steps, then only the touched modules' `spotlessCheck`,
+  test and integration tasks. Modules are directories or `:project` paths; none given = the modules changed since the
+  merge-base with `upstream/main`. `--dry-run` prints the steps; `--full` is the whole suite (the fork CI does that).
+  `gate-run` runs no tests.
+- Stale cs2: a freshCache failure with cs2 `SYNTAX_ERROR`s in scripts the change does not edit, while fork CI is green
+  on the same merge, means the shared download volume is stale. gate prints the verdict (`qa.sh cs2-check <clone>`);
+  `qa.sh refresh-cs2` clears `openrune-dl-cache` and the dev containers' cs2 dirs; rerun the gate.
+- Clone remotes: `qa.sh clone` and `qa.sh remotes <clone>` name the shared local clone `local` (never `origin`), add
+  `fork` and `upstream`, and set `refs/remotes/origin/main` and `upstream/main` to upstream's main (spotless's ratchet).
+
 ## Run
 
 ```
