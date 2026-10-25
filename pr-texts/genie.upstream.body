@@ -1,6 +1,6 @@
 ## Summary
 
-Adds the Genie random event in a new module `content/events/random-events` (content area from #353).
+Adds the Genie random event in a new module `content/events/random-events`.
 
 - Every 1-2 hours of play a Genie appears beside the player, faces them and calls them by name.
 - Talk-to hands over a lamp straight away (the lamp is delivered before the dialogue opens, so cancelling the dialogue or logging out cannot lose it; with a full inventory it drops to the floor). The Genie leaves on the next call tick.
@@ -15,12 +15,12 @@ Server-only ids are in the module's `gamevals.toml`: timers `random_event` and `
 - [ ] Bug fix
 - [x] New content (skill, quest, boss, area, interface)
 - [ ] Engine / API change
-- [ ] Cache / gamevals / pack data
+- [x] Cache / gamevals / pack data
 - [ ] Docs / tooling
 
 ## How it was tested
 
-- CI on the fork (build, `spotlessCheck`, unit and integration tests, Formatting) is green on a merge of this branch with upstream main; `tools/scripts/fix_gameval_conflicts.py --check` finds no conflicts.
+- The `random-events` module compiles and passes `spotlessCheck` locally on this branch; `tools/scripts/fix_gameval_conflicts.py --check` finds no conflicts.
 - In game, on a local build of this branch with a desktop client, full inventory of 28 logs: Talk-to put "Your reward is: 1 x Lamp." in chat and the lamp on the floor under the player while the dialogue was open; the Genie was gone by the next call tick, with no call afterwards.
 - Walking away from the open dialogue left no orphan Genie, and the lamp was still on the floor and could be picked up.
 - Logging out with a Genie present left no orphan Genie.
@@ -33,17 +33,17 @@ Server-only ids are in the module's `gamevals.toml`: timers `random_event` and `
 - [x] Tests only cover complex logic and anything that moves items (no dupes)
 - [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
 - [x] State in varbits/varps, not attrs
-- [x] Matches the OSRS wiki (deviations noted in `docs/quirks.md`)
+- [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`)
 - [x] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings)
 - [x] No unrelated or hand-edited generated changes
 
 ## Screenshots / notes for reviewers
 
-Data sources: OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): Random events, Genie, Transcript:Genie; RSProx recordings of the event for the timings.
+Data sources: OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): Random events, Genie, Transcript:Genie; RSProx recordings 3056 and 1718 of the event, read at the packet level, for the timings.
 
-The lamp's XP uses the base level (`statBase`); the wiki says "current level".
+The lamp's XP uses the base level (`statBase`); the wiki says "current level". This is the one deviation from the wiki and is not in `docs/quirks.md`.
 
-`GenieRandomEventTest` (two integration tests) is the test file already on this PR.
+No tests are included.
 
 Only the Genie is added; other random events could build on the same timer.
 

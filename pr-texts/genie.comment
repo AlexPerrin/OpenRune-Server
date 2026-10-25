@@ -1,0 +1,10 @@
+Updated on current `main`: the net diff is the Genie module only (the event script, its `build.gradle.kts` and `gamevals.toml`).
+
+- The `::randomevent` command requires administrator rights; the non-admin refusal is checked in code only.
+- Talk-to hands the lamp over before the dialogue opens, so cancelling or logging out cannot lose it; with a full inventory it drops to the floor. The Genie leaves on the next call tick.
+- The lamp's XP and its message are the same number; it uses the base level, where the wiki says "current level".
+- No tests are included.
+
+Title and description updated to match.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
