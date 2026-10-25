@@ -44,6 +44,7 @@ content/fletching
 fin/quest-test-fixture
 local/quest-test-fixture
 local/romeo-juliet
+acc/cannon
 # Local only (never upstream)
 local/android
 local/local-auth
