@@ -24,12 +24,8 @@ fix/stile-approach
 fix/ground-item-despawn-times
 fix/cannon-drop-tests
 # Content
-content/witchs-potion
 content/dragon-specials
 content/reconnect-login
-fin/quest-test-fixture
-local/quest-test-fixture
-local/romeo-juliet
 fin/goblin-diplomacy
 fin/vampyre-slayer
 content/pirates-treasure
@@ -43,8 +39,12 @@ content/fletching
 content/goblin-diplomacy-unstacked
 content/goblin-diplomacy
 content/cannon
+content/witchs-potion
 content/genie
 feat/hunter
+fin/quest-test-fixture
+local/quest-test-fixture
+local/romeo-juliet
 # Local only (never upstream)
 local/android
 local/local-auth
