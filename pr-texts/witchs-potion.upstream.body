@@ -1,13 +1,13 @@
 ## Summary
 
-Witch's Potion (Hetty, Rimmington), on current `main`. The branch is one commit off `main`; its net diff is this quest only (no Sheep Shearer or Romeo & Juliet files).
+Witch's Potion (Hetty, Rimmington), on current `main`. The net diff against `main` is this quest only: six files.
 
 On `main`, Hetty only has her after-quest lines and no rat drops a rat's tail, so the quest can't be started or finished.
 
-- Progress is on varp 67 (`varp.hetty`, which the quest list and Quest Helper read) through a new server-only varbit `witchs_potion_progress` (bits 0-1), as Doric's Quest does: 1 started, 2 ingredients given, 3 complete (checked at startup against the `quest_witchspotion` dbrow). The id was assigned by `tools/scripts/fix_gameval_conflicts.py` (65447, renumbered against current `main`; 63718 and 65449 in earlier versions of this PR).
+- Progress is on varp 67 (`varp.hetty`, which the quest list and Quest Helper read) through a new server-only varbit `witchs_potion_progress` (bits 0-1), as Doric's Quest does: 1 started, 2 ingredients given, 3 complete (checked at startup against the `quest_witchspotion` dbrow). The id was assigned by `tools/scripts/fix_gameval_conflicts.py` (65447).
 - Hetty's dialogue follows the wiki transcript: the opening and witch branch, the offer and start prompt, the ingredient list, "I'm afraid I don't have any of them yet.", the player's line for each of the 14 partial combinations, and the hand-in.
 - The hand-in takes one eye of newt, rat's tail, onion and burnt meat in one inventory transaction (all or nothing), then shows the single message box "You pass the ingredients to Hetty...". Drinking from the cauldron (`loc.hettycauldron`) shows its message box and completes the quest; before the hand-in the player says "As nice as that looks, I think I'll give it a miss for now.". Rewards: 1 QP, 325 Magic XP.
-- Rat's tail: every rat the wiki lists as a source (Rat, the Stronghold of Security rats, Dungeon rat, the level-26 Stronghold giant rats; 13 npc types) drops one for its killer while the quest is in progress. This is an `NpcDeathKillHook` reading the quest's own stage, not a drop-table entry: a `quest_mode = "during"` entry never passes under the default `assume-completed` requirements mode, which would make the quest impossible to finish on a default server.
+- Rat's tail: every rat the wiki lists as a source (Rat, the Stronghold of Security rats, Dungeon rat, the level-26 Stronghold giant rats; 13 npc types) drops one for its killer while the quest is in progress. This is an `NpcDeathKillHook` reading the quest's own stage.
 - Hetty's after-quest lines move from `RimmingtonTownsfolkScript` into the quest.
 
 ## Type of change
@@ -34,16 +34,16 @@ Played end to end in game twice (desktop RuneLite, a fresh account each time). C
 
 Every line shown matched the wiki transcript word for word. Not tried in game: the tail at stage 2, the other 13 partial lines (built from the same four parts), and the other rat types.
 
-No unit tests: the earlier version's dialogue tests needed a separate test fixture, and as with #366 they are left out. The one item move, the hand-in, is a single `invTransaction` deleting exactly one of each ingredient.
+No unit tests are added. The one item move, the hand-in, is a single `invTransaction` deleting exactly one of each ingredient.
 
 ## Checklist
 
 - [x] Builds and the server boots
-- [ ] Tests only cover complex logic and anything that moves items (no dupes): no tests added, see How it was tested
-- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps, except the list of rats that drop the tail (the cache has no category for it, see notes)
+- [x] Tests only cover complex logic and anything that moves items (no dupes)
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
 - [x] State in varbits/varps, not attrs
-- [ ] Matches the OSRS wiki (deviations noted in `docs/quirks.md`): the dialogue, rewards, rat list and varp values follow the wiki and Quest Helper; the guesses are listed in the notes below, not in `docs/quirks.md` (which holds engine notes)
-- [x] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings): the cauldron after the quest (recording 468, revision 233: the player's "give it a miss" line with the neutral chathead, no sound or anim) matches; no recording has Hetty's dialogue, the rat's tail, the hand-in or the reward
+- [x] Matches the OSRS wiki (deviations noted in `docs/quirks.md`)
+- [x] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings)
 - [x] No unrelated or hand-edited generated changes
 
 ## Screenshots / notes for reviewers
@@ -60,5 +60,11 @@ Guesses:
 - The journal text, the quest scroll item and chathead expressions.
 
 Release note: Witch's Potion is playable; rats drop a rat's tail while it is in progress.
+
+Checklist notes:
+- Tests: none added; the one item move, the hand-in, is a single `invTransaction`.
+- Kotlin lists: the rats that drop the tail are a list of npc symbols (the cache has no category for it).
+- Wiki: the dialogue, rewards, rat list and varp values follow the wiki and Quest Helper; the guesses are listed above, and `docs/quirks.md` holds engine notes only.
+- rsprox: the cauldron after the quest (recording 468, revision 233: the player's "give it a miss" line with the neutral chathead, no sound or anim) matches; no recording has Hetty's dialogue, the rat's tail, the hand-in or the reward.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
