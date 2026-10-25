@@ -1,26 +1,50 @@
-Review fixes for upstream #355 (Genie random event), on current `main` (5c4c9c106). To be pushed onto the #355 head `content/genie` after the maintainer-side OK; #355 stays draft until then.
+## Summary
 
-**Problem.** Two review findings (eaglepurerocketgrape, 2026-10-22) and two findings of our own gate:
-- P1: `::randomevent` had no `requiredRights`, so any account could summon Genies and farm lamps.
-- P2: `talk()` removed the Genie from `genies` before the dialogue and gave the lamp after it; a cancelled dialogue or a logout at the open page left an orphan Genie and no lamp.
-- Our gate: he left Talk-to + 10 ticks instead of on his next call tick (RSProx 1718, 3056); the Rub message said 10 x level while the world XP rate gave x150.
+Adds the Genie random event in a new module `content/events/random-events` (content area from #353).
 
-**Change.**
-- `::randomevent` requires `Rights.ADMINISTRATOR`.
-- Talk-to hands the lamp over first (`invAddOrDrop`, so a full inventory drops it at the player's feet; message "Your reward is: 1 x Lamp."), then opens the dialogue. The Genie stays tracked, marked handed over, and leaves on his next call tick with no call; logout still removes him. A second Talk-to says "Have a nice day".
-- The lamp gives exactly 10 x the base level in XP, unscaled, and the message states that number.
+- Every 1-2 hours of play a Genie appears beside the player, faces them and calls them by name.
+- Talk-to hands over a lamp straight away (the lamp is delivered before the dialogue opens, so cancelling the dialogue or logging out cannot lose it; with a full inventory it drops to the floor). The Genie leaves on the next call tick.
+- Rubbing the lamp gives 10 x the chosen skill's base level in XP; the message and the XP are the same number.
+- Dismiss sends him away, and he leaves after a minute when ignored.
+- `::randomevent` summons him and requires administrator rights.
 
-**Tests.** None added: the review fix ships without new tests; `GenieRandomEventTest` is unchanged from the #355 head. The behaviour is checked in game against the spec.
+Server-only ids are in the module's `gamevals.toml`: timers `random_event` and `random_event_genie`.
 
-**Data sources.** OSRS Wiki (CC BY-NC-SA 3.0): Genie, Lamp, Random events, Transcript:Genie; RSProx recordings 3056 and 1718 (packet and tick facts only). Spec: `accuracy/genie-review-355.md` on the fork's docs branch.
+## Type of change
 
-**Caveats.** The Rub result is a chat line, not the official message box. Logout removing the Genie is a guess. The message-box and zone work of our fuller build is not part of this PR.
+- [ ] Bug fix
+- [x] New content (skill, quest, boss, area, interface)
+- [ ] Engine / API change
+- [ ] Cache / gamevals / pack data
+- [ ] Docs / tooling
 
-**Release note.** Genie random event: admin-only summon command, the lamp can no longer be lost, correct lamp XP.
+## How it was tested
 
-**Checklist**
-- [x] Compiles; existing tests pass (CI)
-- [x] No documentation change needed
-- [x] No unrelated formatting or dependency changes
+- CI on the fork (build, `spotlessCheck`, unit and integration tests, Formatting) is green on a merge of this branch with upstream main; `tools/scripts/fix_gameval_conflicts.py --check` finds no conflicts.
+- In game, on a local build of this branch with a desktop client, full inventory of 28 logs: Talk-to put "Your reward is: 1 x Lamp." in chat and the lamp on the floor under the player while the dialogue was open; the Genie was gone by the next call tick, with no call afterwards.
+- Walking away from the open dialogue left no orphan Genie, and the lamp was still on the floor and could be picked up.
+- Logging out with a Genie present left no orphan Genie.
+- Rub: "Your wish has been granted! You have been awarded 10 Ranged XP!", and Ranged XP went from 0 to 10 at level 1.
+- The refusal for a non-admin account was checked in code only (`requiredRights = Rights.ADMINISTRATOR`); every account on the local server is an administrator.
+
+## Checklist
+
+- [x] Builds and the server boots
+- [x] Tests only cover complex logic and anything that moves items (no dupes)
+- [x] Gamevals symbols instead of raw ids; game data in the cache, not Kotlin maps
+- [x] State in varbits/varps, not attrs
+- [x] Matches the OSRS wiki (deviations noted in `docs/quirks.md`)
+- [x] New content checked against rsprox dumps where possible (anims, projectiles, sounds, timings)
+- [x] No unrelated or hand-edited generated changes
+
+## Screenshots / notes for reviewers
+
+Data sources: OSRS Wiki (by the wiki's contributors, CC BY-NC-SA 3.0, https://creativecommons.org/licenses/by-nc-sa/3.0/): Random events, Genie, Transcript:Genie; RSProx recordings of the event for the timings.
+
+The lamp's XP uses the base level (`statBase`); the wiki says "current level".
+
+`GenieRandomEventTest` (two integration tests) is the test file already on this PR.
+
+Only the Genie is added; other random events could build on the same timer.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
