@@ -56,3 +56,4 @@ content/goblin-diplomacy 405e38601278b51a9dc38d75ff6315d2f856c90f
 local/drop-stale-goblin-test 96f4e49be27a0e77b2fba72a87b89f0d97159f2a
 fix/cannon-drop-tests 0df5c63a009b75fffb33f8ead897b432f55fcead
 content/cannon 0df5c63a009b75fffb33f8ead897b432f55fcead
+local/server-tools cebd3ba572b8168f811ce75060450b484345f40b
