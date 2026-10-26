@@ -80,9 +80,9 @@ constructor(
             onOpLoc1(kind.brokenLoc) { dismantle(it.loc.coords) }
             onOpLoc2(kind.brokenLoc) { reset(it.loc.coords) }
             for (torch in TORCHES) onOpLocU(kind.setLoc, torch) { smoke(it.loc.coords) }
-            for (creature in kind.creatures) {
-                onOpLoc1(creature.fullLoc) { check(it.loc.coords) }
-                onOpLoc2(creature.fullLoc) { reset(it.loc.coords) }
+            for (loc in kind.creatures.flatMap { it.checkLocs }.distinct()) {
+                onOpLoc1(loc) { check(it.loc.coords) }
+                onOpLoc2(loc) { reset(it.loc.coords) }
             }
             for (bait in kind.creatures.mapNotNull { it.bait }.distinct()) {
                 onOpLocU(kind.setLoc, bait) { bait(it.loc.coords, bait) }
@@ -337,6 +337,16 @@ constructor(
         worldRepo.soundArea(trap.coords, synth)
     }
 
+    fun catchWithoutLure(trap: Trap, creature: Creature, loc: String) {
+        if (trap.state != TrapState.Set) return
+        trap.approach = null
+        trap.creature = creature
+        locRepo.del(trap.loc, Int.MAX_VALUE)
+        trap.loc = placeLoc(trap.coords, loc)
+        trap.state = TrapState.Full
+        trap.stateCycle = clock.cycle
+    }
+
     private fun settle(trap: Trap) {
         setState(trap, TrapState.Full)
         worldRepo.soundArea(trap.coords, if (trap.kind.snare) SNARE_FULL_SYNTH else BOX_FULL_SYNTH)
@@ -485,6 +495,9 @@ constructor(
         val petBase: Int,
     ) {
         val npcIds: Set<Int> by lazy { npcs.map { it.asRSCM(RSCMType.NPC) }.toSet() }
+
+        val checkLocs: List<String>
+            get() = if (fullLoc in trappingLocs) trappingLocs else listOf(fullLoc)
 
         val article: String
             get() = if (name.first() in "aeiou") "an" else "a"

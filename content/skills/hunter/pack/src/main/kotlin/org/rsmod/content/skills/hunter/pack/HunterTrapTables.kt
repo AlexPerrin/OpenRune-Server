@@ -75,6 +75,20 @@ object HunterTrapsTable {
                 column(CONSUMED, true)
                 column(SMOKE_REFUSAL, "Imps steal so many human items, they're unlikely to be worried by human smells.")
             }
+            row("dbrow.hunter_trap_rabbit_snare") {
+                columnRSCM(ITEM, "obj.hunting_snare")
+                column(NAME, "rabbit snare")
+                column(LEVEL, 27)
+                columnRSCM(SET_LOC, "loc.hunting_snare")
+                columnRSCM(FAILING_LOC, "loc.hunting_snare_failed")
+                columnRSCM(BROKEN_LOC, "loc.hunting_snare_failed")
+                columnRSCM(CHECK_SEQ, "seq.human_hunting_dismantle_net")
+                columnRSCM(LAY_SYNTH, "synth.hunting_lay_bird_snare")
+                column(COLLAPSE_TEXT, "The rabbit snare that you laid has fallen over.")
+                column(QUEST, "quest_eaglespeak")
+                column(CONSUMED, false)
+                column(SMOKE_REFUSAL, "")
+            }
         }
 }
 
@@ -99,6 +113,7 @@ object HunterTrapCreaturesTable {
     private const val SNARE = 0
     private const val BOX = 1
     private const val MAGIC_BOX = 2
+    private const val RABBIT_SNARE = 3
 
     private const val NEXT_TICK = 1
 
@@ -220,6 +235,21 @@ object HunterTrapCreaturesTable {
                 high = 197,
                 respawnTicks = 50,
                 approachSeq = "seq.hunting_imp_caught",
+            ),
+            Row(
+                key = "white_rabbit",
+                trap = RABBIT_SNARE,
+                name = "white rabbit",
+                npcs = listOf("npc.hunting_snare_trap_npc"),
+                level = 27,
+                xpTenths = 1440,
+                trappingLocs = listOf("loc.hunting_snare_rabbit", "loc.hunting_snare_rabbit_m"),
+                fullLoc = "loc.hunting_snare_rabbit",
+                loot = listOf(Triple("obj.bones", 1, 1), Triple("obj.raw_rabbit", 1, 1), Triple("obj.hunting_rabbit_foot", 1, 1)),
+                low = 256,
+                high = 256,
+                respawnTicks = 0,
+                approachSeq = "seq.hunting_snare_capture_rabbit0",
             ),
         )
 

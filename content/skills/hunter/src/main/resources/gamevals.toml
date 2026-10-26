@@ -11,6 +11,10 @@ hunter_trap_creatures = 56005
 hunter_net_traps = 65497
 hunter_deadfalls = 65496
 hunter_falconry = 65494
+hunter_tracking = 65490
+hunter_aerial_fish = 65489
+hunter_pearl_shop = 65488
+hunter_pitfalls = 65491
 
 herbiboar_legs = 56006
 herbiboar_spots = 56007
@@ -60,9 +64,35 @@ hunter_trap_creature_chinchompa_black = 60182
 hunter_trap_creature_jerboa = 60183
 hunter_trap_magic_box = 63856
 hunter_trap_creature_imp = 63855
+hunter_trap_rabbit_snare = 63835
+hunter_aerial_fish_greater_siren = 63827
+hunter_aerial_fish_mottled_eel = 63826
+hunter_aerial_fish_common_tench = 63828
+hunter_aerial_fish_bluegill = 63829
+hunter_pearl_shop_0 = 63825
+hunter_pearl_shop_1 = 63824
+hunter_pearl_shop_2 = 63823
+hunter_pearl_shop_3 = 63822
+hunter_pearl_shop_4 = 63821
+hunter_pearl_shop_5 = 63820
+hunter_pearl_shop_6 = 63819
+hunter_pearl_shop_7 = 63818
+hunter_pearl_shop_8 = 63817
+shop_currency_molch_pearl = 63816
+hunter_tracking_polar = 63831
+hunter_tracking_common = 63834
+hunter_tracking_razorback = 63830
+hunter_tracking_feldip = 63832
+hunter_tracking_desert = 63833
+hunter_trap_creature_white_rabbit = 63836
 hunter_net_trap_swamp = 63850
 hunter_deadfall_wild = 63845
 hunter_falconry_spotted = 63842
+hunter_pitfall_larupia = 63839
+hunter_pitfall_graahk = 63841
+hunter_pitfall_kyatt = 63840
+hunter_pitfall_sunlight_antelope = 63837
+hunter_pitfall_moonlight_antelope = 63838
 hunter_falconry_dark = 63844
 hunter_falconry_dashing = 63843
 hunter_deadfall_barbed = 63849
@@ -212,7 +242,16 @@ hunter_traps = 436
 hunter_net_traps = 65535
 hunter_deadfalls = 65534
 hunter_falconry = 65533
+hunter_pitfalls = 65532
+hunter_aerial_fishing = 65531
+hunter_aerial_spot_move = 65530
 
+
+[gamevals.currency]
+molch_pearl = 65532
+
+[gamevals.inv]
+aerial_fishing_pearl_shop = 65535
 
 [gamevals.area]
 piscatoris_falconry = 30010
@@ -232,3 +271,15 @@ hunting_deadfall_set = 2645
 hunting_deadfall_trapping = 2631
 hunting_deadfall_kebbit = 524
 hunting_deadfall_fox = 7894
+hunting_graahk_attack = 666
+hunting_kyatt_attack = 835
+hunting_antelope_attack = 7879
+hunting_graahk_caught = 667
+hunting_kyatt_caught = 836
+hunting_antelope_caught = 7890
+hunting_pitfall_set = 2639
+hunting_pitfall_dismantle = 2649
+hunting_tease = 2524
+hunting_pitfall_jump = 2635
+hunting_pitfall_collapse = 2638
+hunting_pitfall_leap = 2619

@@ -328,8 +328,9 @@ constructor(
     private fun replaceCaught(trap: NetTrap, internal: String): LocInfo {
         val anchor = if (trap.tree.angleId <= 1) trap.tree.coords else trap.net
         val current = trap.treeLoc
-        if (current != null && current.coords != anchor) {
-            locRepo.del(current, Int.MAX_VALUE)
+        if (anchor != trap.tree.coords && current != null && current.coords == trap.tree.coords) {
+            if (current != trap.tree) locRepo.del(current, Int.MAX_VALUE)
+            locRepo.del(trap.tree, Int.MAX_VALUE)
         }
         val loc = LocInfo(trap.tree.layer, anchor, LocEntity(internal.asRSCM(RSCMType.LOC), trap.tree.shapeId, trap.tree.angleId))
         locRepo.add(loc, Int.MAX_VALUE)
