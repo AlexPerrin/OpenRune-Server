@@ -284,7 +284,7 @@ constructor(
     private suspend fun ProtectedAccess.talkToGeneral(npc: Npc) {
         val wartface = npc.id == WARTFACE.asRSCM(RSCMType.NPC)
         val other = if (wartface) BENTNOZE else WARTFACE
-        if (npcFind(npc.coords, other, GENERAL_SIGHT, HuntVis.LineOfSight, search) == null) {
+        if (npcFind(npc.coords, other, GENERAL_RANGE, HuntVis.Off, search) == null) {
             startDialogue(npc) {
                 if (wartface) {
                     wartface(confused, "Where's Bentnoze gone now?")
@@ -941,7 +941,7 @@ constructor(
                 lookAtHeight = 150,
             )
         private const val CHANGE_TICKS = 2
-        private const val GENERAL_SIGHT = 15
+        private const val GENERAL_RANGE = 15
         private const val SCENE_LIFESPAN = 3000
 
         private const val WARTFACE = "npc.general_wartface_green"

@@ -1,29 +1,121 @@
 package org.rsmod.content.quest.area.goblinvillage
 
+import dev.openrune.rscm.RSCM
+import dev.openrune.rscm.RSCM.asRSCM
+import dev.openrune.rscm.RSCMType
+import dev.openrune.types.hunt.HuntVis
 import jakarta.inject.Inject
+import org.rsmod.api.combat.commons.npc.attackRate
+import org.rsmod.api.combat.commons.npc.combatPlayDefendAnim
+import org.rsmod.api.combat.formulas.AccuracyFormulae
+import org.rsmod.api.combat.formulas.MaxHitFormulae
+import org.rsmod.api.config.refs.params
+import org.rsmod.api.hunt.NpcSearch
+import org.rsmod.api.npc.access.StandardNpcAccess
+import org.rsmod.api.npc.events.interact.AiNpcEvents
+import org.rsmod.api.npc.hit.modifier.NpcHitModifier
+import org.rsmod.api.npc.hit.queueHit
+import org.rsmod.api.npc.interact.AiNpcInteractions
 import org.rsmod.api.npc.interact.AiPlayerInteractions
+import org.rsmod.api.npc.isValidTarget
+import org.rsmod.api.npc.opNpc2
 import org.rsmod.api.npc.opPlayer2
 import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.player.protect.ProtectedAccess
+import org.rsmod.api.random.GameRandom
+import org.rsmod.api.script.onAiTimer
+import org.rsmod.api.script.onNpcAccessEvent
 import org.rsmod.api.script.onOpNpc1
 import org.rsmod.game.entity.Npc
+import org.rsmod.game.hit.HitType
+import org.rsmod.game.interact.InteractionNpc
 import org.rsmod.plugin.scripts.PluginScript
 import org.rsmod.plugin.scripts.ScriptContext
 
-class GoblinVillageGoblins @Inject constructor(private val aiPlayerInteractions: AiPlayerInteractions) :
-    PluginScript() {
+class GoblinVillageGoblins
+@Inject
+constructor(
+    private val aiPlayerInteractions: AiPlayerInteractions,
+    private val aiNpcInteractions: AiNpcInteractions,
+    private val search: NpcSearch,
+    private val accuracy: AccuracyFormulae,
+    private val maxHits: MaxHitFormulae,
+    private val hitModifier: NpcHitModifier,
+    private val random: GameRandom,
+) : PluginScript() {
 
     override fun ScriptContext.startup() {
         for (id in SOLDIERS) {
-            onOpNpc1("npc.goblin_red_soldier_$id") { talk(it.npc, red = true) }
-            onOpNpc1("npc.goblin_green_soldier_$id") { talk(it.npc, red = false) }
+            for (red in listOf(true, false)) {
+                val soldier = soldier(red, id)
+                onOpNpc1(soldier) { talk(it.npc, red) }
+                onAiTimer(soldier) { startFight(npc, red) }
+                onNpcAccessEvent<AiNpcEvents.Op2>(soldier.asRSCM(RSCMType.NPC)) { fight(it.target) }
+            }
+        }
+    }
+
+    private fun startFight(npc: Npc, red: Boolean) {
+        if (npc.interaction != null || random.of(maxExclusive = FIGHT_CHANCE) != 0) return
+        val enemy =
+            search
+                .findAllAny(npc.coords, FIGHT_RANGE, HuntVis.LineOfWalk)
+                .filter { isSoldier(it, !red) && it.interaction == null && it.isValidTarget() }
+                .toList()
+        val target = random.pickOrNull(enemy) ?: return
+        npc.opNpc2(target, aiNpcInteractions)
+        target.opNpc2(npc, aiNpcInteractions)
+    }
+
+    private fun StandardNpcAccess.fight(target: Npc) {
+        val red = isSoldier(npc, red = true)
+        if (!red && !isSoldier(npc, red = false) || !isSoldier(target, !red)) {
+            resetMode()
+            return
+        }
+        if (actionDelay > mapClock) return
+        actionDelay = mapClock + npc.attackRate()
+        anim(RSCM.getReverseMapping(RSCMType.SEQ, npc.visType.param(params.attack_anim).id))
+        val damage =
+            if (accuracy.rollMeleeAccuracy(npc, target, null, random)) {
+                random.of(0..maxHits.getMeleeMaxHit(npc))
+            } else {
+                0
+            }
+        target.queueHit(npc, 1, HitType.Melee, damage, hitModifier)
+        target.combatPlayDefendAnim()
+        if (random.of(maxExclusive = SHOUT_CHANCE) == 0) {
+            say(random.pick(if (red) RED_SHOUTS else GREEN_SHOUTS))
         }
     }
 
     private suspend fun ProtectedAccess.talk(npc: Npc, red: Boolean) {
         val questDone = vars["varbit.gobdip_main"] >= QUEST_COMPLETE
+        val enemy = (npc.interaction as? InteractionNpc)?.target?.takeIf { isSoldier(it, !red) }
         startDialogue(npc) {
-            if (questDone) afterQuest(npc, red) else armourBest(red)
+            when {
+                questDone -> afterQuest(npc, red)
+                enemy != null -> whyFighting(npc, red, enemy)
+                else -> armourBest(red)
+            }
+        }
+    }
+
+    private suspend fun Dialogue.whyFighting(npc: Npc, red: Boolean, enemy: Npc) {
+        val redType = RSCM.getReverseMapping(RSCMType.NPC, if (red) npc.id else enemy.id)
+        val greenType = RSCM.getReverseMapping(RSCMType.NPC, if (red) enemy.id else npc.id)
+        if (access.random.of(maxExclusive = 2) == 0) {
+            chatNpcSpecific(GOBLIN, greenType, angry, "Green armour best.")
+            chatNpcSpecific(GOBLIN, redType, angry, "Red armour best!")
+            return
+        }
+        chatPlayer(quiz, "Why are you fighting?")
+        if (red) {
+            chatNpc(angry, "He wearing green armour! General Bentnoze tell us wear red!")
+            chatNpcSpecific(GOBLIN, greenType, angry, "But General Wartface say we must wear green!")
+        } else {
+            chatNpc(angry, "He wearing red armour! General Wartface tell us wear green!")
+            chatNpcSpecific(GOBLIN, redType, angry, "But General Bentnoze say we must wear red!")
         }
     }
 
@@ -156,8 +248,22 @@ class GoblinVillageGoblins @Inject constructor(private val aiPlayerInteractions:
         npc.opPlayer2(player, aiPlayerInteractions)
     }
 
+    private fun soldier(red: Boolean, id: Int): String =
+        if (red) "npc.goblin_red_soldier_$id" else "npc.goblin_green_soldier_$id"
+
+    private fun isSoldier(npc: Npc, red: Boolean): Boolean =
+        SOLDIERS.any { npc.id == soldier(red, it).asRSCM(RSCMType.NPC) }
+
     private companion object {
         private const val QUEST_COMPLETE = 6
+        private const val GOBLIN = "Goblin"
+        private const val FIGHT_CHANCE = 250
+        private const val FIGHT_RANGE = 5
+        private const val SHOUT_CHANCE = 3
         private val SOLDIERS = 2..8
+        private val RED_SHOUTS =
+            listOf("Red armour best!", "Green armour stupid!", "Red not green!", "Red red red!", "Stupid greenie!")
+        private val GREEN_SHOUTS =
+            listOf("Green!", "Green armour best!", "Red armour stupid!", "Green not red!", "Stupid reddie!")
     }
 }
