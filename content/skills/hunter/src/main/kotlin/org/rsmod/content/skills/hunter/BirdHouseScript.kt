@@ -4,6 +4,7 @@ import jakarta.inject.Inject
 import java.time.Clock
 import kotlin.math.roundToInt
 import org.rsmod.api.config.constants
+import org.rsmod.api.player.output.ChatType
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.player.vars.VarPlayerIntMapSetter
 import org.rsmod.api.repo.obj.ObjRepository
@@ -16,6 +17,8 @@ import org.rsmod.api.script.onOpLocU
 import org.rsmod.api.table.BirdhouseSeedsRow
 import org.rsmod.api.table.BirdhouseTypesRow
 import org.rsmod.api.utils.skills.SkillingSuccessRate
+import org.rsmod.content.skills.hunter.HunterClues.canReceiveClue
+import org.rsmod.content.skills.hunter.HunterClues.scrollBoxes
 import org.rsmod.game.cheat.Cheat
 import org.rsmod.game.entity.Player
 import org.rsmod.plugin.scripts.PluginScript
@@ -42,21 +45,35 @@ constructor(val objRepo: ObjRepository) : PluginScript() {
 
     private suspend fun ProtectedAccess.op1(space: Space) {
         if (state(player, space) == 0) {
-            val carried = TIERS.filter { it.item.internalName in inv }
-            val tier = carried.lastOrNull { stat(HUNTER) >= it.hunterLevel } ?: carried.firstOrNull()
+            val tier = TIERS.lastOrNull { it.item.internalName in inv && stat(HUNTER) >= it.hunterLevel }
             if (tier == null) {
-                mes("You need a bird house to build here.")
+                mes("You do not have a birdhouse with the required hunter level to build here.")
                 return
             }
             build(space, tier)
             return
         }
-        if (state(player, space) % 3 == 0) {
-            if (isFull(player, space)) {
-                mes("Your bird house trap is full of birds.")
-            } else {
-                mes("Your bird house trap is still catching birds.")
-            }
+        if (state(player, space) % 3 != 0) return
+        val choice =
+            choice4(
+                "Check seed levels.",
+                1,
+                "Dismantle my trap.",
+                2,
+                "Dismantle and rebuild my trap.",
+                3,
+                "Do nothing",
+                4,
+            )
+        when (choice) {
+            1 ->
+                if (isFull(player, space)) {
+                    mes("Your bird house trap is full of birds.")
+                } else {
+                    mes("Your bird house trap is still catching birds.")
+                }
+            2 -> op3(space)
+            3 -> reset(space)
         }
     }
 
@@ -75,13 +92,18 @@ constructor(val objRepo: ObjRepository) : PluginScript() {
             return
         }
         if (invDel(inv, tier.item.internalName).failure) return
+        place(space, tier)
+    }
+
+    private fun ProtectedAccess.place(space: Space, tier: BirdhouseTypesRow) {
         setState(player, space, tier.tier * 3 + 1)
         VarPlayerIntMapSetter.set(player, space.seedsVarp, 0)
         VarPlayerIntMapSetter.set(player, space.seededVarp, 0)
-        mes("You place the bird house.")
+        anim(PICKUP_SEQ)
+        soundSynth(PLACE_SYNTH)
     }
 
-    fun ProtectedAccess.addSeeds(space: Space, preferred: String?) {
+    suspend fun ProtectedAccess.addSeeds(space: Space, preferred: String?) {
         val state = state(player, space)
         if (state == 0) {
             mes("There is no bird house here.")
@@ -91,6 +113,7 @@ constructor(val objRepo: ObjRepository) : PluginScript() {
             mes("The bird house is already full of seeds.")
             return
         }
+        delay(1)
         var have = player.vars[space.seedsVarp]
         val order = listOfNotNull(preferred) + SEEDS
         for (seed in order) {
@@ -107,14 +130,16 @@ constructor(val objRepo: ObjRepository) : PluginScript() {
         }
         VarPlayerIntMapSetter.set(player, space.seedsVarp, have)
         val tierBase = (state - 1) / 3 * 3
-        if (have >= SEEDS_NEEDED) {
-            VarPlayerIntMapSetter.set(player, space.seededVarp, nowMinutes())
-            setState(player, space, tierBase + 3)
-            mes("You fill the bird house with seeds.")
-        } else {
+        anim(PICKUP_SEQ)
+        soundSynth(PLACE_SYNTH)
+        if (have < SEEDS_NEEDED) {
             setState(player, space, tierBase + 2)
-            mes("You add some seeds to the bird house.")
+            return
         }
+        VarPlayerIntMapSetter.set(player, space.seededVarp, nowMinutes())
+        setState(player, space, tierBase + 3)
+        mes(SEEDED_MESSAGE, ChatType.Spam)
+        mesbox(SEEDED_MESSAGE)
     }
 
     private suspend fun ProtectedAccess.op3(space: Space) {
@@ -155,39 +180,60 @@ constructor(val objRepo: ObjRepository) : PluginScript() {
             return false
         }
         val tier = TIERS[state / 3 - 1]
-        val loot = rollLoot(tier, stat(HUNTER)) { bound -> random.of(bound) }
+        anim(PICKUP_SEQ)
+        soundSynth(PLACE_SYNTH)
+        val foot = STRUNG_RABBIT_FOOT in player.worn
+        val loot = rollLoot(tier, stat(HUNTER), foot, { canReceiveClue(it) }) { bound -> random.of(bound) }
         clear(player, space)
         invAddOrDrop(objRepo, CLOCKWORK)
         objRepo.add(RAW_BIRD_MEAT, player.coords, constants.lootdrop_duration, receiver = player, count = BIRDS)
         invAddOrDrop(objRepo, FEATHER, loot.feathers)
-        for (nest in loot.nests) invAddOrDrop(objRepo, nest)
+        for (nest in loot.nests) {
+            val clueTier = CLUE_NESTS.entries.firstOrNull { it.value == nest }?.key
+            if (clueTier != null && scrollBoxes()) {
+                invAddOrDrop(objRepo, HunterClues.scrollBox(clueTier))
+                objRepo.add(EMPTY_NEST, player.coords, constants.lootdrop_duration, receiver = player)
+            } else {
+                invAddOrDrop(objRepo, nest)
+            }
+        }
         statAdvance(HUNTER, tier.hunterXp.toDouble())
-        mes(collectMessage(loot.nests.size, loot.feathers, tier.hunterXp))
+        mes(collectMessage(loot.nests.size, loot.feathers, tier.hunterXp), ChatType.Spam)
         return true
     }
 
     suspend fun ProtectedAccess.reset(space: Space) {
         if (!empty(space)) return
-        delay(1)
+        delay(2)
         val carried = TIERS.lastOrNull { it.item.internalName in inv && stat(HUNTER) >= it.hunterLevel }
         if (carried != null) {
             build(space, carried)
             return
         }
-        val tier = buildableTier() ?: return
+        val logs = TIERS.filter { it.logs.internalName in inv }
+        if (logs.isEmpty()) {
+            mes("You need logs to make a birdhouse.")
+            return
+        }
+        val buildable = logs.filter { stat(CRAFTING) >= it.craftingLevel && stat(HUNTER) >= it.hunterLevel }
+        if (CLOCKWORK !in inv || HAMMER !in inv || CHISEL !in inv || buildable.isEmpty()) return
+        val tier = if (buildable.size == 1) buildable.single() else chooseLogs(buildable) ?: return
         if (invDel(inv, tier.logs.internalName, 1, CLOCKWORK, 1).failure) return
         statAdvance(CRAFTING, tier.craftingXp.toDouble())
-        setState(player, space, tier.tier * 3 + 1)
-        VarPlayerIntMapSetter.set(player, space.seedsVarp, 0)
-        VarPlayerIntMapSetter.set(player, space.seededVarp, 0)
-        mes("You place the bird house.")
+        place(space, tier)
     }
 
-    private fun ProtectedAccess.buildableTier(): BirdhouseTypesRow? {
-        if (CLOCKWORK !in inv || HAMMER !in inv || CHISEL !in inv) return null
-        return TIERS.lastOrNull {
-            it.logs.internalName in inv && stat(CRAFTING) >= it.craftingLevel && stat(HUNTER) >= it.hunterLevel
-        }
+    private suspend fun ProtectedAccess.chooseLogs(tiers: List<BirdhouseTypesRow>): BirdhouseTypesRow? {
+        val options = tiers.takeLast(5).reversed()
+        val names = options.map { it.logs.name }
+        val choice =
+            when (options.size) {
+                2 -> choice2(names[0], 0, names[1], 1)
+                3 -> choice3(names[0], 0, names[1], 1, names[2], 2)
+                4 -> choice4(names[0], 0, names[1], 1, names[2], 2, names[3], 3)
+                else -> choice5(names[0], 0, names[1], 1, names[2], 2, names[3], 3, names[4], 4)
+            }
+        return options.getOrNull(choice)
     }
 
     private fun Cheat.fastForward() {
@@ -236,7 +282,14 @@ constructor(val objRepo: ObjRepository) : PluginScript() {
         const val EMPTY_NEST = "obj.bird_nest_empty"
         val EGG_NESTS =
             listOf("obj.bird_nest_egg_red", "obj.bird_nest_egg_green", "obj.bird_nest_egg_blue")
+        const val STRUNG_RABBIT_FOOT = "obj.hunting_strung_rabbit_foot"
+        const val CLUE_NEST_DEN = 1500
+        val CLUE_NESTS =
+            listOf("beginner", "easy", "medium", "hard", "elite").associateWith { "obj.wc_clue_nest_$it" }
         const val SEEDS_NEEDED = 10
+        const val PICKUP_SEQ = "seq.human_pickupfloor"
+        const val PLACE_SYNTH = "synth.birdhouse_place"
+        const val SEEDED_MESSAGE = "Your birdhouse trap is now full of seed and will start to catch birds."
         const val FULL_MINUTES = 50
         const val BIRDS = 10
         const val NEST_ROLLS = 5
@@ -264,13 +317,28 @@ constructor(val objRepo: ObjRepository) : PluginScript() {
 
         fun nestChance(level: Int, high: Int): Int = high * (level.coerceIn(50, 99) - 1) / 98
 
-        fun rollLoot(tier: BirdhouseTypesRow, level: Int, nextInt: (Int) -> Int): Loot {
+        fun rollLoot(
+            tier: BirdhouseTypesRow,
+            level: Int,
+            strungRabbitFoot: Boolean,
+            canReceiveClue: (String) -> Boolean,
+            nextInt: (Int) -> Int,
+        ): Loot {
             val feathers = listOf(30, 40, 50, 60)[nextInt(4)]
             val nests = mutableListOf<String>()
             if (nextInt(256) < chance(level, 0, 200)) nests += SEED_NEST
+            var clueGiven = false
             repeat(NEST_ROLLS) {
                 if (nextInt(1000) < nestChance(level, tier.nestChance)) {
-                    val r = nextInt(100)
+                    if (!clueGiven) {
+                        val clue = clueNest(nextInt(CLUE_NEST_DEN))
+                        if (clue != null && canReceiveClue(clue)) {
+                            nests += CLUE_NESTS.getValue(clue)
+                            clueGiven = true
+                            return@repeat
+                        }
+                    }
+                    val r = nextInt(if (strungRabbitFoot) 95 else 100)
                     nests +=
                         when {
                             r < 32 -> RING_NEST
@@ -282,6 +350,16 @@ constructor(val objRepo: ObjRepository) : PluginScript() {
             return Loot(feathers, nests)
         }
 
+        private fun clueNest(r: Int): String? =
+            when {
+                r < 1 -> "elite"
+                r < 3 -> "hard"
+                r < 6 -> "medium"
+                r < 10 -> "easy"
+                r < 40 -> "beginner"
+                else -> null
+            }
+
         fun collectMessage(nests: Int, feathers: Int, xp: Int): String {
             val nestText =
                 when (nests) {
@@ -289,9 +367,8 @@ constructor(val objRepo: ObjRepository) : PluginScript() {
                     1 -> "a nest, "
                     else -> "$nests nests, "
                 }
-            val xpText = "%,d".format(xp)
             return "You dismantle and discard the trap, retrieving ${nestText}10 dead birds, " +
-                "$feathers feathers and $xpText Hunter XP."
+                "$feathers feathers and $xp Hunter XP."
         }
     }
 }

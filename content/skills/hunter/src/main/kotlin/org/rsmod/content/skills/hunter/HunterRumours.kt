@@ -47,9 +47,13 @@ class HunterRumours @Inject constructor(private val objRepo: ObjRepository, priv
         return rumour
     }
 
-    fun resetOthers(player: Player, keep: HunterRumourHuntersRow) {
-        for (hunter in hunters) if (hunter != keep) VarPlayerIntMapSetter.set(player, hunterVarp(hunter), 0)
+    fun reshuffle(player: Player, gilman: HunterRumourHuntersRow) {
+        for (hunter in hunters) VarPlayerIntMapSetter.set(player, hunterVarp(hunter), 0)
+        VarPlayerIntMapSetter.set(player, RESHUFFLED, 1)
+        VarPlayerIntMapSetter.set(player, CURRENT, gilman.index + 1)
     }
+
+    fun reshuffled(player: Player): Boolean = player.vars[RESHUFFLED] != 0
 
     fun meetsRequirements(player: Player, rumour: HunterRumoursRow): Boolean =
         (rumour.quest.isEmpty() || QuestRequirements.hasCompleted(player, rumour.quest)) &&
@@ -95,7 +99,9 @@ class HunterRumours @Inject constructor(private val objRepo: ObjRepository, priv
         val completed = player.vars[COMPLETED] + 1
         VarPlayerIntMapSetter.set(player, COMPLETED, completed)
         VarPlayerIntMapSetter.set(player, LAST, rumour.index)
-        player.mes("You have completed <col=ff3045>$completed</col> rumours for the Hunter Guild.")
+        VarPlayerIntMapSetter.set(player, RESHUFFLED, 0)
+        val noun = if (completed == 1) "rumour" else "rumours"
+        player.mes("You have completed <col=ff3045>$completed</col> $noun for the Hunter Guild.")
         player.statAdvance(HUNTER, turnInXp(player.statBase(HUNTER), hunter.modifier).toDouble())
         if (player.inv.freeSpace() > 0) {
             player.invAdd(player.inv, hunter.lootSack.internalName)
@@ -128,6 +134,7 @@ class HunterRumours @Inject constructor(private val objRepo: ObjRepository, priv
         const val BACK_TO_BACK = "varp.hunter_rumour_back_to_back"
         const val BACK_TO_BACK_OFF = 1
         const val LAST = "varp.hunter_rumour_last"
+        const val RESHUFFLED = "varp.hunter_rumour_reshuffled"
         const val PERCENT = 100
         const val GROUND_DURATION = 200
         const val FOUND_MESSAGE =

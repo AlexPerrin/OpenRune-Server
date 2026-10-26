@@ -66,6 +66,10 @@ constructor(
         if (RING_OF_PURSUIT in player.worn) {
             mes("Hmm, seems my ring of pursuit doesn't work here. Must be the magic of these mushrooms.")
         }
+        if (vars[VISIBLE] != 0 && vars[IGNORE_WARNING] == 0) {
+            val title = "Start a new track? Your caught herbiboar will escape."
+            if (!choice2("Yes.", true, "No.", false, title)) return
+        }
         anim(INSPECT_SEQ)
         delay(INSPECT_TICKS)
         reset(player)

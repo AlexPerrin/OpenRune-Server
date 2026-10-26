@@ -2,6 +2,10 @@
 impling_types = 56002
 impling_loot = 65498
 crystal_impling = 65500
+impling_spawn_tables = 65482
+impling_spawn_points = 65481
+hunter_loot_sacks = 65480
+hunter_loot_sack_cascades = 65479
 
 birdhouse_types = 56003
 birdhouse_seeds = 65501
@@ -30,6 +34,22 @@ hunter_rumour_hunters = 56010
 hunter_rumours = 56011
 
 [gamevals.dbrow]
+hunter_loot_sack_basic = 63783
+hunter_loot_sack_adept = 63782
+hunter_loot_sack_expert = 63781
+hunter_loot_sack_master = 63780
+hunter_loot_sack_supplies = 63779
+hunter_loot_sack_herbs = 63778
+hunter_loot_sack_logs = 63777
+impling_spawn_low = 63776
+impling_spawn_mid = 63775
+impling_spawn_high = 63774
+impling_spawn_high_puro_puro = 63773
+impling_points_gielinor = 63772
+impling_points_gielinor_low = 63771
+impling_points_puro_puro_high = 63770
+impling_points_puro_puro_mid = 63769
+impling_points_puro_puro_low = 63768
 impling_type_baby = 60152
 impling_type_young = 60153
 impling_type_gourmet = 60154
@@ -323,3 +343,6 @@ moss_lizard_rustle = 7925
 moss_lizard_spawn = 607
 moss_lizard_trigger = 7912
 moss_lizard_caught = 606
+birdhouse_place = 2433
+impling_caught = 2623
+hunter_loot_sack_open = 59
