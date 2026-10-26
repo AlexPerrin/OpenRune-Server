@@ -10,7 +10,7 @@ hunter_traps = 56004
 hunter_trap_creatures = 56005
 hunter_net_traps = 65497
 hunter_deadfalls = 65496
-hunter_falconry = 65494
+hunter_falconry = 65483
 hunter_tracking = 65490
 hunter_aerial_fish = 65489
 hunter_moss_lizard_sites = 65486
@@ -64,7 +64,7 @@ hunter_trap_creature_chinchompa = 60180
 hunter_trap_creature_chinchompa_big = 60181
 hunter_trap_creature_chinchompa_black = 60182
 hunter_trap_creature_jerboa = 60183
-hunter_trap_magic_box = 63856
+hunter_trap_magic_box = 63784
 hunter_trap_creature_imp = 63855
 hunter_trap_rabbit_snare = 63835
 hunter_aerial_fish_greater_siren = 63827
@@ -267,7 +267,7 @@ herbiboar_fossil_rare_unid = 63869
 [gamevals.timer]
 
 hunter_traps = 436
-hunter_net_traps = 65535
+hunter_net_traps = 65526
 hunter_deadfalls = 65534
 hunter_falconry = 65533
 hunter_pitfalls = 65532
