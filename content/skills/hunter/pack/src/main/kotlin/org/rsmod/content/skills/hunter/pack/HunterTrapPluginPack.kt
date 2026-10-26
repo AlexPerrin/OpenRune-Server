@@ -8,5 +8,8 @@ class HunterTrapPluginPack : PluginPack() {
         listOf(
             HunterTrapsTable.hunterTraps(),
             HunterTrapCreaturesTable.hunterTrapCreatures(),
+            HunterNetTrapTable.netTraps(),
+            HunterDeadfallTable.deadfalls(),
+            HunterFalconryTable.falconry(),
         )
 }

@@ -8,6 +8,9 @@ birdhouse_seeds = 65501
 
 hunter_traps = 56004
 hunter_trap_creatures = 56005
+hunter_net_traps = 65497
+hunter_deadfalls = 65496
+hunter_falconry = 65494
 
 herbiboar_legs = 56006
 herbiboar_spots = 56007
@@ -55,6 +58,21 @@ hunter_trap_creature_chinchompa = 60180
 hunter_trap_creature_chinchompa_big = 60181
 hunter_trap_creature_chinchompa_black = 60182
 hunter_trap_creature_jerboa = 60183
+hunter_trap_magic_box = 63856
+hunter_trap_creature_imp = 63855
+hunter_net_trap_swamp = 63850
+hunter_deadfall_wild = 63845
+hunter_falconry_spotted = 63842
+hunter_falconry_dark = 63844
+hunter_falconry_dashing = 63843
+hunter_deadfall_barbed = 63849
+hunter_deadfall_prickly = 63848
+hunter_deadfall_sabre = 63846
+hunter_deadfall_pyre_fox = 63847
+hunter_net_trap_orange = 63852
+hunter_net_trap_red = 63851
+hunter_net_trap_black = 63854
+hunter_net_trap_mountain = 63853
 
 herbiboar_leg_0 = 60184
 herbiboar_leg_1 = 60185
@@ -191,4 +209,26 @@ herbiboar_fossil_rare_unid = 63869
 [gamevals.timer]
 
 hunter_traps = 436
+hunter_net_traps = 65535
+hunter_deadfalls = 65534
+hunter_falconry = 65533
 
+
+[gamevals.area]
+piscatoris_falconry = 30010
+
+[gamevals.synth]
+hunting_lay_box_trap = 2636
+hunting_lay_bird_snare = 2646
+hunting_trap_dismantle = 2632
+hunting_box_trap_trapping = 2627
+hunting_box_trap_full = 362
+hunting_snare_trapping = 2637
+hunting_snare_full = 2625
+hunting_net_trap_set = 2644
+salamander_hit = 739
+hunting_net_trap_spring = 2652
+hunting_deadfall_set = 2645
+hunting_deadfall_trapping = 2631
+hunting_deadfall_kebbit = 524
+hunting_deadfall_fox = 7894

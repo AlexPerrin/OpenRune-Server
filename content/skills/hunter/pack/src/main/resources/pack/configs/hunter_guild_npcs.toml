@@ -7,3 +7,18 @@ wanderRange = 0
 id = "npc.hg_verity"
 inherit = "npc.hg_verity"
 wanderRange = 0
+
+[[npc]]
+id = "npc.hunting_falcon_onspeedy"
+inherit = "npc.hunting_falcon_onspeedy"
+wanderRange = 0
+
+[[npc]]
+id = "npc.hunting_falcon_onsilent"
+inherit = "npc.hunting_falcon_onsilent"
+wanderRange = 0
+
+[[npc]]
+id = "npc.hunting_falcon_onspeedy2"
+inherit = "npc.hunting_falcon_onspeedy2"
+wanderRange = 0

@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     implementation(projects.api.pluginCommons)
+    implementation(projects.content.other.pets)
     implementation(projects.content.quest)
     implementation(projects.api.utils.utilsSkills)
 }
