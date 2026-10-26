@@ -31,9 +31,15 @@ constructor(
     private class Bird(val npc: Npc, val tree: Int)
 
     private val birds = HashMap<Player, Bird>()
+    private val trees = HashMap<Int, CoordGrid>()
 
     override fun ScriptContext.startup() {
-        for (tree in TREES.indices) onOpLoc1("loc.hunting_stymphike_tree_$tree") { bait(tree) }
+        for (tree in 0 until TREE_COUNT) {
+            onOpLoc1("loc.hunting_stymphike_tree_$tree") {
+                trees[tree] = it.loc.coords
+                bait(tree)
+            }
+        }
         onOpLoc1(BUSH) { if (vars[HIDING] == 0) hide(it.loc) else exit() }
         onOpLoc1(SPEARS_PILE) { invAdd(inv, MAKESHIFT_SPEAR, PILE_TAKE) }
         onOpNpc1(STYMPHIKE) { spear(it.npc) }
@@ -107,12 +113,12 @@ constructor(
     }
 
     private fun ProtectedAccess.baitedTree(): Int? =
-        TREES.indices.firstOrNull { vars["varbit.hunting_stymphike_trap_status_$it"] != 0 }
+        (0 until TREE_COUNT).firstOrNull { vars["varbit.hunting_stymphike_trap_status_$it"] != 0 }
 
     private fun ProtectedAccess.spawnBird() {
         val tree = baitedTree() ?: return
         val type = ServerCacheManager.getNpc(STYMPHIKE.asRSCM(RSCMType.NPC)) ?: return
-        val npc = Npc(type, TREES[tree])
+        val npc = Npc(type, trees[tree] ?: return)
         npcRepo.add(npc, BIRD_TICKS)
         npc.anim(LANDING_SEQ)
         birds[player] = Bird(npc, tree)
@@ -182,16 +188,8 @@ constructor(
         const val KILL_XP = 1350.0
         const val ALERTED_XP = 891.0
         const val LOOT_DURATION = 200
+        const val TREE_COUNT = 5
 
         val LOOT = listOf("obj.bones" to 1, "obj.stymphike_feather" to 15, "obj.stymphike_carcass" to 1)
-
-        val TREES =
-            listOf(
-                CoordGrid(2652, 7841, 0),
-                CoordGrid(2656, 7848, 0),
-                CoordGrid(2650, 7836, 0),
-                CoordGrid(2657, 7844, 0),
-                CoordGrid(2658, 7834, 0),
-            )
     }
 }
