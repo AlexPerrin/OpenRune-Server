@@ -355,7 +355,7 @@ constructor(
         val level = statBase(HUNTER)
         val hit =
             level >= kebbit.level &&
-                random.of(256) < (SkillingSuccessRate.successRate(kebbit.low, kebbit.high, level.coerceIn(1, 99), 99) * 256).toInt()
+                random.of(256) < HunterOutfit.applyTo((SkillingSuccessRate.successRate(kebbit.low, kebbit.high, level.coerceIn(1, 99), 99) * 256).toInt(), player)
         val arrive = FLIGHT_START + FLIGHT_STEP * d
         if (hit) {
             worldRepo.projAnim(

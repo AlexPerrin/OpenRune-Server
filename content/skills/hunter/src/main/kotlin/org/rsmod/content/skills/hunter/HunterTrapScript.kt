@@ -208,10 +208,10 @@ constructor(
         for ((obj, count) in items) invAdd(inv, obj, count)
         statAdvance(HUNTER, creature.xp)
         worldRepo.soundArea(coords, DISMANTLE_SYNTH)
+        rumours.onCatch(player, creature.npcs.first())
         mes("You dismantle the trap.", ChatType.Spam)
         val caught = "You've caught ${creature.article} ${creature.name}"
         mes(if (creature.npcs.first() == JERBOA) "$caught... or maybe not." else "$caught.", ChatType.Spam)
-        rumours.onCatch(player, creature.npcs.first())
         val pet = creature.pet
         if (pet != null) pets.rollSkillingPet(player, pet, HUNTER, creature.petBase)
         return true
@@ -315,7 +315,7 @@ constructor(
     private fun Player.resolve(trap: Trap, npc: Npc, creature: Creature) {
         val level = statBase(HUNTER)
         val chance =
-            catchChance256(creature.low, creature.high, level) +
+            HunterOutfit.applyTo(catchChance256(creature.low, creature.high, level), this) +
                 (if (trap.baited) BAIT_BONUS else 0) +
                 (if (trap.smoked) SMOKE_BONUS else 0)
         val success = coords != trap.coords && level >= creature.level && random.of(256) < chance

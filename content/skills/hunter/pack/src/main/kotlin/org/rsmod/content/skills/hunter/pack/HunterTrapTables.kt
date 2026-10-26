@@ -221,6 +221,7 @@ object HunterTrapCreaturesTable {
             boxed("chinchompa", "chinchompa", "npc.hunting_chinchompa", 53, 1984, "obj.chinchompa_captured", 6, 268, NEXT_TICK, CHINCHOMPA_APPROACH, SPICY_TOMATO, "obj.skillpethunter_grey", 131_395),
             boxed("chinchompa_big", "carnivorous chinchompa", "npc.hunting_chinchompa_big", 63, 2650, "obj.chinchompa_big_captured", -78, 228, NEXT_TICK, CHINCHOMPA_APPROACH, SPICY_MEAT, "obj.skillpethunter_red", 98_373),
             boxed("chinchompa_black", "black chinchompa", "npc.hunting_chinchompa_black", 73, 3150, "obj.chinchompa_black", -78, 228, NEXT_TICK, CHINCHOMPA_APPROACH, SPICY_MEAT, "obj.skillpethunter_black", 82_758, wilderness = true),
+            boxed("letvek", "letvek", "npc.hunting_letvek", 76, 2085, "obj.letvek", -78, 228, NEXT_TICK, "seq.npc_letvek_approach"),
             Row(
                 key = "imp",
                 trap = MAGIC_BOX,

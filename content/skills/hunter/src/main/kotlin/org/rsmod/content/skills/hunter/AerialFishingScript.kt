@@ -2,15 +2,14 @@ package org.rsmod.content.skills.hunter
 
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
+import dev.openrune.types.aconverted.SpotanimType
 import dev.openrune.util.Wearpos
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import kotlin.math.abs
 import kotlin.math.max
-import dev.openrune.types.aconverted.SpotanimType
 import org.rsmod.api.invtx.invAdd
 import org.rsmod.api.invtx.invDel
-import org.rsmod.game.entity.npc.NpcStateEvents
 import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.player.output.ChatType
 import org.rsmod.api.player.output.mes
@@ -39,6 +38,7 @@ import org.rsmod.content.other.pets.PetRewards
 import org.rsmod.game.MapClock
 import org.rsmod.game.entity.Npc
 import org.rsmod.game.entity.Player
+import org.rsmod.game.entity.npc.NpcStateEvents
 import org.rsmod.game.proj.ProjAnim
 import org.rsmod.map.CoordGrid
 import org.rsmod.plugin.scripts.PluginScript

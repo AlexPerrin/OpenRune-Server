@@ -161,9 +161,9 @@ constructor(
         for (obj in creature.loot) invAdd(inv, obj)
         statAdvance(HUNTER, creature.xp)
         soundSynth(CHECK_SYNTH)
+        rumours.onCatch(player, creature.npc)
         mes("You dismantle the trap.", ChatType.Spam)
         mes("You've caught ${HunterRumours.article(creature.name)} ${creature.name}.", ChatType.Spam)
-        rumours.onCatch(player, creature.npc)
     }
 
     private fun ProtectedAccess.canAdd(items: List<String>): Boolean {
@@ -248,7 +248,7 @@ constructor(
         val creature = lure.creature
         val level = statBase(HUNTER)
         val chance =
-            catchChance256(creature.low, creature.high, level) +
+            HunterOutfit.applyTo(catchChance256(creature.low, creature.high, level), this) +
                 (if (trap.baited) HunterTrapScript.BAIT_BONUS else 0) +
                 (if (trap.smoked) HunterTrapScript.SMOKE_BONUS else 0)
         val now = clock.cycle

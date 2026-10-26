@@ -1,6 +1,5 @@
 package org.rsmod.content.skills.hunter.pack
 
-import dev.openrune.definition.constants.ConstantProvider
 import dev.openrune.definition.dbtables.dbTable
 import dev.openrune.definition.util.VarType
 

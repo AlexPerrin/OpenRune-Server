@@ -15,5 +15,7 @@ class HunterTrapPluginPack : PluginPack() {
             HunterTrackingTable.tracking(),
             HunterAerialFishingTable.aerialFishing(),
             HunterPearlShopTable.pearlShop(),
+            HunterCrabTrapTable.crabTraps(),
+            HunterMossLizardTable.mossLizards(),
         )
 }

@@ -5,7 +5,6 @@ import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-import org.rsmod.api.player.output.ChatType
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.player.vars.VarPlayerIntMapSetter
 import org.rsmod.api.random.GameRandom
@@ -126,8 +125,8 @@ constructor(
         anim(area.catchSeq)
         for (obj in area.loot) invAddOrDrop(objRepo, obj)
         statAdvance(HUNTER, area.xp)
-        mes("You manage to noose ${HunterRumours.article(area.name)} ${area.name} that is hiding in the ${area.spotNoun}.")
         rumours.onCatch(player, area.rumourKey)
+        mes("You manage to noose ${HunterRumours.article(area.name)} ${area.name} that is hiding in the ${area.spotNoun}.")
     }
 
     private fun choose(track: Track, node: Int): Step? {

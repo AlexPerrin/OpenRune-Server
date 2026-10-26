@@ -2,7 +2,7 @@ package org.rsmod.content.skills.hunter
 
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-import org.rsmod.api.invtx.invAddOrDrop
+import org.rsmod.api.invtx.invAdd
 import org.rsmod.api.invtx.invDel
 import org.rsmod.api.player.output.mes
 import org.rsmod.api.player.stat.statAdvance
@@ -47,9 +47,14 @@ class HunterRumours @Inject constructor(private val objRepo: ObjRepository, priv
         return rumour
     }
 
+    fun resetOthers(player: Player, keep: HunterRumourHuntersRow) {
+        for (hunter in hunters) if (hunter != keep) VarPlayerIntMapSetter.set(player, hunterVarp(hunter), 0)
+    }
+
     fun meetsRequirements(player: Player, rumour: HunterRumoursRow): Boolean =
         (rumour.quest.isEmpty() || QuestRequirements.hasCompleted(player, rumour.quest)) &&
-            player.statBase(HERBLORE) >= rumour.herbloreLevel
+            player.statBase(HERBLORE) >= rumour.herbloreLevel &&
+            player.statBase(SAILING) >= rumour.sailingLevel
 
     fun resume(player: Player, hunter: HunterRumourHuntersRow) {
         if (rumourOf(player, hunter) == null) return
@@ -61,16 +66,25 @@ class HunterRumours @Inject constructor(private val objRepo: ObjRepository, priv
 
     fun onCatch(player: Player, creature: String) {
         val rumour = currentRumour(player) ?: return
-        if (rumour.creature.internalName != creature) return
+        if (rumour.creature != creature) return
         val pity = player.vars[PITY] + 1
         VarPlayerIntMapSetter.set(player, PITY, pity)
-        if (rumours.any { it.part.internalName in player.inv }) return
-        val pityDrop = pity >= rumour.pity
-        if (!pityDrop && random.of(rumour.rate) != 0) return
-        if (player.inv.freeSpace() == 0 && pityDrop) return
-        player.invAddOrDrop(objRepo, rumour.part.internalName)
+        if (rumours.any { it.part.internalName in player.inv || player.bankHas(it.part.internalName) }) return
+        val outfit = HunterOutfit.partBonusPercent(player)
+        val threshold = if (HunterOutfit.wearsFullSet(player)) rumour.pityOutfit else rumour.pity
+        val pityDrop = pity >= threshold
+        val denominator = (rumour.rate * PERCENT / (PERCENT + outfit)).coerceAtLeast(1)
+        if (!pityDrop && random.of(denominator) != 0) return
+        val part = rumour.part.internalName
+        if (player.inv.freeSpace() == 0 && part !in player.inv) {
+            if (pityDrop) return
+            objRepo.add(part, player.coords, GROUND_DURATION, receiver = player)
+            player.mes(FULL_MESSAGE)
+        } else {
+            player.invAdd(player.inv, part)
+            player.mes(FOUND_MESSAGE)
+        }
         VarPlayerIntMapSetter.set(player, PITY, 0)
-        player.mes(FOUND_MESSAGE)
     }
 
     fun turnIn(player: Player, hunter: HunterRumourHuntersRow): Boolean {
@@ -78,25 +92,35 @@ class HunterRumours @Inject constructor(private val objRepo: ObjRepository, priv
         if (player.invDel(player.inv, rumour.part.id, 1).failure) return false
         VarPlayerIntMapSetter.set(player, hunterVarp(hunter), 0)
         if (player.vars[CURRENT] == hunter.index + 1) VarPlayerIntMapSetter.set(player, CURRENT, 0)
-        VarPlayerIntMapSetter.set(player, COMPLETED, player.vars[COMPLETED] + 1)
+        val completed = player.vars[COMPLETED] + 1
+        VarPlayerIntMapSetter.set(player, COMPLETED, completed)
         VarPlayerIntMapSetter.set(player, LAST, rumour.index)
+        player.mes("You have completed <col=ff3045>$completed</col> rumours for the Hunter Guild.")
         player.statAdvance(HUNTER, turnInXp(player.statBase(HUNTER), hunter.modifier).toDouble())
-        player.invAddOrDrop(objRepo, hunter.lootSack.internalName)
+        if (player.inv.freeSpace() > 0) {
+            player.invAdd(player.inv, hunter.lootSack.internalName)
+        } else {
+            objRepo.add(hunter.lootSack.internalName, player.coords, GROUND_DURATION, receiver = player)
+        }
         return true
     }
 
     fun whistleMessage(player: Player): String {
         val hunter = currentHunter(player)
         val rumour = hunter?.let { rumourOf(player, it) } ?: return NO_RUMOUR_MESSAGE
-        return "Your current rumour target is ${article(rumour.name)} ${rumour.name}. You'll need to bring back " +
-            "some of its ${rumour.partText}. ${hunter.name} was the source of the rumour."
+        return "Your current rumour target is a ${rumour.name}. You'll need to bring back ${rumour.partText}. " +
+            "${hunter.name} was the source of the rumour."
     }
+
+    private fun Player.bankHas(obj: String): Boolean = invMap[BANK]?.let { obj in it } ?: false
 
     private fun <T> List<T>.randomOrNull(): T? = if (isEmpty()) null else this[random.of(size)]
 
     companion object {
         const val HUNTER = "stat.hunter"
         const val HERBLORE = "stat.herblore"
+        const val SAILING = "stat.sailing"
+        const val BANK = "inv.bank"
         const val CURRENT = "varp.hunter_rumour_current"
         const val PITY = "varp.hunter_rumour_pity"
         const val COMPLETED = "varp.hunter_rumours_completed"
@@ -104,12 +128,42 @@ class HunterRumours @Inject constructor(private val objRepo: ObjRepository, priv
         const val BACK_TO_BACK = "varp.hunter_rumour_back_to_back"
         const val BACK_TO_BACK_OFF = 1
         const val LAST = "varp.hunter_rumour_last"
+        const val PERCENT = 100
+        const val GROUND_DURATION = 200
         const val FOUND_MESSAGE =
             "<col=229628>You find a rare piece of the creature! You should take it back to the Hunter Guild.</col>"
+        const val FULL_MESSAGE =
+            "<col=229628>You find a rare piece of the creature! Though without space in your inventory, it drops to " +
+                "the ground.</col>"
         const val NO_RUMOUR_MESSAGE = "You don't have a rumour to investigate at the moment."
 
         fun turnInXp(level: Int, modifier: Int): Int = (level + 5) * modifier
 
         fun article(name: String): String = if (name.first().lowercaseChar() in "aeiou") "an" else "a"
     }
+}
+
+object HunterOutfit {
+    const val HOOD = "obj.hg_hunter_hood"
+    const val TOP = "obj.hg_hunter_top"
+    const val LEGS = "obj.hg_hunter_legs"
+    const val BOOTS = "obj.hg_hunter_boots"
+    private val PIECES = listOf(HOOD to 2, TOP to 8, LEGS to 6, BOOTS to 4)
+    private const val SET_BONUS = 5
+
+    private fun owns(player: Player, obj: String): Boolean =
+        obj in player.worn || obj in player.inv || (player.invMap[HunterRumours.BANK]?.let { obj in it } ?: false)
+
+    fun catchBonusTenths(player: Player): Int {
+        val worn = PIECES.filter { (obj, _) -> obj in player.worn }
+        if (worn.isEmpty()) return 0
+        val set = if (PIECES.all { (obj, _) -> owns(player, obj) }) SET_BONUS else 0
+        return worn.sumOf { it.second } + set
+    }
+
+    fun partBonusPercent(player: Player): Int = catchBonusTenths(player) / 5
+
+    fun wearsFullSet(player: Player): Boolean = PIECES.all { (obj, _) -> obj in player.worn }
+
+    fun applyTo(chance256: Int, player: Player): Int = chance256 * (1000 + catchBonusTenths(player)) / 1000
 }

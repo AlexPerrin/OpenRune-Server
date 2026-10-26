@@ -186,6 +186,7 @@ constructor(
         invAdd(inv, NET_TRAP)
         invAddOrDrop(objRepo, loot)
         statAdvance(HUNTER, trap.def.xp)
+        rumours.onCatch(player, trap.def.npc)
         if (trap.def.npc == TECU) {
             mes("The salamander that pops out of the net doesn't look to be fully grown.", ChatType.Spam)
             mes("You dismantle the trap.", ChatType.Spam)
@@ -193,7 +194,6 @@ constructor(
             mes("You dismantle the trap.", ChatType.Spam)
             mes("You've caught ${HunterRumours.article(trap.def.name)} ${trap.def.name}.", ChatType.Spam)
         }
-        rumours.onCatch(player, trap.def.npc)
         return true
     }
 
@@ -273,7 +273,7 @@ constructor(
         if (!npc.isSlotAssigned || !npc.isVisible) return
         val level = statBase(HUNTER)
         val chance =
-            catchChance256(trap.def.low, trap.def.high, level) +
+            HunterOutfit.applyTo(catchChance256(trap.def.low, trap.def.high, level), this) +
                 (if (trap.baited) HunterTrapScript.BAIT_BONUS else 0) +
                 (if (trap.smoked) HunterTrapScript.SMOKE_BONUS else 0)
         val success = coords != trap.net && level >= trap.def.level && random.of(256) < chance

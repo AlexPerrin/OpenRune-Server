@@ -48,7 +48,6 @@ object HunterTrackingTable {
             column("segments", SEGMENTS, VarType.STRING, VarType.INT, VarType.INT, VarType.BOOLEAN, VarType.LOC)
             column("spot_loc", SPOT_LOC, VarType.LOC)
 
-
             row("dbrow.hunter_tracking_polar") {
                 column(NAME, "polar kebbit")
                 column(LEVEL, 1)

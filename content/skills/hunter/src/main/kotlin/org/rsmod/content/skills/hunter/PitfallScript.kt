@@ -7,7 +7,6 @@ import dev.openrune.rscm.RSCMType
 import dev.openrune.types.NpcMode
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-import kotlin.math.abs
 import org.rsmod.api.area.checker.AreaChecker
 import org.rsmod.api.invtx.add
 import org.rsmod.api.invtx.invTransaction
@@ -160,8 +159,8 @@ constructor(
         for ((obj, count) in loot) invAdd(inv, obj, count)
         statAdvance(HUNTER, creature.xp.toDouble())
         soundSynth(DISMANTLE_SYNTH)
-        mes("You've caught ${HunterRumours.article(creature.name)} ${creature.name}!", ChatType.Spam)
         rumours.onCatch(player, creature.npc)
+        mes("You've caught ${HunterRumours.article(creature.name)} ${creature.name}!", ChatType.Spam)
     }
 
     private fun ProtectedAccess.canAdd(items: List<Pair<String, Int>>): Boolean {
@@ -287,7 +286,7 @@ constructor(
                 val creature = chase.creature
                 val level = statBase(HUNTER)
                 val spear = if (SPEAR in worn) SPEAR_BONUS else 0
-                val chance = catchChance256(creature.low, creature.high, level) + spear
+                val chance = HunterOutfit.applyTo(catchChance256(creature.low, creature.high, level), this) + spear
                 val repeat = chase.lastLeapt == crossing.pit.index
                 val caught =
                     !repeat && level >= creature.level && creature in crossing.pit.kinds &&
