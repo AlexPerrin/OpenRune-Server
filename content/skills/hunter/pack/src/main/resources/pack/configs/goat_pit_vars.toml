@@ -1,0 +1,5 @@
+[[varp]]
+isServerOnly = true
+id = "varp.goat_pit_trapped"
+scope = "Perm"
+transmit = "Never"

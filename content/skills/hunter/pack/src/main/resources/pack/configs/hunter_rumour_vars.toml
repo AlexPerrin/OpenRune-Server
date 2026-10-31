@@ -69,3 +69,15 @@ isServerOnly = true
 id = "varp.hunter_rumour_last"
 scope = "Perm"
 transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.hunter_rumour_torn_blueprints"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.hunter_rumour_reshuffled"
+scope = "Perm"
+transmit = "Never"

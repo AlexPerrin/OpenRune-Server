@@ -1,0 +1,5 @@
+[[varp]]
+isServerOnly = true
+id = "varp.falconry_invested"
+scope = "Perm"
+transmit = "Never"

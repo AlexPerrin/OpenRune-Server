@@ -1,31 +1,81 @@
 package org.rsmod.content.skills.hunter
 
+import dev.openrune.ServerCacheManager
+import dev.openrune.rscm.RSCM.asRSCM
+import dev.openrune.rscm.RSCMType
+import dev.openrune.types.ItemServerType
 import jakarta.inject.Inject
 import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.player.stat.statBase
 import org.rsmod.api.player.vars.VarPlayerIntMapSetter
 import org.rsmod.api.random.GameRandom
+import org.rsmod.api.repo.obj.ObjRepository
+import org.rsmod.api.script.onApNpc1
+import org.rsmod.api.script.onApNpc3
+import org.rsmod.api.script.onApNpcT
 import org.rsmod.api.script.onOpNpc1
 import org.rsmod.api.script.onOpNpc3
+import org.rsmod.api.script.onOpNpcU
 import org.rsmod.api.table.hunter.HunterRumourHuntersRow
 import org.rsmod.api.table.hunter.HunterRumoursRow
+import org.rsmod.content.quest.manager.QuestRequirements
 import org.rsmod.content.skills.hunter.HunterRumours.Companion.BACK_TO_BACK
 import org.rsmod.content.skills.hunter.HunterRumours.Companion.BACK_TO_BACK_OFF
 import org.rsmod.content.skills.hunter.HunterRumours.Companion.COMPLETED
 import org.rsmod.content.skills.hunter.HunterRumours.Companion.UNLOCKED
+import org.rsmod.game.entity.Npc
 import org.rsmod.plugin.scripts.PluginScript
 import org.rsmod.plugin.scripts.ScriptContext
 
-class HunterGuildScript @Inject constructor(private val rumours: HunterRumours, private val random: GameRandom) :
+class HunterGuildScript
+@Inject
+constructor(private val rumours: HunterRumours, private val random: GameRandom, private val objRepo: ObjRepository) :
     PluginScript() {
     override fun ScriptContext.startup() {
         for (hunter in rumours.hunters) {
-            onOpNpc1(hunter.npc) { startDialogue(it.npc) { talk(hunter) } }
-            onOpNpc3(hunter.npc.internalName) { startDialogue(it.npc) { rumourTalk(hunter, quick = true) } }
+            onNpc(hunter.npc.internalName, { talk(hunter) }, { rumourTalk(hunter, quick = true) })
         }
-        onOpNpc1(VERITY) { startDialogue(it.npc) { verity() } }
-        onOpNpc3(VERITY) { startDialogue(it.npc) { veritySettings() } }
+        onNpc(VERITY, { verity() }, { veritySettings() })
+        onOpNpcU(VERITY) { trade(it.objType) }
+        val verity = checkNotNull(ServerCacheManager.getNpc(VERITY.asRSCM(RSCMType.NPC)))
+        val items = ServerCacheManager.fromComponent(INV_ITEMS.asRSCM(RSCMType.COMPONENT))
+        onApNpcT(verity, items) {
+            val obj = it.objType ?: return@onApNpcT
+            if (isWithinDistance(it.npc, BAR_RANGE)) trade(obj) else apRange(BAR_RANGE)
+        }
+    }
+
+    private suspend fun ProtectedAccess.trade(obj: ItemServerType) {
+        if (obj.internalName !in HunterLootSackScript.TRADEABLE) {
+            mes("Nothing interesting happens.")
+            return
+        }
+        val title = "Trade in your ${obj.name} for spare supplies?"
+        if (!choice2("Yes please!", true, "No thanks.", false, title)) return
+        if (invDel(inv, obj.internalName).failure) return
+        invAddOrDrop(objRepo, HunterLootSackScript.SUPPLIES)
+        objbox(
+            HunterLootSackScript.SUPPLIES,
+            "Guild Scribe Verity takes your ${obj.name} and hands you a sack of supplies in return.",
+        )
+    }
+
+    private fun ScriptContext.onNpc(
+        npc: String,
+        op1: suspend Dialogue.() -> Unit,
+        op3: suspend Dialogue.() -> Unit,
+    ) {
+        onOpNpc1(npc) { startDialogue(it.npc) { op1() } }
+        onOpNpc3(npc) { startDialogue(it.npc) { op3() } }
+        if (npc in BEHIND_BAR) {
+            onApNpc1(npc) { acrossBar(it.npc, op1) }
+            onApNpc3(npc) { acrossBar(it.npc, op3) }
+        }
+    }
+
+    private suspend fun ProtectedAccess.acrossBar(npc: Npc, dialogue: suspend Dialogue.() -> Unit) {
+        if (isWithinDistance(npc, BAR_RANGE)) startDialogue(npc) { dialogue() } else apRange(BAR_RANGE)
     }
 
     private val HunterRumourHuntersRow.lines: HunterLines
@@ -38,6 +88,11 @@ class HunterGuildScript @Inject constructor(private val rumours: HunterRumours, 
             return
         }
         for (line in lines.greeting) say(line)
+        options(hunter)
+    }
+
+    private suspend fun Dialogue.options(hunter: HunterRumourHuntersRow) {
+        val lines = hunter.lines
         if (hunter.name == "Gilman") return gilmanMenu(hunter)
         val choice = choice3(lines.chatOption, 1, lines.rumourOption, 2, lines.leaveOption, 3)
         when (choice) {
@@ -54,7 +109,7 @@ class HunterGuildScript @Inject constructor(private val rumours: HunterRumours, 
                 chatPlayer(neutral, lines.rumourOption)
                 rumourTalk(hunter, quick = false)
             }
-            else -> chatPlayer(neutral, lines.leaveOption)
+            else -> chatPlayer(neutral, lines.leaveLine ?: lines.leaveOption)
         }
     }
 
@@ -125,6 +180,11 @@ class HunterGuildScript @Inject constructor(private val rumours: HunterRumours, 
             else chatNpc(neutral, lines.notVerity)
             return
         }
+        if (hunter.name == "Wolf" && !QuestRequirements.hasCompleted(player, AT_FIRST_LIGHT)) {
+            chatNpc(neutral, "Sorry, but I don't have permission to share information with you.")
+            mesbox("You need to complete At First Light in order to access Master Tier Hunters' Rumours.")
+            return
+        }
         if (player.statBase(HunterRumours.HUNTER) < hunter.level) {
             if (hunter.name == "Wolf") {
                 chatNpc(neutral, "There's an extra seat at this table. I suppose you'd be interested in claiming it one day?")
@@ -177,16 +237,19 @@ class HunterGuildScript @Inject constructor(private val rumours: HunterRumours, 
             }
             chatNpc(
                 neutral,
-                "I seem to remember sending you off to hunt ${a(own)} and bring back ${parts(own)}. Would you " +
-                    "prefer that one, or a new one entirely?",
+                "I seem to remember sending you off to hunt ${a(own)} and bring back ${own.partText}. Would " +
+                    "you prefer that one, or a new one entirely?",
             )
             val choice = choice3("Yes, go back to his old one.", 1, "Yes, but with a brand new one.", 2, "No.", 3, title)
             when (choice) {
                 1 -> {
                     rumours.resume(player, hunter)
-                    chatNpc(neutral, "That was it. I asked you to hunt ${a(own)} and bring back ${parts(own)}. Best of luck.")
+                    chatNpc(neutral, lines.remember.format(a(own), own.partText))
                 }
-                2 -> newRumour(hunter)
+                2 -> {
+                    rumours.reshuffle(player, hunter)
+                    newRumour(hunter)
+                }
             }
             return
         }
@@ -195,11 +258,12 @@ class HunterGuildScript @Inject constructor(private val rumours: HunterRumours, 
             "I hear you're hunting for ${other.name}. Aren't you looking for ${a(otherRumour)} at the moment? " +
                 "You'll need to bring back ${parts(otherRumour)}.",
         )
+        if (rumours.reshuffled(player)) return
         chatNpc(neutral, "Unless you fancy hunting for me instead?")
         if (!choice2("Yes.", true, "No.", false, title)) return
         if (own != null) {
             rumours.resume(player, hunter)
-            chatNpc(neutral, lines.remember.format(a(own), parts(own)))
+            chatNpc(neutral, lines.remember.format(a(own), own.partText))
         } else {
             newRumour(hunter)
         }
@@ -212,7 +276,7 @@ class HunterGuildScript @Inject constructor(private val rumours: HunterRumours, 
             return
         }
         val offers = ASSIGN_LINES + hunter.lines.extraAssign
-        chatNpc(neutral, offers[random.of(offers.size)].format(rumour.name, parts(rumour)))
+        chatNpc(neutral, offers[random.of(offers.size)].format(rumour.name, rumour.partText))
     }
 
     private suspend fun Dialogue.handIn(hunter: HunterRumourHuntersRow, quick: Boolean) {
@@ -223,7 +287,7 @@ class HunterGuildScript @Inject constructor(private val rumours: HunterRumours, 
             chatNpc(happy, hunter.lines.done)
             chatNpc(quiz, hunter.lines.another)
         }
-        if (choice2("Yes.", true, "No.", false, "Get another rumour?")) newRumour(hunter)
+        if (choice2("Yes.", true, "No.", false, "Get another rumour?")) newRumour(hunter) else options(hunter)
     }
 
     private suspend fun Dialogue.verity() {
@@ -265,7 +329,16 @@ class HunterGuildScript @Inject constructor(private val rumours: HunterRumours, 
 
     private suspend fun Dialogue.verityMenu() {
         val choice =
-            choice3("What does a scribe do?", 1, "How many rumours have I completed?", 2, "I have to go.", 3)
+            choice4(
+                "What does a scribe do?",
+                1,
+                "How many rumours have I completed?",
+                2,
+                "I have this spare hunter gear...",
+                4,
+                "I have to go.",
+                3,
+            )
         when (choice) {
             1 -> {
                 chatPlayer(quiz, "What does a scribe do?")
@@ -286,6 +359,14 @@ class HunterGuildScript @Inject constructor(private val rumours: HunterRumours, 
                 chatNpc(
                     happy,
                     "Our records suggest you've managed to complete ${vars[COMPLETED]} rumours for us!",
+                )
+            }
+            4 -> {
+                chatPlayer(quiz, "I have this spare hunter gear, is there anything I can do with it?")
+                chatNpc(
+                    neutral,
+                    "Spare, you say? Hmmm.... I'm sure one of the other hunters could benefit from it if you're " +
+                        "sure. If you hand it over to me, I can give you some spare supplies in return.",
                 )
             }
             else -> chatPlayer(neutral, "I have to go.")
@@ -322,7 +403,7 @@ class HunterGuildScript @Inject constructor(private val rumours: HunterRumours, 
 
     private fun a(rumour: HunterRumoursRow): String = "${HunterRumours.article(rumour.name)} ${rumour.name}"
 
-    private fun parts(rumour: HunterRumoursRow): String = "some of its ${rumour.partText}"
+    private fun parts(rumour: HunterRumoursRow): String = rumour.partText
 
     class Line(val player: Boolean, val text: String)
 
@@ -332,6 +413,7 @@ class HunterGuildScript @Inject constructor(private val rumours: HunterRumours, 
         val chat: List<Line>,
         val rumourOption: String,
         val leaveOption: String,
+        val leaveLine: String? = null,
         val notVerity: String,
         val done: String,
         val another: String,
@@ -341,6 +423,10 @@ class HunterGuildScript @Inject constructor(private val rumours: HunterRumours, 
 
     companion object {
         const val VERITY = "npc.hg_verity"
+        const val INV_ITEMS = "component.inventory:items"
+        const val AT_FIRST_LIGHT = "quest_atfirstlight"
+        const val BAR_RANGE = 2
+        val BEHIND_BAR = setOf("npc.hg_gilman", VERITY)
         const val COINS = "obj.coins"
         const val TIPPLE = "obj.trappers_tipple"
         const val STEW = "obj.stew"
@@ -506,7 +592,8 @@ class HunterGuildScript @Inject constructor(private val rumours: HunterRumours, 
                                 npc("Oi - don't sell yourself short. More importantly, don't give Fox too much credit."),
                             ),
                         rumourOption = "Can I get a rumour?",
-                        leaveOption = "See you later.",
+                        leaveOption = "Never mind.",
+                        leaveLine = "See you later.",
                         notVerity = NEW_HERE,
                         done = "You're quite the talented hunter! I'll have to keep you around. Here's your reward.",
                         another = "Want to test your skills again?",
