@@ -51,9 +51,9 @@ constructor(
     }
 
     private suspend fun Dialogue.geoff() {
-        when (vars[INTRODUCTION]) {
-            INTRO_NONE -> geoffFirst()
-            INTRO_TRAPPED -> {
+        when {
+            vars[INTRODUCTION] == INTRO_NONE && vars[TRAPPED] == 0 -> geoffFirst()
+            vars[INTRODUCTION] == INTRO_NONE -> {
                 chatNpc(angry, "Have ye been pittin me goats without permission?!")
                 chatPlayer(neutral, "Sorry, I didn't realise that I-")
                 chatNpc(laugh, "Ha! I'm just pullin' yer leg, outsider. Ye've got nothin' t'worry 'bout!")
@@ -273,7 +273,7 @@ constructor(
         goat.anim(JUMP_SEQ)
         npcRepo.despawn(goat, GOAT_RESPAWN_TICKS)
         setInPit(vars[IN_PIT] + 1)
-        if (vars[INTRODUCTION] == INTRO_NONE) VarPlayerIntMapSetter.set(player, INTRODUCTION, INTRO_TRAPPED)
+        VarPlayerIntMapSetter.set(player, TRAPPED, 1)
         statAdvance(HUNTER, PROD_XP)
         if (vars[STATE] == FULL) mes("The pit is now filled with goats.", ChatType.Spam)
     }
@@ -312,7 +312,7 @@ constructor(
         const val INTRODUCTION = "varbit.goat_pit_introduction"
         const val INTRO_NONE = 0
         const val INTRO_DONE = 1
-        const val INTRO_TRAPPED = 2
+        const val TRAPPED = "varp.goat_pit_trapped"
         const val SPIKES = "obj.goat_pit_spikes"
         const val PROD = "obj.cattleprod"
         const val HORN = "obj.desert_goat_horn"

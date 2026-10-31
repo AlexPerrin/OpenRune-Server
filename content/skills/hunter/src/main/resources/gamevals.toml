@@ -306,6 +306,7 @@ aerial_fishing_pearl_shop = 65535
 
 [gamevals.area]
 piscatoris_falconry = 30010
+vampyrium_stymphikes = 32756
 
 [gamevals.synth]
 hunting_lay_box_trap = 2636

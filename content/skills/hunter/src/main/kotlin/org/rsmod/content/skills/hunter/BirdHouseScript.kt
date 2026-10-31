@@ -224,14 +224,15 @@ constructor(val objRepo: ObjRepository) : PluginScript() {
     }
 
     private suspend fun ProtectedAccess.chooseLogs(tiers: List<BirdhouseTypesRow>): BirdhouseTypesRow? {
-        val options = tiers.takeLast(5).reversed()
+        val options = tiers.reversed()
         val names = options.map { it.logs.name }
         val choice =
             when (options.size) {
                 2 -> choice2(names[0], 0, names[1], 1)
                 3 -> choice3(names[0], 0, names[1], 1, names[2], 2)
                 4 -> choice4(names[0], 0, names[1], 1, names[2], 2, names[3], 3)
-                else -> choice5(names[0], 0, names[1], 1, names[2], 2, names[3], 3, names[4], 4)
+                5 -> choice5(names[0], 0, names[1], 1, names[2], 2, names[3], 3, names[4], 4)
+                else -> menu("Select logs", hotkeys = true, choices = names)
             }
         return options.getOrNull(choice)
     }

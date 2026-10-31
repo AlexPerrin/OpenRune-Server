@@ -3,15 +3,20 @@ package org.rsmod.content.skills.hunter
 import dev.openrune.ServerCacheManager
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
+import dev.openrune.types.varp.baseVar
+import dev.openrune.types.varp.bits
 import jakarta.inject.Inject
 import org.rsmod.api.player.output.ChatType
+import org.rsmod.api.player.output.VarpSync
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.player.vars.VarPlayerIntMapSetter
 import org.rsmod.api.repo.npc.NpcRepository
 import org.rsmod.api.repo.obj.ObjRepository
 import org.rsmod.api.repo.world.WorldRepository
+import org.rsmod.api.script.onArea
 import org.rsmod.api.script.onOpLoc1
 import org.rsmod.api.script.onOpNpc1
+import org.rsmod.api.table.QuestRow
 import org.rsmod.content.quest.manager.QuestRequirements
 import org.rsmod.game.entity.Npc
 import org.rsmod.game.entity.Player
@@ -43,6 +48,17 @@ constructor(
         onOpLoc1(BUSH) { if (vars[HIDING] == 0) hide(it.loc) else exit() }
         onOpLoc1(SPEARS_PILE) { invAdd(inv, MAKESHIFT_SPEAR, PILE_TAKE) }
         onOpNpc1(STYMPHIKE) { spear(it.npc) }
+        onArea(AREA) { showQuestOps() }
+    }
+
+    private fun ProtectedAccess.showQuestOps() {
+        if (!QuestRequirements.hasCompleted(player, BLOOD_MOON_RISES)) return
+        val varbit = checkNotNull(ServerCacheManager.getVarbit(QUEST_VARBIT.asRSCM(RSCMType.VARBIT)))
+        val end = QuestRow.getRow("dbrow.$BLOOD_MOON_RISES".asRSCM()).endstate
+        if (vars[QUEST_VARBIT] >= end) return
+        val mask = ((1 shl (varbit.bits.last - varbit.bits.first + 1)) - 1) shl varbit.bits.first
+        val packed = (player.vars[varbit.baseVar] and mask.inv()) or ((end shl varbit.bits.first) and mask)
+        VarpSync.writeVarp(player, varbit.baseVar, packed)
     }
 
     private fun ProtectedAccess.canHunt(): Boolean {
@@ -163,6 +179,8 @@ constructor(
         const val HUNTER = "stat.hunter"
         const val LEVEL = 82
         const val BLOOD_MOON_RISES = "quest_bloodmoonrises"
+        const val QUEST_VARBIT = "varbit.myq6"
+        const val AREA = "area.vampyrium_stymphikes"
         const val BUSH = "loc.hunting_stymphike_bush"
         const val SPEARS_PILE = "loc.hunting_stymphike_spears"
         const val STYMPHIKE = "npc.hunting_stymphike"
