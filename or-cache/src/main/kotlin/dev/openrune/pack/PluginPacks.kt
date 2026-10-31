@@ -1,21 +1,20 @@
 package dev.openrune.pack
 
 import dev.openrune.DirectoryConstants
+import dev.openrune.cache.tools.cs2.Cs2Overrides
 import dev.openrune.cache.tools.cs2.PackCs2
+import dev.openrune.cache.tools.cs2.UnpackDefaultCs2
 import dev.openrune.cache.tools.iftype.PackIfType
 import dev.openrune.cache.tools.tasks.CacheTask
 import dev.openrune.cache.tools.tasks.impl.PackDBTables
-import dev.openrune.cache.tools.tasks.impl.PackWorldMap
 import dev.openrune.cache.tools.tasks.impl.PackModels
+import dev.openrune.cache.tools.tasks.impl.PackSprites
+import dev.openrune.cache.tools.tasks.impl.PackWorldMap
 import dev.openrune.cache.tools.tasks.impl.defs.PackConfig
 import dev.openrune.definition.dbtables.DBTable
 import dev.openrune.gamevals.GameValProvider
-import dev.openrune.cache.tools.cs2.Cs2Overrides
-import dev.openrune.cache.tools.cs2.UnpackDefaultCs2
-import dev.openrune.cache.tools.tasks.impl.PackSprites
 import io.github.classgraph.ClassGraph
 import java.io.File
-
 
 class PluginPacks(val projectRoot: File, val all: List<PluginPack>) {
     val active: List<PluginPack> = all.filter { it.shouldPack(projectRoot) }
@@ -85,7 +84,11 @@ class PluginPacks(val projectRoot: File, val all: List<PluginPack>) {
      * name, and pack symbols win over the gameval-derived ones; all of them win over the dumped
      * `symbols/` files.
      */
-    fun cs2Overrides(cs2Root: File, gamevals: GameValProvider? = null): Cs2Overrides {
+    fun cs2Overrides(
+        cs2Root: File,
+        gamevals: GameValProvider? = null,
+        stockClientScripts: Set<Int> = emptySet(),
+    ): Cs2Overrides {
         cs2Root.mkdirs()
         // leftover from when scripts were copied into the project
         File(cs2Root, "custom").deleteRecursively()
@@ -118,11 +121,45 @@ class PluginPacks(val projectRoot: File, val all: List<PluginPack>) {
             }
         }
 
+        checkClientScriptIds(symbols["clientscript"].orEmpty().values, stockClientScripts)
+
         return Cs2Overrides(sources, symbols.mapValues { (_, byName) -> byName.values.toList() })
+    }
+
+    /**
+     * Custom clientscripts take the ids right after the stock maximum: some clients (the official
+     * Android client among them) size their script table from the archive and crash at cache sync
+     * on groups far above the stock range, and an id inside it shadows a stock script. The stock
+     * maximum comes from [stockClientScripts] (see [StockClientScripts]); the upper limit is
+     * `OPENRUNE_MAX_CLIENTSCRIPT_ID` when set.
+     */
+    private fun checkClientScriptIds(lines: Collection<String>, stockClientScripts: Set<Int>) {
+        val custom = lines.mapNotNull { line ->
+            line.substringBefore('\t').toIntOrNull()?.let { it to line }
+        }.toMap()
+        if (custom.isEmpty()) return
+        val stockMax = checkNotNull(StockClientScripts.maxId(stockClientScripts, custom.keys)) {
+            "No stock clientscripts known (no CS2 bundle, no cache); cannot place the custom ones"
+        }
+        val limit = System.getenv("OPENRUNE_MAX_CLIENTSCRIPT_ID")?.toIntOrNull()
+            ?: (stockMax + MAX_CUSTOM_CLIENTSCRIPTS)
+        val shadowing = custom.filterKeys { it <= stockMax }.values
+        check(shadowing.isEmpty()) {
+            "Custom clientscript ids inside the stock range (stock maximum $stockMax) shadow " +
+                "stock scripts; renumber them from ${stockMax + 1}: $shadowing"
+        }
+        val tooHigh = custom.filterKeys { it > limit }.values
+        check(tooHigh.isEmpty()) {
+            "Custom clientscript ids above $limit can crash clients at cache sync; renumber " +
+                "them to follow the stock maximum $stockMax: $tooHigh"
+        }
     }
 
     companion object {
         private val SCANNED_PACKAGES = arrayOf("dev.openrune.pack", "org.rsmod.content")
+
+        /** How far above the stock maximum a custom clientscript may sit. */
+        private const val MAX_CUSTOM_CLIENTSCRIPTS = StockClientScripts.MAX_GAP
 
         private val SYMBOL_LINE = Regex("""^\s*(\S+)\s+(.+?)\s*$""")
 
