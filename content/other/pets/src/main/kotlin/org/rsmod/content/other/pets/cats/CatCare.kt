@@ -102,8 +102,16 @@ class CatCare @Inject constructor(private val followers: PetFollowers) {
             player.catGrowthTicks = ticks
             return
         }
+        if (player.ui.modals.isNotEmpty()) {
+            player.catGrowthTicks = GROWTH_TICKS - 1
+            return
+        }
         player.catGrowthTicks = 0
         val events = player.catGrowthEvents + 1
+        // RuneLite's Kitten Tracker counts growth events by the follower's overhead text.
+        if (cat.stage != CatStage.Kitten || events < KITTEN_EVENTS) {
+            npc.say(GROWTH_SAY)
+        }
         when {
             cat.stage == CatStage.Kitten && events >= KITTEN_EVENTS -> {
                 player.catGrowthEvents = 0
@@ -135,7 +143,7 @@ class CatCare @Inject constructor(private val followers: PetFollowers) {
                 player.say("I think it's very hungry!")
                 player.mes("<col=ff0000>Your kitten is very hungry.</col>")
             }
-            0 -> runAway(player, "Your kitten has run away.")
+            0 -> runAway(player, "Your kitten got hungry and ran off.")
         }
     }
 
@@ -156,12 +164,13 @@ class CatCare @Inject constructor(private val followers: PetFollowers) {
                 player.say("I think it's feeling lonely.")
                 player.mes("<col=ff0000>Your kitten really wants attention.</col>")
             }
-            0 -> runAway(player, "Your kitten has run away.")
+            0 -> runAway(player, "Your kitten got lonely and ran off.")
         }
     }
 
     companion object {
         const val GROWTH_TICKS = 150
+        const val GROWTH_SAY = "Meow!"
         const val KITTEN_EVENTS = 120
         const val CAT_EVENTS = 220
         const val MAX_EVENTS = 255
