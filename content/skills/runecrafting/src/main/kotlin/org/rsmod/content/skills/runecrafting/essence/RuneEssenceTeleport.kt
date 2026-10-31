@@ -7,6 +7,7 @@ import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.player.output.soundSynth
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.script.onOpLoc1
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import org.rsmod.content.skills.runecrafting.essenceMineTeleporter
 import org.rsmod.game.entity.Npc
 import org.rsmod.game.entity.Player
@@ -82,6 +83,7 @@ suspend fun Dialogue.teleportToRuneEssenceMine() {
     delay(1)
     player.essenceMineTeleporter = npc.type.id
     access.telejump(dest)
+    DiaryHooks.essenceMineTeleport(player, npc.type.internalName)
 }
 
 suspend fun Dialogue.teleportToMainLand() {

@@ -3,5 +3,6 @@ plugins {
 }
 
 dependencies {
+    implementation(projects.content.interfaces.achievementDiary)
     implementation(projects.api.pluginCommons)
 }
