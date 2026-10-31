@@ -510,10 +510,35 @@ class GoblinDiplomacy : QuestScript(
         }
     }
 
+    private fun Dialogue.commitHandIn(stage: Int, wanted: String): Boolean {
+        if (access.invDel(access.inv, wanted, 1).failure) {
+            return false
+        }
+        when (stage) {
+            STARTED -> {
+                player.grubfootLook = GRUBFOOT_ORANGE
+                quest.setQuestStage(access, BLUE_WANTED)
+            }
+            BLUE_WANTED -> {
+                player.grubfootLook = GRUBFOOT_BLUE
+                quest.setQuestStage(access, BROWN_WANTED)
+            }
+            else -> {
+                if (!quest.completeQuest(access)) {
+                    access.invAdd(access.inv, wanted, 1)
+                    access.mes(NO_ROOM_FOR_REWARD)
+                    return false
+                }
+                player.grubfootLook = GRUBFOOT_BROWN
+            }
+        }
+        return true
+    }
+
     private suspend fun Dialogue.handIn(stage: Int) {
         val wanted = wantedArmour(stage) ?: return
         chatPlayer(happy, "I have some ${wantedColour(stage)} armour here.")
-        if (access.invDel(access.inv, wanted, 1).failure) {
+        if (stage != BROWN_WANTED && !commitHandIn(stage, wanted)) {
             return
         }
         wartface(neutral, "Grubfoot!")
@@ -521,8 +546,6 @@ class GoblinDiplomacy : QuestScript(
         wartface(neutral, "Put on this armour!")
         when (stage) {
             STARTED -> {
-                player.grubfootLook = GRUBFOOT_ORANGE
-                quest.setQuestStage(access, BLUE_WANTED)
                 grubfoot(quiz, "What do you think?")
                 wartface(neutral, "No I don't like that much.")
                 bentnoze(neutral, "It clashes with skin colour.")
@@ -531,8 +554,6 @@ class GoblinDiplomacy : QuestScript(
                 wartface(neutral, "Human! Get us blue armour!")
             }
             BLUE_WANTED -> {
-                player.grubfootLook = GRUBFOOT_BLUE
-                quest.setQuestStage(access, BROWN_WANTED)
                 grubfoot(quiz, "What do you think?")
                 bentnoze(neutral, "That not right. Not goblin colour at all.")
                 wartface(neutral, "Goblins wear dark earthy colours like brown.")
@@ -542,13 +563,12 @@ class GoblinDiplomacy : QuestScript(
                 chatPlayer(neutral, "Never mind, anything is worth a try.")
             }
             else -> {
-                player.grubfootLook = GRUBFOOT_BROWN
-                grubfoot(quiz, "What do you think?")
+                grubfoot(quiz, "What do you think?", GRUBFOOT_BROWN_HEAD)
                 wartface(happy, "That colour quite nice. Me can see myself wearing that.")
                 bentnoze(happy, "It a deal then. Brown armour it is.")
                 wartface(happy, "Thank you for sorting out argument, human. You have reward now.")
                 chatPlayer(confused, "Thanks... I think...")
-                quest.completeQuest(access)
+                commitHandIn(stage, wanted)
             }
         }
     }
@@ -677,14 +697,17 @@ class GoblinDiplomacy : QuestScript(
     private suspend fun Dialogue.bentnoze(mesanim: MesAnimType, text: String) =
         chatNpcSpecific("General Bentnoze", BENTNOZE, mesanim, text)
 
-    private suspend fun Dialogue.grubfoot(mesanim: MesAnimType, text: String) =
-        chatNpcSpecific("Grubfoot", grubfootHead(player), mesanim, text)
+    private suspend fun Dialogue.grubfoot(
+        mesanim: MesAnimType,
+        text: String,
+        head: String = grubfootHead(player),
+    ) = chatNpcSpecific("Grubfoot", head, mesanim, text)
 
     private fun grubfootHead(player: Player): String =
         when (player.grubfootLook) {
             GRUBFOOT_ORANGE -> "npc.catwalk_goblin_orange"
             GRUBFOOT_BLUE -> "npc.catwalk_goblin_blue"
-            else -> "npc.catwalk_goblin_brown"
+            else -> GRUBFOOT_BROWN_HEAD
         }
 
     private companion object {
@@ -698,6 +721,7 @@ class GoblinDiplomacy : QuestScript(
         private const val GRUBFOOT_BROWN = 0
         private const val GRUBFOOT_ORANGE = 1
         private const val GRUBFOOT_BLUE = 2
+        private const val GRUBFOOT_BROWN_HEAD = "npc.catwalk_goblin_brown"
 
         private const val WARTFACE = "npc.general_wartface_green"
         private const val BENTNOZE = "npc.general_bentnoze_red"
@@ -729,6 +753,7 @@ class GoblinDiplomacy : QuestScript(
         private const val PURPLE_DYE = "obj.purpledye"
         private const val GOLD_BAR = "obj.gold_bar"
         private const val CRAFTING_XP = 200.0
+        private const val NO_ROOM_FOR_REWARD = "You don't have enough room for the reward."
 
         private fun wantedArmour(stage: Int): String? =
             when (stage) {
