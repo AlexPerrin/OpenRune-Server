@@ -10,6 +10,7 @@ import net.rsprot.protocol.game.outgoing.social.FriendListLoaded
 import net.rsprot.protocol.game.outgoing.social.MessagePrivate
 import net.rsprot.protocol.game.outgoing.social.UpdateFriendList
 import net.rsprot.protocol.game.outgoing.social.UpdateIgnoreList
+import org.rsmod.api.net.friendchat.friendChatRankOf
 import org.rsmod.api.server.config.ServerConfig
 import org.rsmod.game.entity.Player
 
@@ -24,7 +25,7 @@ private fun privateMessageCounterSeed(): Int {
     return (hourOfYear * 50_000) and 0xFFFFFF
 }
 
-private fun nextPrivateMessageCounter(worldId: Int): Int {
+internal fun nextPrivateMessageCounter(worldId: Int): Int {
     while (true) {
         val current = privateMessageCounter.get()
         val next = (current + 1) and 0xFFFFFF
@@ -43,7 +44,8 @@ fun Player.writeCentralSocialSnapshot(snapshot: WorldLinkFrameSpecs.CentralSocia
     client.write(FriendListLoaded)
     client.write(ChatFilterSettingsPrivateChat(snapshot.privateChat))
 
-    val friendEntries = snapshot.friends.map { it.toFriendEntry(added = false) }
+    val friendEntries =
+        snapshot.friends.map { it.toFriendEntry(added = false, rank = friendChatRankOf(it.displayName)) }
 
     client.write(UpdateFriendList(friendEntries))
 
@@ -67,19 +69,19 @@ fun Player.writeCentralSocialSnapshot(snapshot: WorldLinkFrameSpecs.CentralSocia
 fun Player.writeCentralAddedFriend(snapshot: WorldLinkFrameSpecs.CentralSocialSnapshot, name: String) {
     val key = name.socialKey()
     val friend = snapshot.friends.firstOrNull { it.displayName.socialKey() == key } ?: return
-    client.write(UpdateFriendList(listOf(friend.toFriendEntry(added = true))))
+    client.write(UpdateFriendList(listOf(friend.toFriendEntry(added = true, rank = friendChatRankOf(friend.displayName)))))
 }
 
 private fun String.socialKey(): String = lowercase().replace('_', ' ').replace('\u00a0', ' ').trim()
 
-private fun WorldLinkFrameSpecs.CentralSocialFriend.toFriendEntry(added: Boolean): UpdateFriendList.Friend =
+private fun WorldLinkFrameSpecs.CentralSocialFriend.toFriendEntry(added: Boolean, rank: Int): UpdateFriendList.Friend =
     if (worldId > 0) {
         UpdateFriendList.OnlineFriend(
             added = added,
             name = displayName,
             previousName = previousDisplayName,
             worldId = worldId,
-            rank = 0,
+            rank = rank,
             properties = 0,
             notes = "",
             worldName = "OpenRune",
@@ -91,7 +93,7 @@ private fun WorldLinkFrameSpecs.CentralSocialFriend.toFriendEntry(added: Boolean
             added = added,
             name = displayName,
             previousName = previousDisplayName,
-            rank = 0,
+            rank = rank,
             properties = 0,
             notes = "",
         )
@@ -115,7 +117,7 @@ fun Player.writeCentralFriendPresence(
                 name = push.friendDisplayName,
                 previousName = push.friendPreviousDisplayName,
                 worldId = push.friendWorldId,
-                rank = 0,
+                rank = friendChatRankOf(push.friendDisplayName),
                 properties = 0,
                 notes = "",
                 worldName = formatWorldName(push.friendWorldId, serverConfig),
@@ -127,7 +129,7 @@ fun Player.writeCentralFriendPresence(
                 added = false,
                 name = push.friendDisplayName,
                 previousName = push.friendPreviousDisplayName,
-                rank = 0,
+                rank = friendChatRankOf(push.friendDisplayName),
                 properties = 0,
                 notes = "",
             )
@@ -162,7 +164,7 @@ fun Player.writeCentralPrivateMessage(
     )
 }
 
-private fun formatWorldName(
+internal fun formatWorldName(
     worldId: Int,
     serverConfig: ServerConfig? = null,
 ): String {
