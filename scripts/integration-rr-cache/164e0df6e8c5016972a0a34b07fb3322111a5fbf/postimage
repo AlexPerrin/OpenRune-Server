@@ -44,7 +44,8 @@ fun Player.writeCentralSocialSnapshot(snapshot: WorldLinkFrameSpecs.CentralSocia
     client.write(FriendListLoaded)
     client.write(ChatFilterSettingsPrivateChat(snapshot.privateChat))
 
-    val friendEntries = snapshot.friends.map { it.toFriendEntry(added = false) }
+    val friendEntries =
+        snapshot.friends.map { it.toFriendEntry(added = false, rank = friendChatRankOf(it.displayName)) }
 
     client.write(UpdateFriendList(friendEntries))
 
@@ -68,19 +69,19 @@ fun Player.writeCentralSocialSnapshot(snapshot: WorldLinkFrameSpecs.CentralSocia
 fun Player.writeCentralAddedFriend(snapshot: WorldLinkFrameSpecs.CentralSocialSnapshot, name: String) {
     val key = name.socialKey()
     val friend = snapshot.friends.firstOrNull { it.displayName.socialKey() == key } ?: return
-    client.write(UpdateFriendList(listOf(friend.toFriendEntry(added = true))))
+    client.write(UpdateFriendList(listOf(friend.toFriendEntry(added = true, rank = friendChatRankOf(friend.displayName)))))
 }
 
 private fun String.socialKey(): String = lowercase().replace('_', ' ').replace('\u00a0', ' ').trim()
 
-private fun WorldLinkFrameSpecs.CentralSocialFriend.toFriendEntry(added: Boolean): UpdateFriendList.Friend =
+private fun WorldLinkFrameSpecs.CentralSocialFriend.toFriendEntry(added: Boolean, rank: Int): UpdateFriendList.Friend =
     if (worldId > 0) {
         UpdateFriendList.OnlineFriend(
             added = added,
             name = displayName,
             previousName = previousDisplayName,
             worldId = worldId,
-            rank = friendChatRankOf(displayName),
+            rank = rank,
             properties = 0,
             notes = "",
             worldName = "OpenRune",
@@ -92,7 +93,7 @@ private fun WorldLinkFrameSpecs.CentralSocialFriend.toFriendEntry(added: Boolean
             added = added,
             name = displayName,
             previousName = previousDisplayName,
-            rank = friendChatRankOf(displayName),
+            rank = rank,
             properties = 0,
             notes = "",
         )
