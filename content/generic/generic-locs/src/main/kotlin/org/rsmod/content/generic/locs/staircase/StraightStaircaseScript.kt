@@ -19,6 +19,8 @@ private enum class StraightStairs(val loc: String, val dx: Int, val dz: Int, val
     Down("loc.stairstop", 1, -2, -1),
     NarrowWoodenUp("loc.narrowstairs_wooden_bottom", 0, -1, 1),
     NarrowWoodenDown("loc.narrowstairs_wooden_top", 0, 3, -1),
+    VarrockTallUp("loc.fai_varrock_stairs_taller", 1, 3, 1),
+    VarrockTallDown("loc.fai_varrock_stairs_top", 1, -2, -1),
 }
 
 class StraightStaircaseScript : PluginScript() {
