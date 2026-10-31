@@ -41,8 +41,10 @@ build() {
   [ -f "$copy/game.yml" ] || cp "$copy/game.example.yml" "$copy/game.yml"
   ck=$(git -C "$copy" ls-tree -r "$tc" | grep -E 'or-cache/|/pack/|gamevals|raw-cache' | sha1sum | cut -c1-12)   # the cache's inputs
   log=$state/build-$T.log
+  vols=(-v "gradle-$slug:/gradle" -v or-dl:/dl -v or-cache-store:/store)
+  docker run --rm "${vols[@]}" eclipse-temurin:21 chown 1000:1000 /gradle /dl /store   # docker makes a new volume root's; the build runs as 1000
   docker run --rm --name "build-$slug" --cpus=4 --memory=5g -u 1000:1000 -e HOME=/gradle/home -e GRADLE_USER_HOME=/gradle -e CK="$ck" \
-    -v "gradle-$slug:/gradle" -v or-dl:/dl -v or-cache-store:/store -v "$repo/.git:$repo/.git:ro" -v "$copy:$copy" -w "$copy" \
+    "${vols[@]}" -v "$repo/.git:$repo/.git:ro" -v "$copy:$copy" -w "$copy" \
     eclipse-temurin:21 bash -c '
       set -e; mkdir -p "$HOME"; g="./gradlew --console=plain --build-cache --no-configuration-cache --max-workers=4 -Dorg.gradle.jvmargs=-Xmx1536m"
       mkdir -p ~/.openrune/caches && cp -an /dl/. ~/.openrune/caches/ 2>/dev/null || true
