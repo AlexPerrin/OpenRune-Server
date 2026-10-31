@@ -1,5 +1,6 @@
 package org.rsmod.content.skills.hunter.pack
 
+import dev.openrune.definition.constants.ConstantProvider
 import dev.openrune.definition.dbtables.dbTable
 import dev.openrune.definition.util.VarType
 
@@ -21,6 +22,9 @@ object HunterButterfliesTable {
     const val EFFECT_CONSTANT = 14
     const val EFFECT_PERCENT = 15
     const val HITPOINTS_HEAL = 16
+    const val NAME = 17
+    const val MIXES = 18
+    const val MIX_MEATS = 19
 
     const val EFFECT_BOOST = 0
     const val EFFECT_HEAL = 1
@@ -40,21 +44,36 @@ object HunterButterfliesTable {
         val constant: Int,
         val percent: Int,
         val hitpoints: Int,
+        val name: String,
+        val mix: String,
     )
 
     private val BUTTERFLY = intArrayOf(20, 296, 40, 316, 40, 316)
     private val SUNLIGHT = intArrayOf(20, 296, 20, 296, 40, 316)
     private val MOONLIGHT = intArrayOf(0, 276, 0, 276, 20, 286)
 
+    private val MIX_MEAT_OBJS =
+        listOf(
+            "obj.huntingbeast_wild_meat",
+            "obj.hunting_larupia_meat",
+            "obj.huntingbeast_barbed_meat",
+            "obj.hunting_graahk_meat",
+            "obj.hunting_kyatt_meat",
+            "obj.hunting_fennecfox_meat",
+            "obj.hunting_antelopesun_meat",
+            "obj.huntingbeast_speedy2_meat",
+            "obj.hunting_antelopemoon_meat",
+        )
+
     private val ROWS =
         listOf(
-            Row("ruby_harvest", "npc.butterfly_ruby", "npc.butterfly_ruby", "obj.butterfly_jar_ruby", "butterfly", 15, 24, BUTTERFLY, EFFECT_BOOST, "stat.attack", 4, 15, 0),
-            Row("sapphire_glacialis", "npc.butterfly_glacialis", "npc.butterfly_glacialis", "obj.butterfly_jar_glacialis", "butterfly", 25, 34, BUTTERFLY, EFFECT_BOOST, "stat.defence", 4, 15, 0),
-            Row("snowy_knight", "npc.butterfly_snowy", "npc.butterfly_snowy", "obj.butterfly_jar_snowy", "butterfly", 35, 44, BUTTERFLY, EFFECT_HEAL, "stat.hitpoints", 15, 0, 0),
-            Row("black_warlock", "npc.butterfly_warlock", "npc.butterfly_warlock", "obj.butterfly_jar_warlock", "butterfly", 45, 54, BUTTERFLY, EFFECT_BOOST, "stat.strength", 4, 15, 0),
-            Row("sunlight_moth", "npc.moth_sunlight", "npc.moth_sunlight", "obj.butterfly_jar_sunmoth", "moth", 65, 74, SUNLIGHT, EFFECT_RESTORE, "stat.hitpoints", 6, 20, 8),
-            Row("moonlight_moth", "npc.moth_moonlight", "npc.moth_moonlight", "obj.butterfly_jar_moonmoth", "moth", 75, 84, MOONLIGHT, EFFECT_HEAL, "stat.prayer", 22, 0, 0),
-            Row("moonlight_moth_low_wander", "npc.moth_moonlight_low_wander", "npc.moth_moonlight", "obj.butterfly_jar_moonmoth", "moth", 75, 84, MOONLIGHT, EFFECT_HEAL, "stat.prayer", 22, 0, 0),
+            Row("ruby_harvest", "npc.butterfly_ruby", "npc.butterfly_ruby", "obj.butterfly_jar_ruby", "butterfly", 15, 24, BUTTERFLY, EFFECT_BOOST, "stat.attack", 4, 15, 0, "ruby harvest", "ruby"),
+            Row("sapphire_glacialis", "npc.butterfly_glacialis", "npc.butterfly_glacialis", "obj.butterfly_jar_glacialis", "butterfly", 25, 34, BUTTERFLY, EFFECT_BOOST, "stat.defence", 4, 15, 0, "sapphire glacialis", "glacialis"),
+            Row("snowy_knight", "npc.butterfly_snowy", "npc.butterfly_snowy", "obj.butterfly_jar_snowy", "butterfly", 35, 44, BUTTERFLY, EFFECT_HEAL, "stat.hitpoints", 15, 0, 0, "snowy knight", "snowy"),
+            Row("black_warlock", "npc.butterfly_warlock", "npc.butterfly_warlock", "obj.butterfly_jar_warlock", "butterfly", 45, 54, BUTTERFLY, EFFECT_BOOST, "stat.strength", 4, 15, 0, "black warlock", "warlock"),
+            Row("sunlight_moth", "npc.moth_sunlight", "npc.moth_sunlight", "obj.butterfly_jar_sunmoth", "moth", 65, 74, SUNLIGHT, EFFECT_RESTORE, "stat.hitpoints", 6, 20, 8, "sunlight moth", "sunmoth"),
+            Row("moonlight_moth", "npc.moth_moonlight", "npc.moth_moonlight", "obj.butterfly_jar_moonmoth", "moth", 75, 84, MOONLIGHT, EFFECT_HEAL, "stat.prayer", 22, 0, 0, "moonlight moth", "moonmoth"),
+            Row("moonlight_moth_low_wander", "npc.moth_moonlight_low_wander", "npc.moth_moonlight", "obj.butterfly_jar_moonmoth", "moth", 75, 84, MOONLIGHT, EFFECT_HEAL, "stat.prayer", 22, 0, 0, "moonlight moth", "moonmoth"),
         )
 
     fun hunterButterflies() =
@@ -76,6 +95,9 @@ object HunterButterfliesTable {
             column("effect_constant", EFFECT_CONSTANT, VarType.INT)
             column("effect_percent", EFFECT_PERCENT, VarType.INT)
             column("hitpoints_heal", HITPOINTS_HEAL, VarType.INT)
+            column("name", NAME, VarType.STRING)
+            column("mixes", MIXES, VarType.OBJ)
+            column("mix_meats", MIX_MEATS, VarType.OBJ)
 
             for (r in ROWS) {
                 row("dbrow.hunter_butterfly_${r.key}") {
@@ -96,6 +118,9 @@ object HunterButterfliesTable {
                     column(EFFECT_CONSTANT, r.constant)
                     column(EFFECT_PERCENT, r.percent)
                     column(HITPOINTS_HEAL, r.hitpoints)
+                    column(NAME, r.name)
+                    column(MIXES, listOf("2dose", "1dose").map { ConstantProvider.getMapping("obj.hunter_mix_${r.mix}_$it") })
+                    column(MIX_MEATS, MIX_MEAT_OBJS.map { ConstantProvider.getMapping(it) })
                 }
             }
         }

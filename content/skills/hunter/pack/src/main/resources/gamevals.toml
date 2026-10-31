@@ -1,4 +1,7 @@
 [gamevals.varp]
+
+falconry_invested = 65467
+
 birdhouse_seeded_a = 63762
 birdhouse_seeded_b = 63763
 birdhouse_seeded_c = 63764
@@ -7,8 +10,10 @@ birdhouse_seeds_a = 63766
 birdhouse_seeds_b = 63767
 birdhouse_seeds_c = 63768
 birdhouse_seeds_d = 63769
+
 herbiboar_harvested = 63770
 herbiboar_route_length = 63771
+
 hunter_rumour_gilman = 63772
 hunter_rumour_cervus = 63773
 hunter_rumour_ornus = 63774
@@ -21,3 +26,5 @@ hunter_rumour_unlocked = 63780
 hunter_rumours_completed = 63781
 hunter_rumour_back_to_back = 63782
 hunter_rumour_last = 63783
+hunter_rumour_torn_blueprints = 65466
+hunter_rumour_reshuffled = 65465
