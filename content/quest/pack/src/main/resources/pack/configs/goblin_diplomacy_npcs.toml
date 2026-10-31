@@ -67,3 +67,13 @@ timer = 8
 id = "npc.goblin_green_soldier_8"
 inherit = "npc.goblin_green_soldier_8"
 timer = 8
+
+[[npc]]
+id = "npc.general_wartface_green"
+inherit = "npc.general_wartface_green"
+wanderRange = 2
+
+[[npc]]
+id = "npc.general_bentnoze_red"
+inherit = "npc.general_bentnoze_red"
+wanderRange = 2

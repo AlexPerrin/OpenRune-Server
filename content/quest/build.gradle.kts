@@ -16,6 +16,5 @@ dependencies {
     implementation(projects.api.bottomlessMilk)
     implementation(projects.content.generic.genericLocs)
     implementation(projects.api.serverConfig)
-    implementation(projects.api.combat.combatFormulas)
     implementation(libs.rsprot.api)
 }
