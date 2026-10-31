@@ -2,7 +2,7 @@
 toplevel_stone_ops=64440
 
 [gamevals.varp]
-friendchat_setup = 65464
+friendchat_setup = 65458
 friendchat_changes_pending = 65459
 
 [gamevals.varbit]
