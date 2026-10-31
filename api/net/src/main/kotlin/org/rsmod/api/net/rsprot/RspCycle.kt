@@ -15,6 +15,7 @@ import net.rsprot.protocol.game.outgoing.info.util.safeReleaseOrThrow
 import net.rsprot.protocol.game.outgoing.map.RebuildLoginV2
 import net.rsprot.protocol.game.outgoing.map.RebuildNormalV2
 import net.rsprot.protocol.game.outgoing.map.RebuildRegionV2
+import net.rsprot.protocol.game.outgoing.map.RebuildWorldEntityV4
 import net.rsprot.protocol.game.outgoing.map.util.RebuildRegionZone
 import net.rsprot.protocol.game.outgoing.map.util.ReferenceZone
 import net.rsprot.protocol.message.OutgoingGameMessage
@@ -127,6 +128,9 @@ class RspCycle(
         for (world in infoPackets.activeWorlds) {
             session.queue(world.activeWorld)
             session.queue(world.npcUpdateOrigin)
+            if (world.added) {
+                TestWorldEntities.regions[world.worldId]?.let { session.queue(rebuildWorldEntity(it)) }
+            }
             session.queueNpcInfoPacket(world.npcInfo)
         }
 
@@ -294,6 +298,18 @@ class RspCycle(
             }
         }
         return zoneProvider
+    }
+
+    private fun rebuildWorldEntity(region: Region): RebuildWorldEntityV4 {
+        val zone = region.southWestZone
+        return RebuildWorldEntityV4(zone.x shl 3, zone.z shl 3, 1, 1) { zoneX, zoneZ, level ->
+            val copy = regions[ZoneKey(zoneX, zoneZ, level)]
+            if (copy == RegionZoneCopy.NULL) {
+                return@RebuildWorldEntityV4 null
+            }
+            val ref = ReferenceZone(copy.packed)
+            RebuildRegionZone(ref.zoneX, ref.zoneZ, ref.level, ref.rotation)
+        }
     }
 
     private fun Player.applyPublicMessage() {
