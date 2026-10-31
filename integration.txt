@@ -51,6 +51,7 @@ dev/goblin-diplomacy-review-367
 dev/genie-review-355-fbftoua
 dev/goblin-diplomacy-review-367-fftgsrq
 dev/server-friends-chat-clan-channels
+dev/hunter-feat-pr
 # Local only (never upstream)
 local/android
 local/local-auth
