@@ -143,7 +143,6 @@ class ItemServerCodec(
             playerCostDerivedConst = customData.playerCostDerivedConst
             stockMarketBuyLimit = customData.stockMarketBuyLimit
             stockMarketRecalcUsers = customData.stockMarketRecalcUsers
-            stockmarket = customData.tradeable
             // An override only marks an obj untradeable; its default would undo the cache's flag.
             if (!customData.tradeable) {
                 tradeable = false
