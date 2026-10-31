@@ -113,6 +113,7 @@ class PluginPacks(val projectRoot: File, val all: List<PluginPack>) {
         }
 
         for (pack in active) {
+            if (nameOf(pack) in skippedCs2Packs()) continue
             val dir = pack.cs2Directory() ?: continue
             File(dir, "script").takeIf { it.isDirectory }?.let(sources::add)
             dir.listFiles()?.filter { it.isCs2() }?.forEach(sources::add)
@@ -125,6 +126,15 @@ class PluginPacks(val projectRoot: File, val all: List<PluginPack>) {
 
         return Cs2Overrides(sources, symbols.mapValues { (_, byName) -> byName.values.toList() })
     }
+
+    /**
+     * Test server: packs whose clientscripts stay out of the cache, by default the dev spawn menu,
+     * which is useless on mobile (`OPENRUNE_SKIP_CS2_PACKS`, comma-separated pack names; empty packs
+     * everything).
+     */
+    private fun skippedCs2Packs(): Set<String> =
+        (System.getenv("OPENRUNE_SKIP_CS2_PACKS") ?: "spawn")
+            .split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
 
     /**
      * Custom clientscripts take the ids right after the stock maximum: some clients (the official
