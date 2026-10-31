@@ -331,6 +331,10 @@ constructor(
             return
         }
 
+        if (quest.getQuestStage(player) != MisthalinStage.MandyWaiting) {
+            return
+        }
+
         chatNpc(happy, "Oh hi, ${player.displayName}.")
         chatPlayer(happy, "Hi Mandy. How are you feeling now?")
         chatNpc(happy, "Much better thanks, and lucky to be alive, thanks to you in no small part.")
