@@ -324,7 +324,8 @@ class AccountLoadResponseHook(
         }
 
         coords = config.spawnCoord
-        xpRate = config.baseXpRate
+        // Test server: OSRS rates (1x) for new characters too, so XP plugins see real values.
+        xpRate = 1.0
         // A first visit needs the new-account initialisation, or the empty stat map reads as
         // level 1 everywhere. The flag is a varp, so it stays scoped to this mode.
         if (firstVisitToWorldType) {
