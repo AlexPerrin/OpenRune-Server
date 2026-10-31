@@ -1,0 +1,1403 @@
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot0_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot0_price"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot0_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot0_done"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot0_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot0_state"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot1_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot1_price"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot1_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot1_done"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot1_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot1_state"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot2_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot2_price"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot2_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot2_done"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot2_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot2_state"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot3_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot3_price"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot3_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot3_done"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot3_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot3_state"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot4_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot4_price"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot4_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot4_done"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot4_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot4_state"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot5_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot5_price"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot5_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot5_done"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot5_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot5_state"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot6_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot6_price"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot6_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot6_done"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot6_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot6_state"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot7_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot7_price"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot7_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot7_done"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot7_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_slot7_state"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_setup_price"
+scope = "Temp"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit0_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit0_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit0_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit1_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit1_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit1_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit2_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit2_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit2_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit3_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit3_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit3_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit4_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit4_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit4_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit5_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit5_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit5_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit6_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit6_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit6_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit7_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit7_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit7_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit8_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit8_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit8_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit9_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit9_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit9_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit10_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit10_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit10_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit11_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit11_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit11_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit12_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit12_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit12_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit13_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit13_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit13_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit14_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit14_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit14_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit15_item"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit15_start"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_limit15_bought"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+isServerOnly = true
+id = "varp.ge_logout_minute"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history0_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history0_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history0_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history0_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history1_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history1_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history1_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history1_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history2_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history2_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history2_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history2_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history3_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history3_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history3_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history3_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history4_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history4_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history4_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history4_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history5_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history5_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history5_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history5_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history6_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history6_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history6_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history6_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history7_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history7_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history7_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history7_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history8_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history8_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history8_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history8_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history9_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history9_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history9_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history9_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history10_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history10_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history10_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history10_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history11_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history11_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history11_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history11_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history12_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history12_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history12_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history12_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history13_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history13_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history13_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history13_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history14_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history14_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history14_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history14_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history15_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history15_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history15_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history15_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history16_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history16_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history16_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history16_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history17_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history17_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history17_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history17_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history18_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history18_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history18_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history18_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history19_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history19_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history19_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history19_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history20_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history20_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history20_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history20_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history21_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history21_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history21_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history21_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history22_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history22_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history22_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history22_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history23_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history23_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history23_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history23_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history24_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history24_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history24_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history24_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history25_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history25_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history25_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history25_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history26_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history26_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history26_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history26_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history27_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history27_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history27_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history27_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history28_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history28_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history28_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history28_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history29_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history29_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history29_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history29_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history30_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history30_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history30_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history30_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history31_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history31_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history31_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history31_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history32_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history32_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history32_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history32_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history33_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history33_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history33_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history33_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history34_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history34_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history34_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history34_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history35_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history35_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history35_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history35_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history36_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history36_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history36_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history36_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history37_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history37_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history37_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history37_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history38_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history38_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history38_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history38_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history39_obj"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history39_count"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history39_gold"
+scope = "Perm"
+transmit = "Never"
+
+[[varp]]
+id = "varp.ge_history39_tax"
+scope = "Perm"
+transmit = "Never"
+
+[[inventory]]
+isServerOnly = true
+id = "inv.tradingpost_sell_0"
+inherit = "inv.tradingpost_sell_0"
+scope = "Perm"
+stack = "Always"
+protect = false
+
+[[inventory]]
+isServerOnly = true
+id = "inv.tradingpost_sell_1"
+inherit = "inv.tradingpost_sell_1"
+scope = "Perm"
+stack = "Always"
+protect = false
+
+[[inventory]]
+isServerOnly = true
+id = "inv.tradingpost_sell_2"
+inherit = "inv.tradingpost_sell_2"
+scope = "Perm"
+stack = "Always"
+protect = false
+
+[[inventory]]
+isServerOnly = true
+id = "inv.tradingpost_sell_3"
+inherit = "inv.tradingpost_sell_3"
+scope = "Perm"
+stack = "Always"
+protect = false
+
+[[inventory]]
+isServerOnly = true
+id = "inv.tradingpost_sell_4"
+inherit = "inv.tradingpost_sell_4"
+scope = "Perm"
+stack = "Always"
+protect = false
+
+[[inventory]]
+isServerOnly = true
+id = "inv.tradingpost_sell_5"
+inherit = "inv.tradingpost_sell_5"
+scope = "Perm"
+stack = "Always"
+protect = false
+
+[[inventory]]
+isServerOnly = true
+id = "inv.ge_collect_6"
+inherit = "inv.ge_collect_6"
+scope = "Perm"
+stack = "Always"
+protect = false
+
+[[inventory]]
+isServerOnly = true
+id = "inv.ge_collect_7"
+inherit = "inv.ge_collect_7"
+scope = "Perm"
+stack = "Always"
+protect = false
