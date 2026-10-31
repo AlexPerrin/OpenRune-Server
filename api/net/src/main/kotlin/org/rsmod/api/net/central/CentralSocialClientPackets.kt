@@ -43,32 +43,7 @@ fun Player.writeCentralSocialSnapshot(snapshot: WorldLinkFrameSpecs.CentralSocia
     client.write(FriendListLoaded)
     client.write(ChatFilterSettingsPrivateChat(snapshot.privateChat))
 
-    val friendEntries =
-        snapshot.friends.map { friend ->
-            if (friend.worldId > 0) {
-                UpdateFriendList.OnlineFriend(
-                    added = false,
-                    name = friend.displayName,
-                    previousName = friend.previousDisplayName,
-                    worldId = friend.worldId,
-                    rank = 0,
-                    properties = 0,
-                    notes = "",
-                    worldName = "OpenRune",
-                    platform = OSRS_PLATFORM,
-                    worldFlags = 0,
-                )
-            } else {
-                UpdateFriendList.OfflineFriend(
-                    added = false,
-                    name = friend.displayName,
-                    previousName = friend.previousDisplayName,
-                    rank = 0,
-                    properties = 0,
-                    notes = "",
-                )
-            }
-        }
+    val friendEntries = snapshot.friends.map { it.toFriendEntry(added = false) }
 
     client.write(UpdateFriendList(friendEntries))
 
@@ -84,6 +59,43 @@ fun Player.writeCentralSocialSnapshot(snapshot: WorldLinkFrameSpecs.CentralSocia
 
     client.write(UpdateIgnoreList(ignoreEntries))
 }
+
+/**
+ * The friend just added, as OSRS sends it after FRIENDLIST_ADD: one UPDATE_FRIENDLIST entry,
+ * online with its world or offline. Central only pushes an entry for a friend who is online.
+ */
+fun Player.writeCentralAddedFriend(snapshot: WorldLinkFrameSpecs.CentralSocialSnapshot, name: String) {
+    val key = name.socialKey()
+    val friend = snapshot.friends.firstOrNull { it.displayName.socialKey() == key } ?: return
+    client.write(UpdateFriendList(listOf(friend.toFriendEntry(added = true))))
+}
+
+private fun String.socialKey(): String = lowercase().replace('_', ' ').replace('\u00a0', ' ').trim()
+
+private fun WorldLinkFrameSpecs.CentralSocialFriend.toFriendEntry(added: Boolean): UpdateFriendList.Friend =
+    if (worldId > 0) {
+        UpdateFriendList.OnlineFriend(
+            added = added,
+            name = displayName,
+            previousName = previousDisplayName,
+            worldId = worldId,
+            rank = 0,
+            properties = 0,
+            notes = "",
+            worldName = "OpenRune",
+            platform = OSRS_PLATFORM,
+            worldFlags = 0,
+        )
+    } else {
+        UpdateFriendList.OfflineFriend(
+            added = added,
+            name = displayName,
+            previousName = previousDisplayName,
+            rank = 0,
+            properties = 0,
+            notes = "",
+        )
+    }
 
 fun Player.writeCentralSocialSnapshotEmpty() {
     client.write(FriendListLoaded)
