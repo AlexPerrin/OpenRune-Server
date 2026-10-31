@@ -2,6 +2,8 @@ package org.rsmod.api.net.friendchat
 
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
+import dev.openrune.ServerCacheManager
+import dev.openrune.rscm.RSCM
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import dev.or2.central.account.Rights
@@ -24,6 +26,7 @@ import org.rsmod.api.parsers.json.Json
 import org.rsmod.api.player.output.ChatType
 import org.rsmod.api.player.output.mes
 import org.rsmod.api.player.output.runClientScript
+import org.rsmod.api.player.stat.statBase
 import org.rsmod.api.player.vars.VarPlayerIntMapSetter
 import org.rsmod.api.server.config.ServerConfig
 import org.rsmod.game.MapClock
@@ -58,6 +61,8 @@ private const val KICK_BAN_CYCLES = 6000
 private const val JOIN_CHAT_LOGIN_SCRIPT = "clientscript.[clientscript,chatchannel_login]"
 private const val RANK_NOTICE_CYCLES = 100
 private const val KICK_NOTIFICATION = "-Attempting to kick player from chat-channel..."
+private const val BLOCKED_VARBIT = "varbit.chatchannel_blocked"
+private const val BLOCKED_BELOW_TOTAL_LEVEL = 150
 
 private fun nameKey(name: String): String = name.trim().lowercase()
 
@@ -81,7 +86,7 @@ constructor(
             leave(player, explicit = true)
             return
         }
-        if (player in joined || !joining.add(player)) {
+        if (player in joined || player.vars[BLOCKED_VARBIT] == 1 || !joining.add(player)) {
             return
         }
         player.mes("Attempting to join chat-channel...", ChatType.FriendsChatNotification)
@@ -94,7 +99,19 @@ constructor(
         load(player, ownerName)
     }
 
+    /** Non-members under total level 150 cannot use chat-channels; the client hides the channel while blocked. */
+    public fun updateBlocked(player: Player) {
+        val total =
+            ServerCacheManager.getStats().values.sumOf {
+                val stat = RSCM.getReverseMapping(RSCMType.STAT, it.id)
+                if (stat == "stat.unreleased") 0 else player.statBase(stat)
+            }
+        val blocked = !player.members && total < BLOCKED_BELOW_TOTAL_LEVEL
+        VarPlayerIntMapSetter.set(player, BLOCKED_VARBIT, if (blocked) 1 else 0)
+    }
+
     public fun login(player: Player) {
+        updateBlocked(player)
         player.client.write(UpdateFriendChatChannelFullV2(UpdateFriendChatChannelFullV2.LeaveUpdate))
         val last = player.attr[FRIEND_CHAT_LAST] ?: return
         player.runClientScript(JOIN_CHAT_LOGIN_SCRIPT.asRSCM(RSCMType.CLIENTSCRIPT), last)
