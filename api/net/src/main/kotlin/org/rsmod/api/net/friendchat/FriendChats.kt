@@ -32,18 +32,19 @@ import org.rsmod.api.server.config.ServerConfig
 import org.rsmod.game.MapClock
 import org.rsmod.game.entity.Player
 import org.rsmod.game.entity.PlayerList
+import org.rsmod.game.vars.VarPlayerIntMap
 
 public val FRIEND_CHAT_NAME: AttributeKey<String> = AttributeKey(persistenceKey = "friend_chat_name")
-public val FRIEND_CHAT_ENTER_RANK: AttributeKey<Int> =
-    AttributeKey(persistenceKey = "friend_chat_enter_rank")
-public val FRIEND_CHAT_TALK_RANK: AttributeKey<Int> =
-    AttributeKey(persistenceKey = "friend_chat_talk_rank")
-public val FRIEND_CHAT_KICK_RANK: AttributeKey<Int> =
-    AttributeKey(persistenceKey = "friend_chat_kick_rank")
 public val FRIEND_CHAT_RANKS: AttributeKey<MutableMap<String, Int>> =
     AttributeKey(persistenceKey = "friend_chat_ranks")
 private val FRIEND_CHAT_LAST: AttributeKey<String> = AttributeKey(persistenceKey = "friend_chat_last")
-private val RANK_NOTICE_CYCLE: AttributeKey<Int> = AttributeKey()
+
+public const val FRIEND_CHAT_ENTER_OPTION: String = "varbit.friendchat_enter_option"
+public const val FRIEND_CHAT_TALK_OPTION: String = "varbit.friendchat_talk_option"
+public const val FRIEND_CHAT_KICK_OPTION: String = "varbit.friendchat_kick_option"
+public const val FRIEND_CHAT_CHANGES_TIMER: String = "timer.friendchat_changes"
+private const val SETUP_VARP = "varp.friendchat_setup"
+private const val CHANGES_PENDING_VARP = "varp.friendchat_changes_pending"
 
 public object FriendChatRank {
     public const val GUEST: Int = -1
@@ -56,10 +57,19 @@ public object FriendChatRank {
 
 public fun Player.friendChatRankOf(name: String): Int = attr[FRIEND_CHAT_RANKS]?.get(nameKey(name)) ?: 0
 
+private fun friendChatOptionRank(option: Int): Int = option + FriendChatRank.GUEST
+
+public fun VarPlayerIntMap.friendChatKickOption(): Int = this[FRIEND_CHAT_KICK_OPTION].takeIf { it != 0 } ?: ONLY_ME_OPTION
+
 private const val CAPACITY = 500
 private const val KICK_BAN_CYCLES = 6000
 private const val JOIN_CHAT_LOGIN_SCRIPT = "clientscript.[clientscript,chatchannel_login]"
-private const val RANK_NOTICE_CYCLES = 100
+private const val CHANGES_DELAY_CYCLES = 101
+private const val ONLY_ME_OPTION = 8
+private const val MAX_RANKED = 400
+private const val MAX_RANKED_FREE = 200
+private const val MAX_BANS = 400
+private const val MAX_BANS_FREE = 100
 private const val KICK_NOTIFICATION = "-Attempting to kick player from chat-channel..."
 private const val BLOCKED_VARBIT = "varbit.chatchannel_blocked"
 private const val BLOCKED_BELOW_TOTAL_LEVEL = 150
@@ -99,7 +109,6 @@ constructor(
         load(player, ownerName)
     }
 
-    /** Non-members under total level 150 cannot use chat-channels; the client hides the channel while blocked. */
     public fun updateBlocked(player: Player) {
         val total =
             ServerCacheManager.getStats().values.sumOf {
@@ -119,6 +128,9 @@ constructor(
 
     public fun logout(player: Player) {
         joining.remove(player)
+        if (player.vars[CHANGES_PENDING_VARP] == 1) {
+            applyChanges(player)
+        }
         if (player in joined) {
             VarPlayerIntMapSetter.set(player, "varbit.chatchannel_on_logout", 1)
             leave(player, explicit = false)
@@ -128,6 +140,9 @@ constructor(
 
     public fun disconnected(player: Player) {
         joining.remove(player)
+        if (player.vars[CHANGES_PENDING_VARP] == 1) {
+            applyChanges(player)
+        }
         leave(player, explicit = false)
     }
 
@@ -174,7 +189,10 @@ constructor(
         if (target == null || channel.rankOf(target) >= rank) {
             return
         }
-        channel.bans[nameKey(target.chatName)] = mapClock.cycle + KICK_BAN_CYCLES
+        channel.bans.values.removeIf { it <= mapClock.cycle }
+        if (channel.bans.size < if (channel.ownerMembers) MAX_BANS else MAX_BANS_FREE) {
+            channel.bans[nameKey(target.chatName)] = mapClock.cycle + KICK_BAN_CYCLES
+        }
         channel.broadcast(channel.message(player, KICK_NOTIFICATION))
         target.attr.remove(FRIEND_CHAT_LAST)
         target.mes("You have been kicked from the channel.", ChatType.FriendsChatNotification)
@@ -185,30 +203,57 @@ constructor(
         val key = nameKey(friendName)
         val ranks = owner.attr[FRIEND_CHAT_RANKS] ?: mutableMapOf()
         if (rank in FriendChatRank.RECRUIT..FriendChatRank.GENERAL) {
+            val max = if (owner.members) MAX_RANKED else MAX_RANKED_FREE
+            if (key !in ranks && ranks.size >= max) {
+                return
+            }
             ranks[key] = rank
         } else {
             ranks.remove(key)
         }
         owner.attr[FRIEND_CHAT_RANKS] = ranks
         refreshFriendList(owner)
-        val lastNotice = owner.attr[RANK_NOTICE_CYCLE]
-        if (lastNotice == null || mapClock.cycle - lastNotice >= RANK_NOTICE_CYCLES) {
-            owner.attr[RANK_NOTICE_CYCLE] = mapClock.cycle
-            owner.mes(
-                "Changes will take effect on your friends channel in the next 60 seconds.",
-                ChatType.FriendNotification,
-            )
-        }
-        val channel = channels[nameKey(owner.chatName)] ?: return
-        channel.ranks = ranks.toMap()
-        channel.members.firstOrNull { nameKey(it.chatName) == key }?.let { member ->
-            channel.members.forEach { channel.sendUserTo(it, member) }
-        }
+        changed(owner)
     }
 
-    public fun settingsChanged(owner: Player) {
+    public fun friendDeleted(owner: Player, friendName: String) {
+        owner.attr[FRIEND_CHAT_RANKS]?.remove(nameKey(friendName))
+        changed(owner)
+    }
+
+    public fun changed(owner: Player) {
+        channels[nameKey(owner.chatName)]?.let { loadSocial(owner.characterId, it) }
+        if (owner.vars[CHANGES_PENDING_VARP] == 1) {
+            return
+        }
+        VarPlayerIntMapSetter.set(owner, CHANGES_PENDING_VARP, 1)
+        owner.softTimer(FRIEND_CHAT_CHANGES_TIMER, CHANGES_DELAY_CYCLES)
+        owner.mes(
+            "Changes will take effect on your friends channel in the next 60 seconds.",
+            ChatType.FriendNotification,
+        )
+    }
+
+    public fun applyChanges(owner: Player) {
+        owner.clearSoftTimer(FRIEND_CHAT_CHANGES_TIMER)
+        VarPlayerIntMapSetter.set(owner, CHANGES_PENDING_VARP, 0)
         val channel = channels[nameKey(owner.chatName)] ?: return
-        val settings = ChannelSettings.of(owner)
+        update(channel, ChannelSettings.of(owner))
+    }
+
+    private fun loadSocial(characterId: Int, channel: Channel) {
+        db.request(
+            request = { GameDbResult.Ok(central.socialSnapshot(characterId)) },
+            response = { result ->
+                val sync = result.fold(onOk = { it }, onErr = { null })
+                if (sync is OpenRuneCentralWorldLink.CentralSocialSnapshotResult.Ok) {
+                    channel.pendingSocial = sync.snapshot
+                }
+            },
+        )
+    }
+
+    private fun update(channel: Channel, settings: ChannelSettings?) {
         if (settings == null) {
             for (member in channel.members.toList()) {
                 leave(member, explicit = false)
@@ -216,9 +261,18 @@ constructor(
             }
             return
         }
+        val oldName = channel.name
+        val oldKickRank = channel.kickRank
+        val oldRanks = channel.members.associateWith(channel::rankOf)
+        channel.pendingSocial?.let(channel::setSocial)
+        channel.pendingSocial = null
         channel.apply(settings)
         for (member in channel.members.toList()) {
-            if (channel.rankOf(member) < channel.enterRank) {
+            val rank = channel.rankOf(member)
+            if (rank < FriendChatRank.OWNER && nameKey(member.chatName) in channel.ignores) {
+                leave(member, explicit = false)
+                member.mes("You have been removed from this channel.", ChatType.FriendsChatNotification)
+            } else if (rank < channel.enterRank) {
                 leave(member, explicit = false)
                 member.mes(
                     "You do not have a high enough rank to be in this chat-channel.",
@@ -226,7 +280,13 @@ constructor(
                 )
             }
         }
-        channel.members.forEach { channel.sendFull(it) }
+        if (channel.name != oldName || channel.kickRank != oldKickRank) {
+            channel.members.forEach { channel.sendFull(it) }
+            return
+        }
+        for (member in channel.members.filter { oldRanks[it] != channel.rankOf(it) }) {
+            channel.members.forEach { channel.sendUserTo(it, member) }
+        }
     }
 
     private fun refreshFriendList(owner: Player) {
@@ -251,7 +311,8 @@ constructor(
     private fun load(player: Player, ownerName: String) {
         val uid = player.uid
         val online = playerList.firstOrNull { nameKey(it.chatName) == nameKey(ownerName) }
-        val onlineOwner = online?.let { OwnerData(it.characterId, it.chatName, ChannelSettings.of(it)) }
+        val onlineOwner =
+            online?.let { OwnerData(it.characterId, it.chatName, it.members, ChannelSettings.of(it)) }
         val schema = player.worldType.key
         db.request(
             request = { connection ->
@@ -292,12 +353,10 @@ constructor(
         val key = nameKey(ownerName)
         val channel =
             channels.getOrPut(key) {
-                Channel(
-                    ownerKey = key,
-                    ownerName = owner.displayName,
-                    friends = snapshot?.friends?.mapTo(HashSet()) { nameKey(it.displayName) } ?: HashSet(),
-                    ignores = snapshot?.ignores?.mapTo(HashSet()) { nameKey(it.displayName) } ?: HashSet(),
-                ).also { it.apply(settings) }
+                Channel(ownerKey = key, ownerName = owner.displayName, ownerMembers = owner.members).also {
+                    snapshot?.let(it::setSocial)
+                    it.apply(settings)
+                }
             }
         tryJoin(player, channel)
     }
@@ -349,27 +408,43 @@ constructor(
     ): OwnerData? {
         val sql =
             """
-            SELECT c.id, c.display_name, a.attr, a.value_json
+            SELECT c.id, c.display_name, c.members, a.attr, a.value_json
             FROM account_characters c
             LEFT JOIN "$schema".character_attrs a ON a.character_id = c.id AND a.attr LIKE 'friend_chat_%'
             WHERE LOWER(TRIM(c.display_name)) = LOWER(TRIM(?))
             """
                 .trimIndent()
-        return connection.prepareStatement(sql).use { ps ->
-            ps.setString(1, ownerName)
-            ps.executeQuery().use { rs ->
-                var id = 0
-                var displayName = ""
-                val attrs = HashMap<String, Any>()
-                while (rs.next()) {
-                    id = rs.getInt("id")
-                    displayName = rs.getString("display_name")
-                    val attr = rs.getString("attr") ?: continue
-                    attrs[attr] = objectMapper.readValue(rs.getString("value_json"), object : TypeReference<Any>() {})
+        val owner =
+            connection.prepareStatement(sql).use { ps ->
+                ps.setString(1, ownerName)
+                ps.executeQuery().use { rs ->
+                    var id = 0
+                    var displayName = ""
+                    var members = false
+                    val attrs = HashMap<String, Any>()
+                    while (rs.next()) {
+                        id = rs.getInt("id")
+                        displayName = rs.getString("display_name")
+                        members = rs.getBoolean("members")
+                        val attr = rs.getString("attr") ?: continue
+                        attrs[attr] = objectMapper.readValue(rs.getString("value_json"), object : TypeReference<Any>() {})
+                    }
+                    if (id <= 0) null else Triple(id, displayName, members) to attrs
                 }
-                if (id <= 0) null else OwnerData(id, displayName, ChannelSettings.of(attrs))
+            } ?: return null
+        val (id, displayName, members) = owner.first
+        val vars = VarPlayerIntMap()
+        val setupSql = """SELECT value FROM "$schema".character_varps WHERE character_id = ? AND varp = ?"""
+        connection.prepareStatement(setupSql).use { ps ->
+            ps.setInt(1, id)
+            ps.setString(2, SETUP_VARP)
+            ps.executeQuery().use { rs ->
+                if (rs.next()) {
+                    vars.backing[SETUP_VARP.asRSCM(RSCMType.VARP)] = rs.getInt("value")
+                }
             }
         }
+        return OwnerData(id, displayName, members, ChannelSettings.of(owner.second, vars))
     }
 
     private fun Channel.removeIfEmpty() {
@@ -412,7 +487,12 @@ constructor(
         receiver.client.write(UpdateFriendChatChannelSingleUser(added))
     }
 
-    private class OwnerData(val characterId: Int, val displayName: String, val settings: ChannelSettings?)
+    private class OwnerData(
+        val characterId: Int,
+        val displayName: String,
+        val members: Boolean,
+        val settings: ChannelSettings?,
+    )
 
     private class ChannelSettings(
         val name: String,
@@ -422,44 +502,46 @@ constructor(
         val ranks: Map<String, Int>,
     ) {
         companion object {
-            fun of(owner: Player): ChannelSettings? {
-                val name = owner.attr[FRIEND_CHAT_NAME] ?: return null
-                return ChannelSettings(
-                    name = name,
-                    enterRank = owner.attr[FRIEND_CHAT_ENTER_RANK] ?: FriendChatRank.GUEST,
-                    talkRank = owner.attr[FRIEND_CHAT_TALK_RANK] ?: FriendChatRank.GUEST,
-                    kickRank = owner.attr[FRIEND_CHAT_KICK_RANK] ?: FriendChatRank.OWNER,
-                    ranks = owner.attr[FRIEND_CHAT_RANKS]?.toMap() ?: emptyMap(),
-                )
-            }
+            fun of(owner: Player): ChannelSettings? =
+                of(owner.attr[FRIEND_CHAT_NAME], owner.attr[FRIEND_CHAT_RANKS]?.toMap(), owner.vars)
 
             @Suppress("UNCHECKED_CAST")
-            fun of(attrs: Map<String, Any>): ChannelSettings? {
-                val name = attrs[FRIEND_CHAT_NAME.persistenceKey] as? String ?: return null
+            fun of(attrs: Map<String, Any>, vars: VarPlayerIntMap): ChannelSettings? =
+                of(
+                    attrs[FRIEND_CHAT_NAME.persistenceKey] as? String,
+                    attrs[FRIEND_CHAT_RANKS.persistenceKey] as? Map<String, Int>,
+                    vars,
+                )
+
+            private fun of(name: String?, ranks: Map<String, Int>?, vars: VarPlayerIntMap): ChannelSettings? {
+                name ?: return null
                 return ChannelSettings(
                     name = name,
-                    enterRank = attrs[FRIEND_CHAT_ENTER_RANK.persistenceKey] as? Int ?: FriendChatRank.GUEST,
-                    talkRank = attrs[FRIEND_CHAT_TALK_RANK.persistenceKey] as? Int ?: FriendChatRank.GUEST,
-                    kickRank = attrs[FRIEND_CHAT_KICK_RANK.persistenceKey] as? Int ?: FriendChatRank.OWNER,
-                    ranks = attrs[FRIEND_CHAT_RANKS.persistenceKey] as? Map<String, Int> ?: emptyMap(),
+                    enterRank = friendChatOptionRank(vars[FRIEND_CHAT_ENTER_OPTION]),
+                    talkRank = friendChatOptionRank(vars[FRIEND_CHAT_TALK_OPTION]),
+                    kickRank = friendChatOptionRank(vars.friendChatKickOption()),
+                    ranks = ranks ?: emptyMap(),
                 )
             }
         }
     }
 
-    private class Channel(
-        val ownerKey: String,
-        val ownerName: String,
-        val friends: MutableSet<String>,
-        val ignores: MutableSet<String>,
-    ) {
+    private class Channel(val ownerKey: String, val ownerName: String, val ownerMembers: Boolean) {
         var name: String = ""
         var enterRank: Int = FriendChatRank.GUEST
         var talkRank: Int = FriendChatRank.GUEST
         var kickRank: Int = FriendChatRank.OWNER
         var ranks: Map<String, Int> = emptyMap()
+        var friends: Set<String> = emptySet()
+        var ignores: Set<String> = emptySet()
+        var pendingSocial: WorldLinkFrameSpecs.CentralSocialSnapshot? = null
         val members = LinkedHashSet<Player>()
         val bans = HashMap<String, Int>()
+
+        fun setSocial(snapshot: WorldLinkFrameSpecs.CentralSocialSnapshot) {
+            friends = snapshot.friends.mapTo(HashSet()) { nameKey(it.displayName) }
+            ignores = snapshot.ignores.mapTo(HashSet()) { nameKey(it.displayName) }
+        }
 
         fun apply(settings: ChannelSettings) {
             name = settings.name
@@ -474,7 +556,8 @@ constructor(
             return when {
                 player.modLevel.isAtLeast(Rights.ADMINISTRATOR) -> FriendChatRank.JMOD
                 key == ownerKey -> FriendChatRank.OWNER
-                else -> ranks[key] ?: if (key in friends) FriendChatRank.FRIEND else FriendChatRank.GUEST
+                key !in friends -> FriendChatRank.GUEST
+                else -> ranks[key] ?: FriendChatRank.FRIEND
             }
         }
     }

@@ -1,2 +1,14 @@
 [gamevals.enum]
 toplevel_stone_ops=64440
+
+[gamevals.varp]
+friendchat_setup = 65464
+friendchat_changes_pending = 65459
+
+[gamevals.varbit]
+friendchat_enter_option = 65399
+friendchat_talk_option = 65398
+friendchat_kick_option = 65397
+
+[gamevals.timer]
+friendchat_changes = 65525

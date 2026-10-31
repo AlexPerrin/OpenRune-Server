@@ -1,14 +1,15 @@
 package org.rsmod.content.interfaces.gameframe.script
 
+import dev.openrune.ServerCacheManager
 import dev.openrune.definition.type.widget.IfEvent
 import jakarta.inject.Inject
-import org.rsmod.api.attr.AttributeKey
-import org.rsmod.api.net.friendchat.FRIEND_CHAT_ENTER_RANK
-import org.rsmod.api.net.friendchat.FRIEND_CHAT_KICK_RANK
+import org.rsmod.api.net.friendchat.FRIEND_CHAT_CHANGES_TIMER
+import org.rsmod.api.net.friendchat.FRIEND_CHAT_ENTER_OPTION
+import org.rsmod.api.net.friendchat.FRIEND_CHAT_KICK_OPTION
 import org.rsmod.api.net.friendchat.FRIEND_CHAT_NAME
-import org.rsmod.api.net.friendchat.FRIEND_CHAT_TALK_RANK
-import org.rsmod.api.net.friendchat.FriendChatRank
+import org.rsmod.api.net.friendchat.FRIEND_CHAT_TALK_OPTION
 import org.rsmod.api.net.friendchat.FriendChats
+import org.rsmod.api.net.friendchat.friendChatKickOption
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.player.ui.ifOpenOverlay
 import org.rsmod.api.player.ui.ifSetEvents
@@ -19,6 +20,7 @@ import org.rsmod.api.script.onIfClose
 import org.rsmod.api.script.onIfModalButton
 import org.rsmod.api.script.onIfOpen
 import org.rsmod.api.script.onIfOverlayButton
+import org.rsmod.api.script.onPlayerSoftTimer
 import org.rsmod.events.EventBus
 import org.rsmod.game.entity.Player
 import org.rsmod.game.entity.player.SessionStateEvent
@@ -38,19 +40,6 @@ private val RANK_EVENTS =
         IfEvent.Op7,
         IfEvent.Op8,
         IfEvent.Op9,
-    )
-
-private val RANK_OPTIONS =
-    listOf(
-        "Anyone",
-        "Any friends",
-        "Recruit+",
-        "Corporal+",
-        "Sergeant+",
-        "Lieutenant+",
-        "Captain+",
-        "General+",
-        "Only me",
     )
 
 private val CHANNEL_TABS =
@@ -82,6 +71,7 @@ constructor(private val friendChats: FriendChats, private val eventBus: EventBus
         onEvent<SessionStateEvent.Login> { friendChats.login(player) }
         onEvent<SessionStateEvent.Logout> { friendChats.logout(player) }
         onEvent<SessionStateEvent.Delete> { friendChats.disconnected(player) }
+        onPlayerSoftTimer(FRIEND_CHAT_CHANGES_TIMER) { friendChats.applyChanges(player) }
         onIfOpen("interface.chatchannel_current") {
             player.ifSetEvents("component.chatchannel_current:setup", -1..-1, IfEvent.Op1)
         }
@@ -95,13 +85,13 @@ constructor(private val friendChats: FriendChats, private val eventBus: EventBus
             if (it.op.slot == 1) setName() else disable()
         }
         onIfModalButton("component.chatchannel_setup:opt_enter") {
-            setRank(FRIEND_CHAT_ENTER_RANK, it.op.slot)
+            setRank(FRIEND_CHAT_ENTER_OPTION, it.op.slot)
         }
         onIfModalButton("component.chatchannel_setup:opt_talk") {
-            setRank(FRIEND_CHAT_TALK_RANK, it.op.slot)
+            setRank(FRIEND_CHAT_TALK_OPTION, it.op.slot)
         }
         onIfModalButton("component.chatchannel_setup:opt_kick") {
-            setRank(FRIEND_CHAT_KICK_RANK, it.op.slot)
+            setRank(FRIEND_CHAT_KICK_OPTION, it.op.slot)
         }
     }
 
@@ -137,23 +127,24 @@ constructor(private val friendChats: FriendChats, private val eventBus: EventBus
         changed()
     }
 
-    private fun ProtectedAccess.setRank(key: AttributeKey<Int>, opSlot: Int) {
-        player.attr[key] = opSlot + FriendChatRank.GUEST - 1
+    private fun ProtectedAccess.setRank(varbit: String, opSlot: Int) {
+        VarPlayerIntMapSetter.set(player, varbit, opSlot - 1)
         changed()
     }
 
     private fun ProtectedAccess.changed() {
         updateSetupTexts()
-        friendChats.settingsChanged(player)
+        friendChats.changed(player)
     }
 
     private fun ProtectedAccess.updateSetupTexts() {
-        ifSetText("component.chatchannel_setup:opt_enter", player.rankText(FRIEND_CHAT_ENTER_RANK, FriendChatRank.GUEST))
-        ifSetText("component.chatchannel_setup:opt_talk", player.rankText(FRIEND_CHAT_TALK_RANK, FriendChatRank.GUEST))
-        ifSetText("component.chatchannel_setup:opt_kick", player.rankText(FRIEND_CHAT_KICK_RANK, FriendChatRank.OWNER))
+        setOptionText("component.chatchannel_setup:opt_enter", player.vars[FRIEND_CHAT_ENTER_OPTION])
+        setOptionText("component.chatchannel_setup:opt_talk", player.vars[FRIEND_CHAT_TALK_OPTION])
+        setOptionText("component.chatchannel_setup:opt_kick", player.vars.friendChatKickOption())
         ifSetText("component.chatchannel_setup:opt_prefix", player.attr[FRIEND_CHAT_NAME] ?: "Chat disabled")
     }
 
-    private fun Player.rankText(key: AttributeKey<Int>, default: Int): String =
-        RANK_OPTIONS[(attr[key] ?: default) - FriendChatRank.GUEST]
+    private fun ProtectedAccess.setOptionText(component: String, option: Int) {
+        ifSetText(component, ServerCacheManager.fromComponent(component).op[option])
+    }
 }
