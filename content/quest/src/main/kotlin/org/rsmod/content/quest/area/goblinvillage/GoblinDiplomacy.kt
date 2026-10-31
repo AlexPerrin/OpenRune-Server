@@ -5,24 +5,49 @@ import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import dev.openrune.types.ItemServerType
 import dev.openrune.types.MesAnimType
+import dev.openrune.types.hunt.HuntVis
+import jakarta.inject.Inject
+import org.rsmod.api.hunt.NpcSearch
 import org.rsmod.api.invtx.invTransaction
 import org.rsmod.api.invtx.select
+import org.rsmod.api.player.cinematic.CameraMode
+import org.rsmod.api.player.cinematic.Cinematic
 import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.player.protect.ProtectedAccess
+import org.rsmod.api.player.vars.VarPlayerIntMapSetter
 import org.rsmod.api.player.vars.intVarBit
+import org.rsmod.api.player.vars.intVarp
+import org.rsmod.api.repo.npc.NpcRepository
+import org.rsmod.api.repo.region.RegionRepository
+import org.rsmod.api.repo.region.RegionTemplate
+import org.rsmod.api.script.onEvent
 import org.rsmod.api.script.onOpHeldU
 import org.rsmod.api.script.onOpLoc1
 import org.rsmod.api.script.onOpNpc1
 import org.rsmod.api.script.onOpNpcU
+import org.rsmod.api.script.onPlayerLogin
+import org.rsmod.content.quest.area.misthalin.SceneCamera
+import org.rsmod.content.quest.area.misthalin.SceneRegion
+import org.rsmod.content.quest.area.misthalin.lockedScene
 import org.rsmod.content.quest.manager.ItemRewardDisplay
 import org.rsmod.content.quest.manager.QuestScript
 import org.rsmod.content.quest.manager.rewards
 import org.rsmod.content.quest.manager.startQuestPrompt
 import org.rsmod.game.entity.Npc
 import org.rsmod.game.entity.Player
+import org.rsmod.game.entity.player.SessionStateEvent
+import org.rsmod.game.region.Region
+import org.rsmod.map.CoordGrid
 import org.rsmod.plugin.scripts.ScriptContext
 
-class GoblinDiplomacy : QuestScript(
+class GoblinDiplomacy
+@Inject
+constructor(
+    private val regionRepo: RegionRepository,
+    private val npcRepo: NpcRepository,
+    private val search: NpcSearch,
+) :
+    QuestScript(
     "quest_goblindiplomacy",
     "varp.goblinquest",
     rewards {
@@ -33,6 +58,12 @@ class GoblinDiplomacy : QuestScript(
     questVarbit = "varbit.gobdip_main",
 ) {
     private var Player.grubfootLook by intVarBit("varbit.gobdip_grubfoot_vis")
+    private var Player.sceneReturnTile by intVarp("varp.gobdip_return_tile")
+    private var Player.knowsAboutArmour by intVarBit("varbit.gobdip_know_about_armour")
+    private var Player.knowsAboutDye by intVarBit("varbit.gobdip_know_about_dye")
+    private val Player.metAggie by intVarBit("varbit.gobdip_met_aggie")
+
+    private val sceneRegions = HashMap<Long, Region>()
 
     override fun ScriptContext.init() {
         check(quest.maxSteps == COMPLETE) {
@@ -40,7 +71,7 @@ class GoblinDiplomacy : QuestScript(
                 "armour writes $COMPLETE."
         }
         for (general in GENERALS) {
-            onOpNpc1(general) { startDialogue(it.npc) { generalsDialogue() } }
+            onOpNpc1(general) { talkToGeneral(it.npc) }
             onOpNpcU(general) { useOnGeneral(it.npc, it.objType) }
         }
         onOpNpc1(GRUBFOOT_MULTI) { startDialogue(it.npc) { grubfootDialogue() } }
@@ -48,35 +79,109 @@ class GoblinDiplomacy : QuestScript(
             onOpLoc1(crate.loc) { searchCrate(crate) }
         }
         for (dye in MailDye.entries) {
-            onOpHeldU(dye.dye, GOBLIN_MAIL) { dyeMail(dye, it.firstSlot, it.secondSlot) }
+            for (mail in ARMOURS - dye.mail) {
+                onOpHeldU(dye.dye, mail) { dyeMail(dye, it.firstSlot, mail, it.secondSlot) }
+            }
         }
-        onOpHeldU(RED_DYE, YELLOW_DYE) { mixDyes(it.firstSlot, it.secondSlot, ORANGE_DYE, "orange") }
-        onOpHeldU(YELLOW_DYE, BLUE_DYE) { mixDyes(it.firstSlot, it.secondSlot, GREEN_DYE, "green") }
-        onOpHeldU(RED_DYE, BLUE_DYE) { mixDyes(it.firstSlot, it.secondSlot, PURPLE_DYE, "purple") }
+        onOpHeldU(RED_DYE, YELLOW_DYE) { mixDyes(it.firstSlot, it.secondSlot, ORANGE_DYE, "an orange") }
+        onOpHeldU(YELLOW_DYE, BLUE_DYE) { mixDyes(it.firstSlot, it.secondSlot, GREEN_DYE, "a green") }
+        onOpHeldU(RED_DYE, BLUE_DYE) { mixDyes(it.firstSlot, it.secondSlot, PURPLE_DYE, "a purple") }
+        onEvent<SessionStateEvent.PrepareLogin> { restoreLeftScene(player) }
+        onPlayerLogin { discardLeftScene(player) }
+    }
+
+    private fun restoreLeftScene(player: Player) {
+        val saved = player.sceneReturnTile
+        if (saved == 0) return
+        player.coords = CoordGrid(saved)
+        player.sceneReturnTile = 0
+        Cinematic.setHideToplevel(player, hide = false)
+        Cinematic.setHideHealthHud(player, hide = false)
+        Cinematic.setCameraMode(player, CameraMode.Normal)
+        Cinematic.setMaxDrawDistance(player, enabled = false)
+        Cinematic.restoreAcceptAid(player)
+        VarPlayerIntMapSetter.set(player, "varbit.minimap_state", 0)
+    }
+
+    private fun discardLeftScene(player: Player) {
+        val region = player.uuid?.let(sceneRegions::remove) ?: return
+        regionRepo.unprotect(region)
     }
 
     override fun subTitle(): String =
-        "talking to <col=800000>General Wartface</col> and <col=800000>General Bentnoze</col> " +
-            "in the <col=800000>Goblin Village</col>."
+        "talking to the <col=800000>Goblin Generals<col=000080> in " +
+            "<col=800000>Goblin Village<col=000080>."
 
     override fun questLog(player: ProtectedAccess) =
         questJournal(player) {
-            description(
-                "The goblin generals cannot agree on a new colour for their armour, and I " +
-                    "offered to bring them armour in a new colour."
-            )
-            val wanted = wantedColour(stage(player.player)) ?: return@questJournal
-            objective(
-                "They want to see <red>$wanted goblin armour</red>. Goblin mail can be found in " +
-                    "crates around the village and dyed with the right dye."
-            ) {}
+            val p = player.player
+            val stage = stage(p)
+            val hasMail = p.inv.count(GOBLIN_MAIL) > 0
+            if (stage == STARTED) {
+                when {
+                    p.inv.count(ORANGE_MAIL) > 0 ->
+                        line(
+                            "$ASKED_FOR_ORANGE I should give them the <red>Orange Goblin " +
+                                "Mail</red> that I have."
+                        )
+                    p.metAggie != 0 ->
+                        line(if (hasMail) "$ASKED_FOR_ORANGE $AGGIE" else "$ASKED_FOR_ORANGE $AGGIE $CRATES")
+                    p.knowsAboutDye != 0 || hasMail -> {
+                        line(ASKED_FOR_ORANGE)
+                        line(if (p.knowsAboutArmour != 0 && !hasMail) "$WITCH $CRATES" else WITCH)
+                    }
+                    p.knowsAboutArmour != 0 ->
+                        line(
+                            "$ASKED_FOR_ORANGE I should be able to find some <red>Goblin " +
+                                "Mail</red> in crates around <red>Goblin Village</red>, though " +
+                                "I'll need to find a way to change the colour. <red>General " +
+                                "Wartface</red> and <red>General Bentnoze</red> might have an " +
+                                "idea on how to do that."
+                        )
+                    else ->
+                        line("$ASKED_FOR_ORANGE Perhaps they'll have an idea on how I can get some.")
+                }
+                return@questJournal
+            }
+            strike(DONE_ASKED)
+            if (stage == BLUE_WANTED) {
+                val next =
+                    when {
+                        p.inv.count(BLUE_MAIL) > 0 ->
+                            "I should give them the <red>Blue Goblin Mail</red> that I have."
+                        hasMail && p.inv.count(BLUE_DYE) > 0 ->
+                            "I should use my <red>Blue Dye</red> to recolour some <red>Goblin " +
+                                "Mail</red> and then give it to them."
+                        hasMail -> AGGIE
+                        else -> "$AGGIE $CRATES"
+                    }
+                line("$GAVE_ORANGE $next")
+                return@questJournal
+            }
+            strike(DONE_GAVE_ORANGE)
+            val next =
+                if (hasMail) {
+                    "I should give them the <red>Brown Goblin Mail</red> that I have."
+                } else {
+                    "I should be able to find some <red>Brown Goblin Mail</red> in crates around " +
+                        "<red>Goblin Village</red>."
+                }
+            line("$GAVE_BLUE $next")
         }
 
     override fun completedLog(player: ProtectedAccess): String =
         completionJournal(player) {
+            line(DONE_ASKED)
+            line(DONE_GAVE_ORANGE)
             line(
-                "I brought the goblin generals orange, then blue, then plain brown goblin armour. " +
-                    "They decided brown was best after all and rewarded me for ending the argument."
+                "I gave some Blue Goblin Mail to General Wartface and General Bentnoze, but they " +
+                    "didn't like it. They asked me to bring them some of their original Brown " +
+                    "Goblin Mail to try out instead."
+            )
+            line(
+                "I gave General Wartface and General Bentnoze some of the original Brown Goblin " +
+                    "Mail, and it turned out to be their favourite. They're clearly not the " +
+                    "smartest, but that's goblins for you."
             )
         }
 
@@ -113,8 +218,8 @@ class GoblinDiplomacy : QuestScript(
         Black("obj.golem_ink", "obj.goblin_armour_black", "black"),
     }
 
-    private fun ProtectedAccess.dyeMail(dye: MailDye, dyeSlot: Int, mailSlot: Int) {
-        if (combine(dye.dye, dyeSlot, GOBLIN_MAIL, mailSlot, dye.mail)) {
+    private fun ProtectedAccess.dyeMail(dye: MailDye, dyeSlot: Int, mail: String, mailSlot: Int) {
+        if (combine(dye.dye, dyeSlot, mail, mailSlot, dye.mail)) {
             soundSynth("synth.gobdip_dye_goblin_mail")
             mes("You dye the goblin mail ${dye.colour}.")
         }
@@ -126,7 +231,7 @@ class GoblinDiplomacy : QuestScript(
         val firstName = RSCM.getReverseMapping(RSCMType.OBJ, firstObj.id)
         val secondName = RSCM.getReverseMapping(RSCMType.OBJ, secondObj.id)
         if (combine(firstName, first, secondName, second, result)) {
-            mes("You mix the two dyes and make $colour dye.")
+            mes("You mix the two dyes and make $colour one.")
         }
     }
 
@@ -174,6 +279,22 @@ class GoblinDiplomacy : QuestScript(
             }
             handIn(stage)
         }
+    }
+
+    private suspend fun ProtectedAccess.talkToGeneral(npc: Npc) {
+        val wartface = npc.id == WARTFACE.asRSCM(RSCMType.NPC)
+        val other = if (wartface) BENTNOZE else WARTFACE
+        if (npcFind(npc.coords, other, GENERAL_SIGHT, HuntVis.LineOfSight, search) == null) {
+            startDialogue(npc) {
+                if (wartface) {
+                    wartface(confused, "Where's Bentnoze gone now?")
+                } else {
+                    bentnoze(confused, "Where's Wartface gone now?")
+                }
+            }
+            return
+        }
+        startDialogue(npc) { generalsDialogue() }
     }
 
     private suspend fun Dialogue.generalsDialogue() {
@@ -269,31 +390,27 @@ class GoblinDiplomacy : QuestScript(
     private suspend fun Dialogue.mainMenu() {
         var askedWhy = false
         while (true) {
-            val stage = stage(player)
-            val wanted = wantedArmour(stage)
-            val handInText =
-                wanted?.takeIf { player.inv.count(it) > 0 }?.let {
-                    "I have some ${wantedColour(stage)} armour here."
-                }
-            val options =
-                buildList {
+            val first = if (askedWhy) "What is the goblin new century?" else WHY_ARGUING
+            when (
+                choice4(
+                    first,
+                    1,
+                    "Wouldn't you prefer peace?",
+                    2,
+                    "Do you want me to pick an armour colour for you?",
+                    3,
+                    "I'll leave you to it.",
+                    4,
+                )
+            ) {
+                1 ->
                     if (askedWhy) {
-                        add("What is the goblin new century?" to MenuChoice.NewCentury)
+                        newCentury()
                     } else {
-                        add(WHY_ARGUING to MenuChoice.Why)
+                        whyArguing()
+                        askedWhy = true
                     }
-                    add("Wouldn't you prefer peace?" to MenuChoice.Peace)
-                    add("Do you want me to pick an armour colour for you?" to MenuChoice.Pick)
-                    if (handInText != null) add(handInText to MenuChoice.HandIn)
-                    add("I'll leave you to it." to MenuChoice.Leave)
-                }
-            when (menu(options)) {
-                MenuChoice.Why -> {
-                    whyArguing()
-                    askedWhy = true
-                }
-                MenuChoice.NewCentury -> newCentury()
-                MenuChoice.Peace -> {
+                2 -> {
                     chatPlayer(quiz, "Wouldn't you prefer peace?")
                     wartface(
                         neutral,
@@ -302,55 +419,17 @@ class GoblinDiplomacy : QuestScript(
                     )
                     bentnoze(angry, "But green too much like skin. Nearly make you look naked!")
                 }
-                MenuChoice.Pick -> if (pickColour()) return
-                MenuChoice.HandIn -> {
-                    handIn(stage)
+                3 -> {
+                    pickColour()
                     return
                 }
-                MenuChoice.Leave, null -> {
+                else -> {
                     chatPlayer(neutral, "I'll leave you to it.")
                     return
                 }
             }
         }
     }
-
-    private enum class MenuChoice {
-        Why,
-        NewCentury,
-        Peace,
-        Pick,
-        HandIn,
-        Leave,
-    }
-
-    private suspend fun Dialogue.menu(options: List<Pair<String, MenuChoice>>): MenuChoice? =
-        when (options.size) {
-            4 ->
-                choice4(
-                    options[0].first,
-                    options[0].second,
-                    options[1].first,
-                    options[1].second,
-                    options[2].first,
-                    options[2].second,
-                    options[3].first,
-                    options[3].second,
-                )
-            else ->
-                choice5(
-                    options[0].first,
-                    options[0].second,
-                    options[1].first,
-                    options[1].second,
-                    options[2].first,
-                    options[2].second,
-                    options[3].first,
-                    options[3].second,
-                    options[4].first,
-                    options[4].second,
-                )
-        }
 
     private suspend fun Dialogue.whyArguing() {
         chatPlayer(quiz, WHY_ARGUING)
@@ -389,50 +468,55 @@ class GoblinDiplomacy : QuestScript(
         wartface(angry, "Shut up! Big High War God would hate you!")
     }
 
-    private suspend fun Dialogue.pickColour(): Boolean {
+    private suspend fun Dialogue.pickColour() {
         chatPlayer(quiz, "Do you want me to pick an armour colour for you?")
         wartface(neutral, "Yes, as long as you pick green.")
         bentnoze(angry, "No you have to pick red!")
-        when (
-            choice4(
-                "You should wear red.",
-                1,
-                "You should wear green.",
-                2,
-                "What about a different colour?",
-                3,
-                "I'll leave you to it.",
-                4,
-            )
-        ) {
-            1 -> {
-                chatPlayer(neutral, "You should wear red.")
-                bentnoze(laugh, "See? Even stupid human think red best. Now we all wear red!")
-                wartface(
-                    angry,
-                    "Human not know anything! If we wear red then whole village be ugly like YOU!",
+        while (true) {
+            when (
+                choice4(
+                    "You should wear red.",
+                    1,
+                    "You should wear green.",
+                    2,
+                    "What about a different colour?",
+                    3,
+                    "I'll leave you to it.",
+                    4,
                 )
-                bentnoze(angry, "Go away human. You not helping.")
-            }
-            2 -> {
-                chatPlayer(neutral, "You should wear green.")
-                wartface(laugh, "Green! We all wear green now, human has decided!")
-                bentnoze(angry, "Why we have to do what human say? He not boss of us!")
-                wartface(neutral, "No but he agree with me!")
-                bentnoze(angry, "That prove you a filthy human-lover!")
-                wartface(angry, "Me hate humans! This human just happen to be right!")
-                bentnoze(angry, "Go away human. You not know anything.")
-            }
-            3 -> return differentColour()
-            4 -> {
-                chatPlayer(neutral, "I'll leave you to it.")
-                return true
+            ) {
+                1 -> {
+                    chatPlayer(neutral, "You should wear red.")
+                    bentnoze(laugh, "See? Even stupid human think red best. Now we all wear red!")
+                    wartface(
+                        angry,
+                        "Human not know anything! If we wear red then whole village be ugly like " +
+                            "YOU!",
+                    )
+                    bentnoze(angry, "Go away human. You not helping.")
+                }
+                2 -> {
+                    chatPlayer(neutral, "You should wear green.")
+                    wartface(laugh, "Green! We all wear green now, human has decided!")
+                    bentnoze(angry, "Why we have to do what human say? He not boss of us!")
+                    wartface(neutral, "No but he agree with me!")
+                    bentnoze(angry, "That prove you a filthy human-lover!")
+                    wartface(angry, "Me hate humans! This human just happen to be right!")
+                    bentnoze(angry, "Go away human. You not know anything.")
+                }
+                3 -> {
+                    differentColour()
+                    return
+                }
+                else -> {
+                    chatPlayer(neutral, "I'll leave you to it.")
+                    return
+                }
             }
         }
-        return false
     }
 
-    private suspend fun Dialogue.differentColour(): Boolean {
+    private suspend fun Dialogue.differentColour() {
         chatPlayer(quiz, "What about a different colour?")
         bentnoze(neutral, "That would mean me wrong... but at least Wartface not right!")
         wartface(
@@ -443,12 +527,12 @@ class GoblinDiplomacy : QuestScript(
         val stage = stage(player)
         if (stage >= STARTED) {
             wartface(neutral, "Human! Get us ${wantedColour(stage)} armour!")
-            return true
+            return
         }
         bentnoze(neutral, "Human! You bring us armour in new colour!")
         if (!startQuestPrompt(quest)) {
             chatPlayer(neutral, "Actually, I think I'll leave you to it.")
-            return true
+            return
         }
         chatPlayer(happy, "I can do that.")
         quest.setQuestStage(access, STARTED)
@@ -460,7 +544,6 @@ class GoblinDiplomacy : QuestScript(
         wartface(neutral, "...and then you dye it orange!")
         bentnoze(laugh, "Even human should be able to work that out!")
         whereToGet()
-        return true
     }
 
     private suspend fun Dialogue.whereToGet() {
@@ -477,6 +560,7 @@ class GoblinDiplomacy : QuestScript(
             ) {
                 1 -> {
                     chatPlayer(quiz, "Where do I get goblin armour?")
+                    player.knowsAboutArmour = 1
                     wartface(
                         neutral,
                         "There some spare armour around village somewhere. You can take that.",
@@ -485,6 +569,7 @@ class GoblinDiplomacy : QuestScript(
                 }
                 2 -> {
                     chatPlayer(quiz, "Where do I get dye?")
+                    player.knowsAboutDye = 1
                     bentnoze(
                         neutral,
                         "You go north of here into wilderness. There you find many ways to die!",
@@ -526,6 +611,7 @@ class GoblinDiplomacy : QuestScript(
             else -> {
                 if (!quest.completeQuest(access)) {
                     access.invAdd(access.inv, wanted, 1)
+                    player.grubfootLook = GRUBFOOT_BLUE
                     access.mes(NO_ROOM_FOR_REWARD)
                     return false
                 }
@@ -537,40 +623,107 @@ class GoblinDiplomacy : QuestScript(
 
     private suspend fun Dialogue.handIn(stage: Int) {
         val wanted = wantedArmour(stage) ?: return
+        val wearing = grubfootHead(player)
         chatPlayer(happy, "I have some ${wantedColour(stage)} armour here.")
-        if (stage != BROWN_WANTED && !commitHandIn(stage, wanted)) {
-            return
+        if (tryOn(stage, wanted, wearing) && stage == BROWN_WANTED) {
+            commitHandIn(stage, wanted)
         }
-        wartface(neutral, "Grubfoot!")
-        grubfoot(neutral, "Yes General Wartface?")
-        wartface(neutral, "Put on this armour!")
-        when (stage) {
-            STARTED -> {
-                grubfoot(quiz, "What do you think?")
-                wartface(neutral, "No I don't like that much.")
-                bentnoze(neutral, "It clashes with skin colour.")
-                wartface(neutral, "We need darker colour, like blue.")
-                bentnoze(neutral, "Yeah blue might be good.")
-                wartface(neutral, "Human! Get us blue armour!")
+    }
+
+    private suspend fun Dialogue.tryOn(stage: Int, wanted: String, wearing: String): Boolean {
+        val tryOn =
+            when (stage) {
+                STARTED -> GRUBFOOT_ORANGE_HEAD
+                BLUE_WANTED -> GRUBFOOT_BLUE_HEAD
+                else -> GRUBFOOT_BROWN_HEAD
             }
-            BLUE_WANTED -> {
-                grubfoot(quiz, "What do you think?")
-                bentnoze(neutral, "That not right. Not goblin colour at all.")
-                wartface(neutral, "Goblins wear dark earthy colours like brown.")
-                bentnoze(neutral, "Yeah brown might be good.")
-                wartface(neutral, "Human! Get us brown armour!")
-                chatPlayer(confused, "But I thought brown was the armour you were changing from...")
-                chatPlayer(neutral, "Never mind, anything is worth a try.")
-            }
-            else -> {
-                grubfoot(quiz, "What do you think?", GRUBFOOT_BROWN_HEAD)
-                wartface(happy, "That colour quite nice. Me can see myself wearing that.")
-                bentnoze(happy, "It a deal then. Brown armour it is.")
-                wartface(happy, "Thank you for sorting out argument, human. You have reward now.")
-                chatPlayer(confused, "Thanks... I think...")
-                commitHandIn(stage, wanted)
-            }
+        val returnTo = player.coords
+        val region = regionRepo.add(HUT)
+        region?.let(regionRepo::protect)
+        val r = SceneRegion(region)
+        player.sceneReturnTile = returnTo.packed
+        player.uuid?.let { uuid -> region?.let { sceneRegions[uuid] = it } }
+        val actors = ArrayList<Npc>()
+        var committed = stage == BROWN_WANTED
+        var verdictGiven = false
+        lateinit var grubfoot: Npc
+        fun spawn(type: String, coords: CoordGrid): Npc {
+            val npc = Npc(type, coords)
+            npcRepo.add(npc, SCENE_LIFESPAN)
+            npc.noneMode()
+            npc.faceSquare(r[GRUBFOOT_TILE])
+            actors += npc
+            return npc
         }
+        try {
+            access.lockedScene(
+                vantage = r[PLAYER_TILE],
+                faceAt = r[GRUBFOOT_TILE],
+                camera = r.map(CAMERA),
+                returnTo = returnTo,
+                underFade = {
+                    spawn(WARTFACE, r[WARTFACE_TILE])
+                    spawn(BENTNOZE, r[BENTNOZE_TILE])
+                    grubfoot = spawn(wearing, r[FETCH_TILE])
+                    if (!committed) committed = commitHandIn(stage, wanted)
+                },
+                teardown = {
+                    if (verdictGiven && player.inv.count(wanted) > 0) {
+                        player.grubfootLook = GRUBFOOT_BROWN
+                    }
+                },
+            ) {
+                if (!committed) return@lockedScene
+                grubfoot.walk(FETCH_PATH.map(r::get))
+                wartface(neutral, "Grubfoot!")
+                grubfoot(neutral, "Yes General Wartface?", wearing)
+                wartface(neutral, "Put on this armour!")
+                grubfoot.walk(r[CURTAIN_TILE])
+                delay(CHANGE_TICKS)
+                if (grubfoot.isSlotAssigned) npcRepo.del(grubfoot, Int.MAX_VALUE)
+                delay(CHANGE_TICKS)
+                grubfoot = spawn(tryOn, r[CURTAIN_TILE])
+                grubfoot.walk(r[GRUBFOOT_TILE])
+                delay(CHANGE_TICKS)
+                grubfoot(quiz, "What do you think?", tryOn)
+                when (stage) {
+                    STARTED -> {
+                        wartface(neutral, "No I don't like that much.")
+                        bentnoze(neutral, "It clashes with skin colour.")
+                        wartface(neutral, "We need darker colour, like blue.")
+                        bentnoze(neutral, "Yeah blue might be good.")
+                        wartface(neutral, "Human! Get us blue armour!")
+                    }
+                    BLUE_WANTED -> {
+                        bentnoze(neutral, "That not right. Not goblin colour at all.")
+                        wartface(neutral, "Goblins wear dark earthy colours like brown.")
+                        bentnoze(neutral, "Yeah brown might be good.")
+                        wartface(neutral, "Human! Get us brown armour!")
+                        chatPlayer(
+                            confused,
+                            "But I thought brown was the armour you were changing from...",
+                        )
+                        chatPlayer(neutral, "Never mind, anything is worth a try.")
+                    }
+                    else -> {
+                        wartface(happy, "That colour quite nice. Me can see myself wearing that.")
+                        bentnoze(happy, "It a deal then. Brown armour it is.")
+                        wartface(
+                            happy,
+                            "Thank you for sorting out argument, human. You have reward now.",
+                        )
+                        chatPlayer(confused, "Thanks... I think...")
+                        verdictGiven = true
+                    }
+                }
+            }
+            player.sceneReturnTile = 0
+        } finally {
+            for (npc in actors) if (npc.isSlotAssigned) npcRepo.del(npc, Int.MAX_VALUE)
+            player.uuid?.let(sceneRegions::remove)
+            region?.let(regionRepo::unprotect)
+        }
+        return committed
     }
 
     private suspend fun Dialogue.grubfootDialogue() {
@@ -705,8 +858,8 @@ class GoblinDiplomacy : QuestScript(
 
     private fun grubfootHead(player: Player): String =
         when (player.grubfootLook) {
-            GRUBFOOT_ORANGE -> "npc.catwalk_goblin_orange"
-            GRUBFOOT_BLUE -> "npc.catwalk_goblin_blue"
+            GRUBFOOT_ORANGE -> GRUBFOOT_ORANGE_HEAD
+            GRUBFOOT_BLUE -> GRUBFOOT_BLUE_HEAD
             else -> GRUBFOOT_BROWN_HEAD
         }
 
@@ -718,10 +871,78 @@ class GoblinDiplomacy : QuestScript(
 
         private const val WHY_ARGUING = "Why are you arguing about the colour of your armour?"
 
+        private const val GENERALS_HUT =
+            "<red>General Wartface</red> and <red>General Bentnoze</red> in <red>Goblin Village</red>"
+        private const val ASKED_FOR_ORANGE =
+            "I spoke to $GENERALS_HUT. They've been trying to pick a new colour of armour for " +
+                "the goblins in the village, but have been unable to agree on a colour. I offered " +
+                "to help, so they asked me to bring them some <red>Orange Goblin Mail</red> to " +
+                "try out."
+        private const val WITCH =
+            "Apparently there's a <red>Witch</red> in <red>Draynor Village</red> who makes " +
+                "<red>Dye</red> that can be used to recolour <red>Goblin Mail</red>."
+        private const val AGGIE =
+            "<red>Aggie</red> in <red>Draynor Village</red> can make some <red>Dye</red> for me " +
+                "to recolour <red>Goblin Mail</red> with."
+        private const val CRATES =
+            "I should be able to find some <red>Goblin Mail</red> in crates around <red>Goblin " +
+                "Village</red>."
+        private const val GAVE_ORANGE =
+            "I gave some <red>Orange Goblin Mail</red> to <red>General Wartface</red> and " +
+                "<red>General Bentnoze</red>, but they didn't like it. They asked me to bring " +
+                "them some <red>Blue Goblin Mail</red> to try out instead."
+        private const val GAVE_BLUE =
+            "I gave some <red>Blue Goblin Mail</red> to <red>General Wartface</red> and " +
+                "<red>General Bentnoze</red>, but they didn't like it. They asked me to bring " +
+                "them some of their original <red>Brown Goblin Mail</red> to try out instead."
+        private const val DONE_ASKED =
+            "I spoke to General Wartface and General Bentnoze in Goblin Village. They were " +
+                "trying to pick a new colour of armour for the goblins in the village, but were " +
+                "unable to agree on a colour. I offered to help, so they asked me to bring them " +
+                "some Orange Goblin Mail to try out."
+        private const val DONE_GAVE_ORANGE =
+            "I gave some Orange Goblin Mail to General Wartface and General Bentnoze, but they " +
+                "didn't like it. They asked me to bring them some Blue Goblin Mail to try out " +
+                "instead."
+
         private const val GRUBFOOT_BROWN = 0
         private const val GRUBFOOT_ORANGE = 1
         private const val GRUBFOOT_BLUE = 2
         private const val GRUBFOOT_BROWN_HEAD = "npc.catwalk_goblin_brown"
+        private const val GRUBFOOT_ORANGE_HEAD = "npc.catwalk_goblin_orange"
+        private const val GRUBFOOT_BLUE_HEAD = "npc.catwalk_goblin_blue"
+
+        private val HUT =
+            RegionTemplate.create {
+                copy(HUT_ZONE_X, HUT_ZONE_Z, 0) {
+                    regionZoneX = HUT_REGION_ZONE
+                    regionZoneZ = HUT_REGION_ZONE
+                    zoneWidth = HUT_ZONES
+                    zoneLength = HUT_ZONES
+                }
+            }
+        private const val HUT_ZONE_X = 368
+        private const val HUT_ZONE_Z = 437
+        private const val HUT_ZONES = 3
+        private const val HUT_REGION_ZONE = 6
+        private val PLAYER_TILE = CoordGrid(2958, 3512)
+        private val WARTFACE_TILE = CoordGrid(2958, 3510)
+        private val BENTNOZE_TILE = CoordGrid(2959, 3510)
+        private val GRUBFOOT_TILE = CoordGrid(2955, 3511)
+        private val CURTAIN_TILE = CoordGrid(2954, 3511)
+        private val FETCH_TILE = CoordGrid(2957, 3514)
+        private val FETCH_PATH =
+            listOf(CoordGrid(2956, 3513), CoordGrid(2956, 3511), GRUBFOOT_TILE)
+        private val CAMERA =
+            SceneCamera(
+                eye = CoordGrid(2961, 3511),
+                eyeHeight = 400,
+                lookAt = CoordGrid(2956, 3511),
+                lookAtHeight = 150,
+            )
+        private const val CHANGE_TICKS = 2
+        private const val GENERAL_SIGHT = 15
+        private const val SCENE_LIFESPAN = 3000
 
         private const val WARTFACE = "npc.general_wartface_green"
         private const val BENTNOZE = "npc.general_bentnoze_red"
