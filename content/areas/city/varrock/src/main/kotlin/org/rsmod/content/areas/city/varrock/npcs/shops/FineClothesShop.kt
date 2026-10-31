@@ -6,6 +6,7 @@ import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.script.onOpNpc1
 import org.rsmod.api.script.onOpNpc3
 import org.rsmod.api.shops.Shops
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import org.rsmod.game.entity.Npc
 import org.rsmod.game.entity.Player
 import org.rsmod.plugin.scripts.PluginScript
@@ -21,6 +22,7 @@ class FineClothesShop @Inject constructor(private val shops: Shops) : PluginScri
 
     private fun Player.openFineClothesShop(npc: Npc) {
         shops.open(this, npc, "Thessalia's Fine Clothes", "inv.clotheshop")
+        DiaryHooks.thessaliaStoreBrowsed(this)
     }
 
     private suspend fun ProtectedAccess.shopDialogue(npc: Npc) =
@@ -28,7 +30,6 @@ class FineClothesShop @Inject constructor(private val shops: Shops) : PluginScri
 
     private suspend fun Dialogue.shopKeeper(npc: Npc) {
         chatNpc(happy, "Do you want to buy any fine clothes?")
-
 
         val choice = choice3(
             "What have you got?", 1,

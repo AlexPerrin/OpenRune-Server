@@ -10,6 +10,7 @@ dependencies {
     testImplementation(projects.api.registry)
     testImplementation(libs.fastutil)
     implementation(projects.api.pluginCommons)
+    implementation(projects.content.interfaces.achievementDiary)
     implementation(projects.api.shops)
     implementation(projects.content.skills.utils)
 }

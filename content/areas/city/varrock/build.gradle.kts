@@ -4,6 +4,7 @@ plugins {
 }
 
 dependencies {
+    implementation(projects.content.interfaces.achievementDiary)
     testImplementation(projects.api.invPlugin)
     testImplementation(projects.api.gameProcess)
     testImplementation(projects.api.invStorage)

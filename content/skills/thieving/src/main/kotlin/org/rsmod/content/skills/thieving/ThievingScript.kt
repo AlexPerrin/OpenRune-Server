@@ -14,6 +14,7 @@ import org.rsmod.api.script.onOpHeld1
 import org.rsmod.api.script.onOpHeld2
 import org.rsmod.api.script.onOpLoc2
 import org.rsmod.api.script.onOpNpc3
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import org.rsmod.game.entity.Npc
 import org.rsmod.game.hit.HitType
 import org.rsmod.game.loc.BoundLocInfo
@@ -143,6 +144,7 @@ constructor(
             mes("You steal ${describe(loot.obj, count)}.", ChatType.Spam)
         }
         statAdvance(THIEVING, target.xp)
+        DiaryHooks.pickpocketed(player, npc.type.internalName, npc.name, npc.coords)
     }
 
     private fun ProtectedAccess.openPouches(pouch: CoinPouch, all: Boolean) {

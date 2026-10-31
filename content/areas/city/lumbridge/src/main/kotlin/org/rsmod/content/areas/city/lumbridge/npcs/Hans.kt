@@ -6,6 +6,7 @@ import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.script.onOpNpc1
 import org.rsmod.api.script.onOpNpc3
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import org.rsmod.game.entity.Npc
 import org.rsmod.plugin.scripts.PluginScript
 import org.rsmod.plugin.scripts.ScriptContext
@@ -13,7 +14,10 @@ import org.rsmod.plugin.scripts.ScriptContext
 class Hans : PluginScript() {
     override fun ScriptContext.startup() {
         onOpNpc1("npc.hans") { hansDialogue(it.npc) }
-        onOpNpc3("npc.hans") { hansAgeDialogue(it.npc) }
+        onOpNpc3("npc.hans") {
+            hansAgeDialogue(it.npc)
+            DiaryHooks.hansAge(player)
+        }
     }
 
     private suspend fun ProtectedAccess.hansDialogue(npc: Npc) =

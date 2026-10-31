@@ -17,6 +17,7 @@ import org.rsmod.api.repo.region.RegionTemplate
 import org.rsmod.api.script.onAiTimer
 import org.rsmod.api.script.onIfModalButton
 import org.rsmod.api.script.onOpLoc1
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import org.rsmod.game.entity.Npc
 import org.rsmod.game.loc.LocAngle
 import org.rsmod.game.loc.LocShape
@@ -134,6 +135,7 @@ class CanoeTravelling @Inject private constructor(private val cutscene: CanoeCut
 
         val cutsceneType = if (wilderness) CutsceneType.Wilderness else CutsceneType.Grass
         cutscene.start(this, destination, cutsceneType)
+        DiaryHooks.canoeTravelled(player, canoe == Canoe.Waka, station.currentLocation().name, destination.name)
     }
 
     private fun resolveValidDestinations(station: Station, canoe: Canoe): List<CanoeDestination> {

@@ -17,6 +17,7 @@ import org.rsmod.api.script.onOpLoc1
 import org.rsmod.api.script.onOpLoc3
 import org.rsmod.api.stats.levelmod.InvisibleLevels
 import org.rsmod.api.stats.xpmod.XpModifiers
+import org.rsmod.content.interfaces.diary.DiaryHooks
 import org.rsmod.game.loc.BoundLocInfo
 import org.rsmod.game.loc.LocShape
 import org.rsmod.map.CoordGrid
@@ -150,6 +151,7 @@ constructor(
             val station = resolveStation()
             this[station, canoe] = CanoeState.Ready
             confirmedCanoeType = false
+            DiaryHooks.canoeShaped(player, canoe == Canoe.Waka, station.name)
 
             val xp = lcParam(ServerCacheManager.getObject(canoe.loc.asRSCM(RSCMType.LOC))!!, params.skill_xp) * xpMods.get(player, "stat.woodcutting")
             resetAnim()
