@@ -33,6 +33,9 @@ var Player.gameframeTopLevel by intVarBit("varbit.gameframe_toplevel")
 private var Player.stoneArrangements by boolVarBit("varbit.resizable_stone_arrangement")
 lateinit var gameframes: Map<Int, Gameframe>
 
+private fun desktopFrames(): List<Gameframe> =
+    gameframes.values.filter { it.topLevel != GameframeLoader.MOBILE_TOPLEVEL }
+
 private val STONE_EVENTS = listOf(IfEvent.Op1, IfEvent.Op2, IfEvent.Op3, IfEvent.Op4, IfEvent.Op5, IfEvent.Op6)
 
 class GameframeScript
@@ -73,6 +76,13 @@ internal constructor(
     }
 
     private fun Player.openLoginGameframe() {
+        if (mobileClient) {
+            val mobile = gameframes.values.first { it.topLevel == GameframeLoader.MOBILE_TOPLEVEL }
+            gameframeTopLevel = mobile.topLevel.asRSCM(RSCMType.INTERFACE)
+            ifOpenTop(mobile.topLevel)
+            openGameframe(mobile, eventBus)
+            return
+        }
         val gameframe = gameframes[gameframeTopLevel]
         if (gameframe != null && gameframe.isGameplay && gameframe.resizable == ui.frameResizable) {
             ifOpenTop(gameframe.topLevel)
@@ -139,7 +149,7 @@ internal constructor(
             if (!requiresIntermediate) {
                 return null
             }
-            return gameframes.values.first { it.hasFlags(resizable = true, stoneArrangements) }
+            return desktopFrames().first { it.hasFlags(resizable = true, stoneArrangements) }
         }
 
         private fun Gameframe.hasFlags(resizable: Boolean, stoneArrangements: Boolean): Boolean {
@@ -176,11 +186,11 @@ internal constructor(
     }
 
     private fun selectFallback(resizable: Boolean, stoneArrangements: Boolean): Gameframe? {
-        val priority = gameframes.values.firstOrNull { it.hasFlags(resizable, stoneArrangements) }
+        val priority = desktopFrames().firstOrNull { it.hasFlags(resizable, stoneArrangements) }
         if (priority != null) {
             return priority
         }
-        return gameframes.values.firstOrNull { it.isGameplay && it.resizable == resizable }
+        return desktopFrames().firstOrNull { it.isGameplay && it.resizable == resizable }
     }
 
     private fun loadAll() {

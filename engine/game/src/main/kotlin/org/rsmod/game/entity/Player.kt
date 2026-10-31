@@ -190,6 +190,9 @@ public class Player(
     public var userHash: Long by Delegates.notNull()
 
     public var username: String = ""
+
+    /** Spike: true when the session is the Android (ENHANCED_ANDROID) client type. */
+    public var mobileClient: Boolean = false
     public var displayName: String by avatar::name
     public var members: Boolean = false
     public var gamemode: Int = 0

@@ -42,7 +42,7 @@ constructor(
     override val ports: List<Int> = listOf(config.gamePort)
 
     override val supportedClientTypes: List<OldSchoolClientType> =
-        listOf(OldSchoolClientType.DESKTOP)
+        listOf(OldSchoolClientType.DESKTOP, OldSchoolClientType.ANDROID)
 
     override fun getExceptionHandlers(): ExceptionHandlers<Player> {
         return ExceptionHandlersProvider.provide()
@@ -52,8 +52,7 @@ constructor(
         return connectionHandler
     }
 
-    override fun getGameMessageConsumerRepositoryProvider():
-        GameMessageConsumerRepositoryProvider<Player> {
+    override fun getGameMessageConsumerRepositoryProvider(): GameMessageConsumerRepositoryProvider<Player> {
         return messageConsumerProvider.get()
     }
 
