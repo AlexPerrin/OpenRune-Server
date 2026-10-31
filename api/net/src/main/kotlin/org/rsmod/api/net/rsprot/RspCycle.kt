@@ -37,7 +37,7 @@ import org.rsmod.map.CoordGrid
 import org.rsmod.map.zone.ZoneKey
 
 class RspCycle(
-    private val session: Session<Player>,
+    private var session: Session<Player>,
     private val infos: Infos,
     private val regions: RegionRegistry,
 ) : ClientCycle {
@@ -70,6 +70,18 @@ class RspCycle(
     fun init(player: Player) {
         player.updateCoords()
         player.queueRebuildLogin()
+    }
+
+    /**
+     * Moves this cycle to the session of a reconnect login (the client keeps its scene). The
+     * build area and npc view distance are re-assigned on the next update, since the info
+     * protocols' `onReconnect` drops them, without sending a rebuild packet.
+     */
+    fun reconnect(newSession: Session<Player>) {
+        session = newSession
+        knownBuildArea = CoordGrid.NULL
+        pendingSceneRebuild = false
+        knownNpcViewDistance = null
     }
 
     override fun forceSceneRebuild() {

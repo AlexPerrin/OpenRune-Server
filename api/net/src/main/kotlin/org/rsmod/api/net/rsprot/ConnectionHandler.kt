@@ -16,6 +16,7 @@ import org.rsmod.api.db.jdbc.GameDatabase
 import org.rsmod.api.game.process.PluginScriptBootGate
 import org.rsmod.api.net.central.OpenRuneCentralWorldLink
 import org.rsmod.api.net.rsprot.player.AccountLoadResponseHook
+import org.rsmod.api.net.rsprot.player.PlayerReconnect
 import org.rsmod.api.realm.Realm
 import org.rsmod.api.registry.account.AccountRegistry
 import org.rsmod.api.registry.player.PlayerRegistry
@@ -43,6 +44,7 @@ private constructor(
     private val gameDatabase: GameDatabase,
     private val characterAccountRepository: CharacterAccountRepository,
     private val scriptBootGate: PluginScriptBootGate,
+    private val playerReconnect: PlayerReconnect,
 ) : GameConnectionHandler<Player> {
     private val logger = InlineLogger()
 
@@ -218,7 +220,10 @@ private constructor(
         responseHandler: GameLoginResponseHandler<Player>,
         block: LoginBlock<XteaKey>,
     ) {
-        // TODO: Reconnection.
-        responseHandler.writeFailedResponse(LoginResponse.ConnectFail)
+        if (!scriptBootGate.isReady() || accountManager.isLoaderShuttingDown()) {
+            responseHandler.writeFailedResponse(LoginResponse.ConnectFail)
+            return
+        }
+        accountReg.queueReconnect { playerReconnect.reconnect(responseHandler, block) }
     }
 }

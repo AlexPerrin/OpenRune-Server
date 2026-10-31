@@ -18,6 +18,7 @@ constructor(
 ) {
     private val pendingLogins = ConcurrentLinkedQueue<QueuedLogin>()
     private val pendingLogouts = ConcurrentLinkedQueue<QueuedLogout>()
+    private val pendingReconnects = ConcurrentLinkedQueue<() -> Unit>()
 
     public fun queueLogin(
         player: Player,
@@ -28,11 +29,20 @@ constructor(
         pendingLogins.add(queued)
     }
 
+    /** Runs [handler] on the game thread, before the queued logins of the next login cycle. */
+    public fun queueReconnect(handler: () -> Unit) {
+        pendingReconnects.add(handler)
+    }
+
     public fun queueLogout(player: Player) {
         accountManager.save(player, ::queueSaveResponse)
     }
 
     public fun handleLogins(count: Int = DEFAULT_LOGINS_PER_CYCLE) {
+        while (true) {
+            val reconnect = pendingReconnects.poll() ?: break
+            reconnect()
+        }
         var left = count
         while (left-- > 0) {
             val next = pendingLogins.poll() ?: break

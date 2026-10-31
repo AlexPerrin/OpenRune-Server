@@ -18,6 +18,12 @@ public class SessionStateEvent {
     public data class EngineLogin(override val player: Player, override val id: Long = 0L) :
         KeyedEvent, PlayerEvent
 
+    /**
+     * Fired on the game thread after a reconnect login moved the player to a new session. Packets
+     * written while the old connection was gone were lost, so state is sent again.
+     */
+    public data class Reconnect(override val player: Player) : UnboundEvent, PlayerEvent
+
     /** Fired before the player's account data is queued for saving. */
     public data class Logout(override val player: Player) : UnboundEvent, PlayerEvent
 

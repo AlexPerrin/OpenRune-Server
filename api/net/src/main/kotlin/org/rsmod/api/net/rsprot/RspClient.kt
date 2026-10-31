@@ -3,8 +3,6 @@ package org.rsmod.api.net.rsprot
 import net.rsprot.protocol.api.NetworkService
 import net.rsprot.protocol.api.Session
 import net.rsprot.protocol.game.outgoing.info.Infos
-import net.rsprot.protocol.game.outgoing.info.npcinfo.NpcInfo
-import net.rsprot.protocol.game.outgoing.info.playerinfo.PlayerInfo
 import net.rsprot.protocol.message.OutgoingGameMessage
 import org.rsmod.game.client.Client
 import org.rsmod.game.entity.Player
@@ -13,7 +11,7 @@ import org.rsmod.game.entity.Player
 private typealias Service = NetworkService<Player>
 
 @OptIn(ExperimentalUnsignedTypes::class)
-class RspClient(private val session: Session<Player>, private val infos: Infos) :
+class RspClient(val session: Session<Player>, val infos: Infos) :
     Client<NetworkService<Player>, OutgoingGameMessage> {
     override fun close() {
         session.requestClose()
