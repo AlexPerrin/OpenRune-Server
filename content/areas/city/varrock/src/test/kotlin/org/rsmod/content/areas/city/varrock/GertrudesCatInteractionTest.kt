@@ -175,6 +175,26 @@ class GertrudesCatInteractionTest {
         assertEquals(1, f.player.inv.count(FluffsKitten))
     }
 
+    @Test fun `Stroke hisses with its own line and Pick-up keeps the stage hint`() {
+        for (stage in 1..4) {
+            val f = Fixture(stage)
+            f.opFluffs(3)
+            assertTrue(f.output().contains("Perhaps the cat wants something?"), "stage $stage: ${f.output()}")
+            assertFalse(f.output().contains("Maybe the cat"), "stage $stage: ${f.output()}")
+            assertEquals(stage, f.stage())
+        }
+        val f = Fixture(2)
+        f.opFluffs(1)
+        assertTrue(f.output().contains("Maybe the cat is thirsty?"), f.output())
+        assertFalse(f.output().contains("Perhaps the cat wants something?"), f.output())
+    }
+
+    @Test fun `Stroke after the kitten is home purrs`() {
+        val f = Fixture(5)
+        f.opFluffs(3)
+        assertTrue(f.output().contains("Fluffs purrs contentedly."), f.output())
+    }
+
     @Test fun `doogle leaves season a raw sardine`() {
         val f = Fixture(0)
         f.player.inv[1] = InvObj(DoogleLeaves, 1)
@@ -464,6 +484,17 @@ class GertrudesCatInteractionTest {
 
         fun talkToKid(kid: String) = start {
             assertTrue(events.publish(this, NpcEvents.Op1(Npc(kid, coords.translateZ(1)))))
+        }
+
+        fun opFluffs(op: Int) {
+            val event =
+                when (op) {
+                    1 -> NpcEvents.Op1(fluffs)
+                    3 -> NpcEvents.Op3(fluffs)
+                    else -> error("op $op")
+                }
+            start { assertTrue(events.publish(this, event)) }
+            finish()
         }
 
         fun useOnFluffs(obj: String) {
