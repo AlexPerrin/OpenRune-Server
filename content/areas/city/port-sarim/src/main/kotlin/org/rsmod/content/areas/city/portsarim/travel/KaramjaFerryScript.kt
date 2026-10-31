@@ -4,6 +4,7 @@ import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.script.onOpNpc1
 import org.rsmod.api.script.onOpNpc3
+import org.rsmod.content.quest.area.portsarim.piratestreasure.PiratesTreasureState
 import org.rsmod.map.CoordGrid
 import org.rsmod.plugin.scripts.PluginScript
 import org.rsmod.plugin.scripts.ScriptContext
@@ -15,7 +16,13 @@ class KaramjaFerryScript : PluginScript() {
             onOpNpc3(sailor) { payAndSail(MUSA_POINT, MUSA_POINT_NAME) }
         }
         onOpNpc1(CUSTOMS_OFFICER) { startDialogue(it.npc) { customsOfficer() } }
-        onOpNpc3(CUSTOMS_OFFICER) { payAndSail(PORT_SARIM, PORT_SARIM_NAME) }
+        onOpNpc3(CUSTOMS_OFFICER) {
+            if (PiratesTreasureState.carriesRum(player)) {
+                confiscateRum()
+            } else {
+                payAndSail(PORT_SARIM, PORT_SARIM_NAME)
+            }
+        }
     }
 
     private suspend fun Dialogue.offerTrip() {
@@ -33,37 +40,74 @@ class KaramjaFerryScript : PluginScript() {
         board(MUSA_POINT, MUSA_POINT_NAME)
     }
 
+    // Rum smuggling (Pirate's Treasure) from the wiki transcript. Karamja gloves and the Ring of
+    // Charos(a) are not handled.
     private suspend fun Dialogue.customsOfficer() {
         chatNpc(neutral, "Can I help you?")
-        val topic =
-            choice3(
+        val journey =
+            choice2(
                 "Can I journey on this ship?",
-                CustomsTopic.Journey,
-                "What unusual customs do they have here?",
-                CustomsTopic.Customs,
-                "I'm good, thanks.",
-                CustomsTopic.Leave,
+                true,
+                "Does Karamja have unusual customs then?",
+                false,
             )
-        when (topic) {
-            CustomsTopic.Journey -> {
-                chatPlayer(quiz, "Can I journey on this ship?")
-                chatNpc(
-                    neutral,
-                    "You can, but you'll need to pay a boarding charge of $FARE coins.",
+        if (!journey) {
+            chatPlayer(quiz, "Does Karamja have any unusual customs then?")
+            chatNpc(neutral, "I'm not that sort of customs officer.")
+            return
+        }
+        chatPlayer(quiz, "Can I journey on this ship?")
+        chatNpc(neutral, "You need to be searched before you can board.")
+        while (true) {
+            val topic =
+                choice3(
+                    "Why?",
+                    CustomsTopic.Why,
+                    "Search away. I have nothing to hide.",
+                    CustomsTopic.Search,
+                    "You're not putting your hands on my things!",
+                    CustomsTopic.Refuse,
                 )
-                if (choice2("Okay.", true, "Oh, I'll not bother then.", false)) {
-                    chatPlayer(neutral, "Okay.")
-                    board(PORT_SARIM, PORT_SARIM_NAME)
-                } else {
-                    chatPlayer(neutral, "Oh, I'll not bother then.")
+            when (topic) {
+                CustomsTopic.Why -> {
+                    chatPlayer(quiz, "Why?")
+                    chatNpc(neutral, "Because Asgarnia has banned the import of intoxicating spirits.")
+                }
+                CustomsTopic.Search -> return search()
+                CustomsTopic.Refuse -> {
+                    chatPlayer(angry, "You're not putting your hands on my things!")
+                    chatNpc(neutral, "You're not getting on this ship then.")
+                    return
                 }
             }
-            CustomsTopic.Customs -> {
-                chatPlayer(quiz, "What unusual customs do they have here?")
-                chatNpc(neutral, "I'm not that sort of customs officer.")
-            }
-            CustomsTopic.Leave -> chatPlayer(neutral, "I'm good, thanks.")
         }
+    }
+
+    private suspend fun Dialogue.search() {
+        chatPlayer(neutral, "Search away. I have nothing to hide.")
+        if (PiratesTreasureState.carriesRum(player)) {
+            chatNpc(angry, "Aha, trying to smuggle rum are we?")
+            chatPlayer(shifty, "Umm... it's for personal use?")
+            access.confiscateRum()
+            return
+        }
+        chatNpc(
+            neutral,
+            "Well you've got some odd stuff, but it's all legal. Now you need to pay a boarding " +
+                "charge of $FARE coins.",
+        )
+        if (choice2("Okay.", true, "Oh, I'll not bother then.", false)) {
+            chatPlayer(neutral, "Okay.")
+            board(PORT_SARIM, PORT_SARIM_NAME)
+        } else {
+            chatPlayer(neutral, "Oh, I'll not bother then.")
+        }
+    }
+
+    private fun ProtectedAccess.confiscateRum() {
+        invDel(inv, PiratesTreasureState.KARAMJA_RUM, inv.count(PiratesTreasureState.KARAMJA_RUM))
+        mes("The customs officer confiscates your rum.")
+        mes("You will need to find some way to smuggle it off the island...")
     }
 
     private suspend fun Dialogue.board(dest: CoordGrid, destName: String) {
@@ -83,9 +127,9 @@ class KaramjaFerryScript : PluginScript() {
     }
 
     private enum class CustomsTopic {
-        Journey,
-        Customs,
-        Leave,
+        Why,
+        Search,
+        Refuse,
     }
 
     private companion object {

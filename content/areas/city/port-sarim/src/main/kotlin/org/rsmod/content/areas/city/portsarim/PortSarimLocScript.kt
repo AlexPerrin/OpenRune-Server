@@ -1,11 +1,15 @@
 package org.rsmod.content.areas.city.portsarim
 
 import jakarta.inject.Inject
+import kotlin.math.abs
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.player.stat.agilityLvl
 import org.rsmod.api.repo.loc.LocRepository
 import org.rsmod.api.script.onOpLoc1
 import org.rsmod.content.generic.locs.doors.DoorTranslations
+import org.rsmod.content.quest.area.portsarim.piratestreasure.PiratesTreasureState
+import org.rsmod.content.quest.area.portsarim.piratestreasure.wydin
+import org.rsmod.content.quest.area.portsarim.piratestreasure.wydinJobOffer
 import org.rsmod.game.loc.BoundLocInfo
 import org.rsmod.game.loc.LocAngle
 import org.rsmod.map.CoordGrid
@@ -18,6 +22,7 @@ class PortSarimLocScript @Inject constructor(private val locRepo: LocRepository)
         onOpLoc1("loc.vc_manhole_open") { climbDownManhole() }
         onOpLoc1("loc.vc_ladder") { climbUpFromSewer() }
         onOpLoc1("loc.jewellersdoor") { walkThroughDoor(it.loc) }
+        onOpLoc1("loc.wydindoor") { wydinBackDoor(it.loc) }
         onOpLoc1("loc.cavewall_shortcut_wyvern_west") { wyvernTunnel() }
         onOpLoc1("loc.draynor_diary_under_wall_w") { underwallTunnel(UNDERWALL_EAST_EXIT) }
         onOpLoc1("loc.draynor_diary_under_wall_e") { underwallTunnel(UNDERWALL_WEST_EXIT) }
@@ -49,12 +54,58 @@ class PortSarimLocScript @Inject constructor(private val locRepo: LocRepository)
         arriveDelay()
         val inside = door.coords.translateX(-1)
         val dest = if (coords.x >= door.coords.x) inside else door.coords
+        passDoor(door, dest, OPEN_DOOR)
+    }
+
+    private suspend fun ProtectedAccess.passDoor(door: BoundLocInfo, dest: CoordGrid, open: String) {
         val openCoords = DoorTranslations.translateOpen(door.coords, door.shape, door.angle)
         locRepo.del(door, DOOR_OPEN_TICKS)
-        locRepo.add(openCoords, OPEN_DOOR, DOOR_OPEN_TICKS, door.turnAngle(rotations = 1), door.shape)
+        locRepo.add(openCoords, open, DOOR_OPEN_TICKS, door.turnAngle(rotations = 1), door.shape)
         soundSynth("synth.door_open")
         playerMove(dest)
     }
+
+    // Pirate's Treasure: only Wydin's employees, wearing a white apron, may go into the back room.
+    private suspend fun ProtectedAccess.wydinBackDoor(door: BoundLocInfo) {
+        arriveDelay()
+        val beyond =
+            when (door.angle) {
+                LocAngle.West -> door.coords.translateX(-1)
+                LocAngle.North -> door.coords.translateZ(1)
+                LocAngle.East -> door.coords.translateX(1)
+                else -> door.coords.translateZ(-1)
+            }
+        val (inside, outside) =
+            if (backRoomDistance(door.coords) < backRoomDistance(beyond)) door.coords to beyond
+            else beyond to door.coords
+        val entering = backRoomDistance(coords) > backRoomDistance(inside)
+        val dest = if (entering) inside else outside
+        if (entering && !PiratesTreasureState.employedAtWydin(player)) {
+            startDialogue {
+                wydin(
+                    neutral,
+                    "Hey, you can't go in there. Only employees of the grocery store can go in.",
+                )
+                if (choice2("Well, can I get a job here?", true, "Sorry, I didn't realise.", false)) {
+                    wydinJobOffer("Well, can I get a job here?")
+                } else {
+                    chatPlayer(neutral, "Sorry, I didn't realise.")
+                }
+            }
+            return
+        }
+        if (entering && !PiratesTreasureState.wearsWhiteApron(player)) {
+            startDialogue {
+                wydin(neutral, "Can you put your white apron on before going in there, please?")
+            }
+            return
+        }
+        passDoor(door, dest, "loc.wydindooropen")
+        if (coords != dest) telejump(dest)
+    }
+
+    private fun backRoomDistance(coords: CoordGrid): Int =
+        abs(coords.x - WYDIN_BACK_ROOM.x) + abs(coords.z - WYDIN_BACK_ROOM.z)
 
     private suspend fun ProtectedAccess.wyvernTunnel() {
         arriveDelay()
@@ -121,5 +172,6 @@ class PortSarimLocScript @Inject constructor(private val locRepo: LocRepository)
         val MANHOLE_EXIT = CoordGrid(3018, 3233, 0)
         val UNDERWALL_EAST_EXIT = CoordGrid(3070, 3257, 0)
         val UNDERWALL_WEST_EXIT = CoordGrid(3066, 3257, 0)
+        val WYDIN_BACK_ROOM = CoordGrid(3009, 3207, 0)
     }
 }
