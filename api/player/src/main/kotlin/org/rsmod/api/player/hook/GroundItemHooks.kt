@@ -3,6 +3,7 @@ package org.rsmod.api.player.hook
 import dev.openrune.types.ItemServerType
 import jakarta.inject.Inject
 import org.rsmod.game.entity.Player
+import org.rsmod.game.inv.Inventory
 import org.rsmod.game.obj.Obj
 import org.rsmod.map.CoordGrid
 
@@ -44,6 +45,14 @@ public fun interface PlayerObjTakeValidateHook {
     public fun validateTake(player: Player, obj: Obj, objType: ItemServerType): String?
 }
 
+public fun interface PlayerObjTakeRedirectHook {
+    /**
+     * @return The inventory a picked-up [obj] goes into instead of the player's own, or `null` to
+     *   leave it alone. The pickup falls back to the player's inventory when it does not fit.
+     */
+    public fun takeInto(player: Player, obj: Obj, objType: ItemServerType): Inventory?
+}
+
 public class GroundItemDropResolver
 @Inject
 constructor(private val hooks: Set<@JvmSuppressWildcards PlayerGroundItemDropHook>) {
@@ -74,4 +83,11 @@ constructor(private val hooks: Set<@JvmSuppressWildcards PlayerObjTakeValidateHo
         }
         return null
     }
+}
+
+public class PlayerObjTakeRedirector
+@Inject
+constructor(private val hooks: Set<@JvmSuppressWildcards PlayerObjTakeRedirectHook>) {
+    public fun redirect(player: Player, obj: Obj, objType: ItemServerType): Inventory? =
+        hooks.firstNotNullOfOrNull { it.takeInto(player, obj, objType) }
 }
