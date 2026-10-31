@@ -4,6 +4,7 @@ import dev.openrune.ServerCacheManager
 import jakarta.inject.Inject
 import org.rsmod.api.config.Constants
 import org.rsmod.api.invtx.invAdd
+import org.rsmod.api.player.hook.PlayerObjTakeRedirector
 import org.rsmod.api.player.hook.PlayerObjTakeValidator
 import org.rsmod.api.player.output.mes
 import org.rsmod.api.player.protect.ProtectedAccess
@@ -11,6 +12,7 @@ import org.rsmod.api.repo.obj.ObjRepository
 import org.rsmod.api.script.advanced.onDefaultOpObj3
 import org.rsmod.game.entity.Player
 import org.rsmod.game.inv.InvObj
+import org.rsmod.game.inv.Inventory
 import org.rsmod.game.obj.Obj
 import org.rsmod.objtx.TransactionResultList
 import org.rsmod.plugin.scripts.PluginScript
@@ -21,6 +23,7 @@ public class ObjTakePlugin
 constructor(
     private val repo: ObjRepository,
     private val takeValidator: PlayerObjTakeValidator,
+    private val takeRedirector: PlayerObjTakeRedirector,
 ) : PluginScript() {
     override fun ScriptContext.startup() {
         onDefaultOpObj3 { triggerTake(it.obj) }
@@ -59,7 +62,7 @@ constructor(
             mes(Constants.dm_take_taken)
             return
         }
-        val take = transaction(obj)
+        val take = transaction(obj, takeTarget(obj))
         if (take.failure) {
             mes(Constants.dm_take_invspace)
         } else {
@@ -67,8 +70,14 @@ constructor(
         }
     }
 
-    private fun Player.hasInvSpace(obj: Obj): Boolean = transaction(obj).success
+    private fun Player.hasInvSpace(obj: Obj): Boolean = transaction(obj, takeTarget(obj)).success
 
-    private fun Player.transaction(obj: Obj): TransactionResultList<InvObj> =
-        invAdd(inv, obj.type, obj.count, autoCommit = false)
+    private fun Player.takeTarget(obj: Obj): Inventory {
+        val type = ServerCacheManager.getItem(obj.type) ?: return inv
+        val redirect = takeRedirector.redirect(this, obj, type) ?: return inv
+        return if (transaction(obj, redirect).success) redirect else inv
+    }
+
+    private fun Player.transaction(obj: Obj, into: Inventory): TransactionResultList<InvObj> =
+        invAdd(into, obj.type, obj.count, autoCommit = false)
 }
