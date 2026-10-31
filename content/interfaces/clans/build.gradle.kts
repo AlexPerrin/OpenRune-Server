@@ -1,0 +1,9 @@
+plugins {
+    id("base-conventions")
+}
+
+dependencies {
+    implementation(projects.api.net)
+    implementation(projects.api.pluginCommons)
+    implementation(projects.api.scriptAdvanced)
+}

@@ -1,11 +1,20 @@
 package org.rsmod.api.net.rsprot.handlers
 
+import jakarta.inject.Inject
 import net.rsprot.protocol.game.incoming.messaging.MessagePublic
+import org.rsmod.api.net.clan.Clans
 import org.rsmod.game.entity.Player
 import org.rsmod.game.entity.player.PublicMessage
 
-class MessagePublicHandler : MessageHandler<MessagePublic> {
+private const val CLAN_CHAT_TYPE = 3
+
+class MessagePublicHandler @Inject constructor(private val clans: Clans) :
+    MessageHandler<MessagePublic> {
     override fun handle(player: Player, message: MessagePublic) {
+        if (message.type == CLAN_CHAT_TYPE) {
+            if (message.clanType == 0) clans.message(player, message.message)
+            return
+        }
         /*
          * TODO(social): Ignore list currently blocks ignored public chat from the
          *  chatbox through the client ignore list, but overhead public-chat bubbles are
@@ -15,7 +24,7 @@ class MessagePublicHandler : MessageHandler<MessagePublic> {
          * TODO(trade):
          *  - When trade is implemented, trade requests should be blocked when
          *  either side has the other ignored.
-            */
+         */
 
         val publicMessage =
             PublicMessage(

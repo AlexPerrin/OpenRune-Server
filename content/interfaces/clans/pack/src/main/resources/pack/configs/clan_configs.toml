@@ -1,0 +1,66 @@
+[[varp]]
+id = "varp.clan_state"
+scope = "Perm"
+transmit = "Never"
+
+[[varbit]]
+id = "varbit.clan_channel_left"
+varp = "varp.clan_state"
+startBit = 0
+endBit = 0
+
+[[varbit]]
+id = "varbit.clan_founded_runeday"
+varp = "varp.clan_state"
+startBit = 1
+endBit = 15
+
+[[enum]]
+isServerOnly = true
+id = "enum.clan_permission_settings"
+keyType = "INT"
+valueType = "INT"
+
+[enum.values]
+2943 = 12
+2947 = 13
+2948 = 14
+2949 = 16
+2950 = 15
+2951 = 17
+2952 = 25
+2954 = -1
+2955 = -2
+2956 = 18
+2957 = -3
+2963 = 19
+2964 = 20
+2966 = 21
+2967 = 22
+2969 = 23
+2970 = 24
+3106 = 27
+4230 = 28
+4231 = 58
+4232 = 59
+4233 = 62
+4234 = 63
+4236 = 30
+4237 = 64
+4243 = 29
+4244 = 32
+4246 = 60
+4248 = 61
+4387 = 94
+4388 = 95
+4389 = 96
+4570 = 110
+4571 = 111
+4572 = 112
+4677 = 97
+853 = 100
+6240 = 105
+6241 = 106
+6242 = 107
+6243 = 108
+6244 = 109

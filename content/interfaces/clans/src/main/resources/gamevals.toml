@@ -1,0 +1,9 @@
+[gamevals.enum]
+clan_permission_settings = 65468
+
+[gamevals.varp]
+clan_state = 65454
+
+[gamevals.varbit]
+clan_channel_left = 65396
+clan_founded_runeday = 65395
