@@ -32,6 +32,7 @@ import dev.openrune.impl.GameframeTable
 import dev.openrune.impl.Music
 import dev.openrune.map.packing.MapPackers
 import dev.openrune.pack.PluginPacks
+import dev.openrune.pack.StockClientScripts
 import dev.openrune.tables.CollectionLogCategoriesTable
 import dev.openrune.tables.DidYouKnow
 import dev.openrune.tables.GauntletRoomSlotsTable
@@ -144,6 +145,7 @@ fun buildCache(type: TaskType, force: Boolean = false) {
     val cs2Overrides = packs.cs2Overrides(
         DirectoryConstants.CS2_PATH.toFile(),
         ConstantProvider.getCurrentProviders().filterIsInstance<GameValProvider>().firstOrNull(),
+        StockClientScripts.knownIds(File(getCacheLocation()), DirectoryConstants.CS2_PATH.toFile()),
     )
 
     val packTasks = packs.buildPackTasks(tablesToPack(), cs2Overrides)
