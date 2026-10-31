@@ -87,6 +87,17 @@ class Text(Repo):
         s.assertEqual(s.row("text.py", "dupes", HEAD=head)[0], 0)
         shutil.rmtree(ev)
 
+    def test_commits_after_an_existing_prs_head(s):
+        s.write("mod/src/test/kotlin/T.kt", "x\n")
+        public = s.commit("test: already public on the PR")
+        git(s.repo, "update-ref", "refs/remotes/fork/content/x", public)
+        s.write("mod/src/main/kotlin/A.kt", "fun a() { 1 }\n")
+        head = s.commit("fix: the review finding")
+        rc, out = s.row("text.py", "commits", HEAD=head)
+        s.assertEqual(rc, 1); s.assertIn("already public", out)
+        rc, out = s.row("text.py", "commits", HEAD=head, PR="9", PUBLIC_BRANCH="content/x")
+        s.assertEqual(rc, 0, out)
+
 
 if __name__ == "__main__":
     unittest.main()

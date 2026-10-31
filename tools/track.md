@@ -84,7 +84,7 @@ Rows the contract starts from (`check:` rows run with SLUG, HEAD, T, BASE, CLONE
 - dupes | each item-moving flow's four paths tested with totals, or a reason that holds | judge: dupes
 - accuracy | each rule of accuracy.md matches in game or is a fixed difference | judge: accuracy
 - evidence | accuracy.md, pr-title.txt, pr-body.md, pr-comment.md present and non-empty | check: tools/server/text.py evidence
-- subject | commit subjects start with feat: or fix:; no Claude-Session trailer; the co-author line only | check: tools/server/text.py commits
+- subject | commit subjects (on an existing PR, those after its live head) start with feat: or fix:; no Claude-Session trailer; the co-author line only | check: tools/server/text.py commits
 - texts | template sections present; no fork PR link; pr-comment.md names HEAD | check: tools/server/text.py texts
 - gamevals | custom gameval ids unique across upstream main, the pins and open dev heads | check: tools/server/gamevals.py check
 - dupe-tests | every module whose main sources gain an item-moving call has a test source added or changed | check: tools/server/text.py dupes

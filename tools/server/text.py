@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """The server contract's script rows that read text. Exit 1 names every miss.
   text.py evidence   accuracy.md, pr-title.txt, pr-body.md, pr-comment.md present and non-empty in $EVIDENCE
-  text.py commits    every commit $BASE..$HEAD: subject feat:/fix:, no Claude-Session trailer, only a Co-Authored-By trailer
+  text.py commits    every commit $BASE..$HEAD not on an existing PR's head fork/$PUBLIC_BRANCH: subject feat:/fix:, no Claude-Session trailer, only a Co-Authored-By trailer
   text.py texts      pr-body.md has upstream's template sections (read live from origin/main), no fork PR link anywhere,
                      pr-comment.md names $HEAD
   text.py dupes      a module whose main sources gain an item-moving call has a test source added or changed ($BASE...$HEAD)
-Env: EVIDENCE, CLONE, BASE, HEAD.
+Env: EVIDENCE, CLONE, BASE, HEAD, PR, PUBLIC_BRANCH.
 """
 import os, re, subprocess, sys
 
@@ -29,7 +29,9 @@ def evidence():
 
 def commits():
     bad = []
-    for c in git("log", "--format=%H%x01%s%x01%b%x02", f"{BASE}..{HEAD}").split("\x02"):
+    # an existing PR's public head (fork/$PUBLIC_BRANCH) cannot change without a force-push: check only what follows it
+    live = [f"^fork/{os.environ['PUBLIC_BRANCH']}"] if os.environ.get("PR") and os.environ.get("PUBLIC_BRANCH") else []
+    for c in git("log", "--format=%H%x01%s%x01%b%x02", HEAD, f"^{BASE}", *live).split("\x02"):
         if not c.strip():
             continue
         sha, subject, body = (c.strip("\n") + "\x01\x01").split("\x01")[:3]
