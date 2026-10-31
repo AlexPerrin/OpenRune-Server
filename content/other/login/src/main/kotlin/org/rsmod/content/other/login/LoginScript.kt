@@ -62,6 +62,10 @@ constructor(
         sendHighPriority()
         sendLowPriority()
         VarPlayerIntMapSetter.set(this, "varbit.player_in_instance", 0)
+        // Test server: no clans; the clan tabs say "No current clan" instead of "Connecting..."
+        // (clan_sidepanel_draw / script4288). 1 is a guess.
+        VarPlayerIntMapSetter.set(this, "varbit.clan_affinitystatus", 1)
+        VarPlayerIntMapSetter.set(this, "varbit.clan_guest_affinitystatus", 1)
     }
 
     /**
