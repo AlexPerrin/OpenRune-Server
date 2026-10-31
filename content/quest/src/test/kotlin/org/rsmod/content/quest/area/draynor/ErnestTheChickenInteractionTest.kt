@@ -236,8 +236,9 @@ class ErnestTheChickenInteractionTest {
         }
 
         fun assertPending() {
-            assertEquals(1, script.quest.getQuestStage(player))
-            assertEquals(1, player.vars["varp.haunted"])
+            // Talking to Oddenstein sets stage 2 (OSRS varp haunted; Quest Helper's step key).
+            assertEquals(2, script.quest.getQuestStage(player))
+            assertEquals(2, player.vars["varp.haunted"])
             assertEquals(1, player.vars["varbit.ernesthandin_complete"])
             assertEquals(0, player.vars["varp.qp"])
             assertEquals(0, player.vars["varbit.quests_completed_count"])
