@@ -1,0 +1,35 @@
+[gamevals.dbtable]
+farming_crops = 56001
+
+[gamevals.dbrow]
+farming_crop_potato = 60124
+farming_crop_onion = 60125
+farming_crop_cabbage = 60126
+farming_crop_tomato = 60127
+farming_crop_sweetcorn = 60128
+farming_crop_strawberry = 60129
+farming_crop_watermelon = 60130
+farming_crop_snape_grass = 60131
+farming_crop_marigold = 60132
+farming_crop_rosemary = 60133
+farming_crop_nasturtium = 60134
+farming_crop_woad = 60135
+farming_crop_limpwurt = 60136
+farming_crop_white_lily = 60137
+farming_crop_guam = 60138
+farming_crop_marrentill = 60139
+farming_crop_tarromin = 60140
+farming_crop_harralander = 60141
+farming_crop_ranarr = 60142
+farming_crop_toadflax = 60143
+farming_crop_irit = 60144
+farming_crop_avantoe = 60145
+farming_crop_kwuarm = 60146
+farming_crop_snapdragon = 60147
+farming_crop_cadantine = 60148
+farming_crop_lantadyme = 60149
+farming_crop_dwarf_weed = 60150
+farming_crop_torstol = 60151
+
+[gamevals.timer]
+farming_transmit = 435
