@@ -10,6 +10,7 @@ import org.rsmod.content.quest.area.falador.knightssword.KnightsSwordQuest
 import org.rsmod.content.quest.area.lumbridge.RuneMysteriesQuest
 import org.rsmod.content.quest.area.lumbridge.idesofmilk.IdesOfMilkQuest
 import org.rsmod.content.quest.area.lumbridge.xmarksthespot.XMarksTheSpotQuest
+import org.rsmod.content.quest.area.portsarim.piratestreasure.PiratesTreasure
 import org.rsmod.content.quest.area.rimmington.WitchsPotionRatTail
 import org.rsmod.content.quest.area.varrock.daddyshome.DaddysHomeQuest
 import org.rsmod.content.quest.area.varrock.gertrudescat.GertrudesCatQuest
@@ -25,9 +26,11 @@ public class QuestModule : PluginModule() {
         bindInstance<DoricsQuest>()
         bindInstance<IdesOfMilkQuest>()
         bindInstance<KnightsSwordQuest>()
+        bindInstance<PiratesTreasure>()
         addSetBinding<SpellQuestRequirement>(PolicySpellQuestRequirement::class.java)
         addSetBinding<BookcaseSearchHook>(TouristCentreBookcases::class.java)
         addSetBinding<SpadeDigHook>(XMarksTheSpotQuest::class.java)
         addSetBinding<NpcDeathKillHook>(WitchsPotionRatTail::class.java)
+        addSetBinding<SpadeDigHook>(PiratesTreasure::class.java)
     }
 }
