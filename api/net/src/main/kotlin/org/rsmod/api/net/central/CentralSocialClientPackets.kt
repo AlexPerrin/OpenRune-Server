@@ -10,6 +10,7 @@ import net.rsprot.protocol.game.outgoing.social.FriendListLoaded
 import net.rsprot.protocol.game.outgoing.social.MessagePrivate
 import net.rsprot.protocol.game.outgoing.social.UpdateFriendList
 import net.rsprot.protocol.game.outgoing.social.UpdateIgnoreList
+import org.rsmod.api.net.friendchat.friendChatRankOf
 import org.rsmod.api.server.config.ServerConfig
 import org.rsmod.game.entity.Player
 
@@ -24,7 +25,7 @@ private fun privateMessageCounterSeed(): Int {
     return (hourOfYear * 50_000) and 0xFFFFFF
 }
 
-private fun nextPrivateMessageCounter(worldId: Int): Int {
+internal fun nextPrivateMessageCounter(worldId: Int): Int {
     while (true) {
         val current = privateMessageCounter.get()
         val next = (current + 1) and 0xFFFFFF
@@ -51,7 +52,7 @@ fun Player.writeCentralSocialSnapshot(snapshot: WorldLinkFrameSpecs.CentralSocia
                     name = friend.displayName,
                     previousName = friend.previousDisplayName,
                     worldId = friend.worldId,
-                    rank = 0,
+                    rank = friendChatRankOf(friend.displayName),
                     properties = 0,
                     notes = "",
                     worldName = "OpenRune",
@@ -63,7 +64,7 @@ fun Player.writeCentralSocialSnapshot(snapshot: WorldLinkFrameSpecs.CentralSocia
                     added = false,
                     name = friend.displayName,
                     previousName = friend.previousDisplayName,
-                    rank = 0,
+                    rank = friendChatRankOf(friend.displayName),
                     properties = 0,
                     notes = "",
                 )
@@ -103,7 +104,7 @@ fun Player.writeCentralFriendPresence(
                 name = push.friendDisplayName,
                 previousName = push.friendPreviousDisplayName,
                 worldId = push.friendWorldId,
-                rank = 0,
+                rank = friendChatRankOf(push.friendDisplayName),
                 properties = 0,
                 notes = "",
                 worldName = formatWorldName(push.friendWorldId, serverConfig),
@@ -115,7 +116,7 @@ fun Player.writeCentralFriendPresence(
                 added = false,
                 name = push.friendDisplayName,
                 previousName = push.friendPreviousDisplayName,
-                rank = 0,
+                rank = friendChatRankOf(push.friendDisplayName),
                 properties = 0,
                 notes = "",
             )
@@ -150,7 +151,7 @@ fun Player.writeCentralPrivateMessage(
     )
 }
 
-private fun formatWorldName(
+internal fun formatWorldName(
     worldId: Int,
     serverConfig: ServerConfig? = null,
 ): String {
