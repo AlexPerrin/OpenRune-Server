@@ -11,10 +11,10 @@ comment naming HEAD. Upstream's rules: CONTRIBUTING.md, `.github/pull_request_te
 ## claims
 Every id, file, test name, result, "matches the wiki" tick and "verified in game" statement is true of the exact head:
 check each against the diff, the test output and the accuracy spec. A ticked box that is not true fails the row.
-## no-deferral (v7 cause: 10 findings; a maintainer's "I'd like the cutscene too" became 23 runs)
+## no-deferral
 No Not-done list, no unticked item, no open question, nothing promised for a later PR: every reported defect is
 fixed in this PR.
-## net-change (8 findings)
+## net-change
 On an existing PR, `pr-comment.md` covers exactly the commits the push carries since the PR's live head, no more.
 ## one-change
 One quest, feature or fix; nothing unrelated; no open upstream PR for the same content; `Depends:` stated.

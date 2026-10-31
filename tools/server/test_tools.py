@@ -1,0 +1,92 @@
+"""The contract's script rows against a throwaway git repo: python3 -m unittest tools/server/test_tools.py"""
+import os, shutil, subprocess, sys, tempfile, unittest
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+
+
+def git(repo, *a, env=None):
+    return subprocess.run(["git", "-C", repo, *a], capture_output=True, text=True, env={**os.environ, **(env or {})}).stdout.strip()
+
+
+class Repo(unittest.TestCase):
+    def setUp(s):
+        s.repo = tempfile.mkdtemp()
+        git(s.repo, "init", "-q", "-b", "main")
+        git(s.repo, "config", "user.email", "t@t"); git(s.repo, "config", "user.name", "t")
+        s.write(".data/gamevals-binary/max-ids.toml", "[max_ids]\nvarp = 100\narea = 10\n")
+        s.write("content/a/gamevals.toml", "[gamevals.varp]\nquest_a = 101\n")
+        s.write(".github/pull_request_template.md", "## Summary\n## Checklist\n")
+        s.write("mod/src/main/kotlin/A.kt", "fun a() {}\n")
+        s.commit("feat: base")
+        git(s.repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+        s.base = git(s.repo, "rev-parse", "HEAD")
+        s.env = {"CLONE": s.repo, "PINS": "x", "SLUG": "s1", "BASE": s.base}
+
+    def tearDown(s):
+        shutil.rmtree(s.repo, ignore_errors=True)
+
+    def write(s, path, text):
+        p = Path(s.repo) / path
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text)
+        git(s.repo, "add", path)
+
+    def commit(s, msg):
+        git(s.repo, "commit", "-q", "-m", msg)
+        return git(s.repo, "rev-parse", "HEAD")
+
+    def run(s, script, *args, **env):
+        r = subprocess.run([sys.executable, str(HERE / script), *args], capture_output=True, text=True, env={**os.environ, **s.env, **env})
+        return r.returncode, r.stdout + r.stderr
+
+
+class Gamevals(Repo):
+    def test_clash_with_a_pin_and_assign(s):
+        s.write("content/b/gamevals.toml", "[gamevals.varp]\nquest_b = 102\n")
+        pin = s.commit("feat: pin takes 102")
+        git(s.repo, "update-ref", "refs/remotes/fork/x", pin)
+        git(s.repo, "reset", "-q", "--hard", s.base)
+        s.write("content/c/gamevals.toml", "[gamevals.varp]\nquest_c = 102\nquest_d = -1\n")
+        head = s.commit("feat: ours takes 102 too")
+        rc, out = s.run("gamevals.py", "check", head)
+        s.assertEqual(rc, 1); s.assertIn("varp.quest_c = 102 is varp.quest_b on x", out)
+        rc, out = s.run("gamevals.py", "assign", s.repo)
+        s.assertEqual(rc, 0); s.assertIn("varp.quest_d = 65535", out)
+        s.assertIn("quest_d = 65535", (Path(s.repo) / "content/c/gamevals.toml").read_text())
+
+    def test_missing_max_ids_fails_loudly(s):
+        git(s.repo, "rm", "-q", ".data/gamevals-binary/max-ids.toml")
+        head = s.commit("fix: no maxes")
+        rc, out = s.run("gamevals.py", "check", head)
+        s.assertEqual(rc, 1); s.assertIn("max-ids.toml missing", out)
+
+
+class Text(Repo):
+    def test_commits_texts_dupes_evidence(s):
+        s.write("mod/src/main/kotlin/A.kt", "fun a() { invAdd(x) }\n")
+        git(s.repo, "commit", "-q", "-m", "add a thing\n\nClaude-Session: abc\nCo-Authored-By: C <c@c>")
+        head = git(s.repo, "rev-parse", "HEAD")
+        ev = tempfile.mkdtemp()
+        rc, out = s.run("text.py", "commits", HEAD=head)
+        s.assertEqual(rc, 1); s.assertIn("not feat: or fix:", out); s.assertIn("Claude-Session trailer", out)
+        rc, out = s.run("text.py", "dupes", HEAD=head)
+        s.assertEqual(rc, 1); s.assertIn("item flow in mod/src/main/kotlin/A.kt: invAdd", out); s.assertIn("mod moves items with no test", out)
+        rc, out = s.run("text.py", "evidence", EVIDENCE=ev)
+        s.assertEqual(rc, 1); s.assertIn("accuracy.md missing", out)
+        for n, t in (("accuracy.md", "spec"), ("pr-title.txt", "feat: x"), ("pr-body.md", "## Summary\nsee AlexPerrin/OpenRune-Server#9"), ("pr-comment.md", "Updated to " + head[:9])):
+            (Path(ev) / n).write_text(t)
+        rc, out = s.run("text.py", "texts", EVIDENCE=ev, HEAD=head)
+        s.assertEqual(rc, 1); s.assertIn("lacks the template section 'Checklist'", out); s.assertIn("pr-body.md links a fork PR", out)
+        (Path(ev) / "pr-body.md").write_text("## Summary\n## Checklist\n")
+        rc, out = s.run("text.py", "texts", EVIDENCE=ev, HEAD=head)
+        s.assertEqual((rc, out.strip()), (0, "texts: ok"))
+        s.write("mod/src/test/kotlin/ATest.kt", "class ATest\n")
+        head = s.commit("fix: test the flow")
+        s.assertEqual(s.run("text.py", "dupes", HEAD=head)[0], 0)
+        shutil.rmtree(ev)
+
+
+if __name__ == "__main__":
+    unittest.main()

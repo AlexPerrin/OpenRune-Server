@@ -10,8 +10,7 @@ row, in the order of the contract → `hd verdict <slug> <head> rows.json` with 
 
 ## Rows this skill judges
 - **no-raw-data**: no game data or raw ids in Kotlin (lists, tables, timings belong in the cache or config); gameval
-  symbols; state in varbits and varps. Fixed as a rule across the whole diff, not where one instance was named
-  (v7 cause: `MailDye` fixed, `ARMOURS` next round).
+  symbols; state in varbits and varps. Fixed as a rule across the whole diff, not where one instance was named.
 - **playable**: every flow playable without a cheat on the test server; evidence (dumps, container history, chat
   history) in the evidence dir; a blocker's repro passes.
 - **style**: no added comments or KDoc, no unjustified test, nothing public for a test, no quirk entries, toggles in

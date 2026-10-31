@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""The server contract's script rows that read text. Exit 1 names every miss.
+  text.py evidence   accuracy.md, pr-title.txt, pr-body.md, pr-comment.md present and non-empty in $EVIDENCE
+  text.py commits    every commit $BASE..$HEAD: subject feat:/fix:, no Claude-Session trailer, only a Co-Authored-By trailer
+  text.py texts      pr-body.md has upstream's template sections (read live from origin/main), no fork PR link anywhere,
+                     pr-comment.md names $HEAD
+  text.py dupes      a module whose main sources gain an item-moving call has a test source added or changed ($BASE...$HEAD)
+Env: EVIDENCE, CLONE, BASE, HEAD.
+"""
+import os, re, subprocess, sys
+
+E, CLONE, BASE, HEAD = (os.environ.get(k, "") for k in ("EVIDENCE", "CLONE", "BASE", "HEAD"))
+MOVES = re.compile(r"\b(inv(Add|Del|Transfer|Move|Replace|Swap|TakeFee|Transaction|Drop|Equip|Sell)[A-Za-z]*|wornUnequip|shopBuy|invSell|objRepo\.(add|del))\b")
+FORK_LINK = re.compile(r"AlexPerrin/OpenRune-Server(#\d+|/pull/\d+)|\bfork PR #\d+", re.I)
+
+
+def git(*a):
+    return subprocess.run(["git", "-C", CLONE, *a], capture_output=True, text=True).stdout
+
+
+def text(name):
+    p = os.path.join(E, name)
+    return open(p).read() if os.path.exists(p) else ""
+
+
+def evidence():
+    return [f"{n} missing or empty in {E}" for n in ("accuracy.md", "pr-title.txt", "pr-body.md", "pr-comment.md") if not text(n).strip()]
+
+
+def commits():
+    bad = []
+    for c in git("log", "--format=%H%x01%s%x01%b%x02", f"{BASE}..{HEAD}").split("\x02"):
+        if not c.strip():
+            continue
+        sha, subject, body = (c.strip("\n") + "\x01\x01").split("\x01")[:3]
+        if not re.match(r"(feat|fix)(\(.+\))?: ", subject):
+            bad.append(f"{sha[:9]}: subject is not feat: or fix:: {subject[:60]}")
+        trailers = [l for l in body.splitlines() if re.match(r"[A-Za-z-]+: ", l) and l.split(":")[0] in ("Claude-Session", "Co-Authored-By", "Signed-off-by")]
+        if any(l.startswith("Claude-Session:") for l in trailers):
+            bad.append(f"{sha[:9]}: carries a Claude-Session trailer")
+        if any(not l.startswith("Co-Authored-By:") for l in trailers):
+            bad.append(f"{sha[:9]}: a trailer other than Co-Authored-By")
+    return bad
+
+
+def texts():
+    bad = []
+    template = git("show", "origin/main:.github/pull_request_template.md")
+    body = text("pr-body.md")
+    for h in re.findall(r"^##+ *(.+?)\s*$", template, re.M):
+        if h.lower() not in body.lower():
+            bad.append(f"pr-body.md lacks the template section '{h}'")
+    for n in ("pr-title.txt", "pr-body.md", "pr-comment.md"):
+        if FORK_LINK.search(text(n)):
+            bad.append(f"{n} links a fork PR (it renders as a red Closed on upstream)")
+    if HEAD[:9] not in text("pr-comment.md"):
+        bad.append(f"pr-comment.md does not name the head {HEAD[:9]}")
+    return bad
+
+
+def dupes():
+    flows, tested, path = {}, set(), None
+    for line in git("diff", "--unified=0", f"{BASE}...{HEAD}").splitlines():
+        if line.startswith("+++ b/"):
+            path = line[6:]
+            if "/src/test/" in path:
+                tested.add(path.split("/src/test/")[0])
+        elif line.startswith("+") and path and "/src/main/" in path and path.endswith(".kt"):
+            for m in MOVES.finditer(line):
+                flows.setdefault(path, set()).add(m.group(1))
+    bad = []
+    for p, calls in sorted(flows.items()):
+        mod = p.split("/src/main/")[0]
+        print(f"item flow in {p}: {', '.join(sorted(calls))}")
+        if mod not in tested:
+            bad.append(f"{mod} moves items with no test source added or changed (upstream AGENTS.md: a dupe test per flow)")
+    return bad
+
+
+if __name__ == "__main__":
+    bad = {"evidence": evidence, "commits": commits, "texts": texts, "dupes": dupes}[sys.argv[1]]()
+    print("\n".join(bad) or f"{sys.argv[1]}: ok")
+    sys.exit(1 if bad else 0)
