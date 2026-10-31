@@ -70,7 +70,6 @@ private const val MAX_RANKED = 400
 private const val MAX_RANKED_FREE = 200
 private const val MAX_BANS = 400
 private const val MAX_BANS_FREE = 100
-private const val KICK_NOTIFICATION = "-Attempting to kick player from chat-channel..."
 private const val BLOCKED_VARBIT = "varbit.chatchannel_blocked"
 private const val BLOCKED_BELOW_TOTAL_LEVEL = 150
 
@@ -122,6 +121,9 @@ constructor(
     public fun login(player: Player) {
         updateBlocked(player)
         player.client.write(UpdateFriendChatChannelFullV2(UpdateFriendChatChannelFullV2.LeaveUpdate))
+        channels[nameKey(player.chatName)]?.let { channel ->
+            loadSocial(player.characterId, channel) { update(channel, ChannelSettings.of(player)) }
+        }
         val last = player.attr[FRIEND_CHAT_LAST] ?: return
         player.runClientScript(JOIN_CHAT_LOGIN_SCRIPT.asRSCM(RSCMType.CLIENTSCRIPT), last)
     }
@@ -193,7 +195,6 @@ constructor(
         if (channel.bans.size < if (channel.ownerMembers) MAX_BANS else MAX_BANS_FREE) {
             channel.bans[nameKey(target.chatName)] = mapClock.cycle + KICK_BAN_CYCLES
         }
-        channel.broadcast(channel.message(player, KICK_NOTIFICATION))
         target.attr.remove(FRIEND_CHAT_LAST)
         target.mes("You have been kicked from the channel.", ChatType.FriendsChatNotification)
         leave(target, explicit = false)
@@ -218,7 +219,13 @@ constructor(
 
     public fun friendDeleted(owner: Player, friendName: String) {
         owner.attr[FRIEND_CHAT_RANKS]?.remove(nameKey(friendName))
-        changed(owner)
+        socialChanged(owner)
+    }
+
+    public fun socialChanged(owner: Player) {
+        if (owner.attr[FRIEND_CHAT_NAME] != null) {
+            changed(owner)
+        }
     }
 
     public fun changed(owner: Player) {
@@ -241,13 +248,14 @@ constructor(
         update(channel, ChannelSettings.of(owner))
     }
 
-    private fun loadSocial(characterId: Int, channel: Channel) {
+    private fun loadSocial(characterId: Int, channel: Channel, onLoaded: () -> Unit = {}) {
         db.request(
             request = { GameDbResult.Ok(central.socialSnapshot(characterId)) },
             response = { result ->
                 val sync = result.fold(onOk = { it }, onErr = { null })
                 if (sync is OpenRuneCentralWorldLink.CentralSocialSnapshotResult.Ok) {
-                    channel.pendingSocial = sync.snapshot
+                    channel.pendingSocial = Social.of(sync.snapshot)
+                    onLoaded()
                 }
             },
         )
@@ -317,12 +325,16 @@ constructor(
         db.request(
             request = { connection ->
                 val owner = onlineOwner ?: selectOwner(connection, schema, ownerName)
-                val snapshot =
-                    owner?.let {
-                        val result = central.socialSnapshot(it.characterId)
-                        (result as? OpenRuneCentralWorldLink.CentralSocialSnapshotResult.Ok)?.snapshot
+                val social =
+                    when {
+                        owner == null -> null
+                        onlineOwner == null -> selectSocial(connection, owner.characterId)
+                        else -> {
+                            val result = central.socialSnapshot(owner.characterId)
+                            (result as? OpenRuneCentralWorldLink.CentralSocialSnapshotResult.Ok)?.snapshot?.let(Social::of)
+                        }
                     }
-                GameDbResult.Ok(owner to snapshot)
+                GameDbResult.Ok(owner to social)
             },
             response = { result ->
                 val current = uid.resolve(playerList)
@@ -332,7 +344,7 @@ constructor(
                 }
                 joining.remove(current)
                 result.fold(
-                    onOk = { (owner, snapshot) -> joinLoaded(current, ownerName, owner, snapshot) },
+                    onOk = { (owner, social) -> joinLoaded(current, ownerName, owner, social) },
                     onErr = { current.mes("Unable to join the chat-channel right now.", ChatType.FriendsChatNotification) },
                 )
             },
@@ -343,7 +355,7 @@ constructor(
         player: Player,
         ownerName: String,
         owner: OwnerData?,
-        snapshot: WorldLinkFrameSpecs.CentralSocialSnapshot?,
+        social: Social?,
     ) {
         val settings = owner?.settings
         if (owner == null || settings == null) {
@@ -354,7 +366,7 @@ constructor(
         val channel =
             channels.getOrPut(key) {
                 Channel(ownerKey = key, ownerName = owner.displayName, ownerMembers = owner.members).also {
-                    snapshot?.let(it::setSocial)
+                    social?.let(it::setSocial)
                     it.apply(settings)
                 }
             }
@@ -447,6 +459,28 @@ constructor(
         return OwnerData(id, displayName, members, ChannelSettings.of(owner.second, vars))
     }
 
+    private fun selectSocial(connection: org.rsmod.api.db.DatabaseConnection, characterId: Int): Social {
+        fun names(table: String, column: String): Set<String> {
+            val sql =
+                """
+                SELECT c.display_name FROM $table s
+                JOIN account_characters c ON c.id = s.$column
+                WHERE s.owner_character_id = ?
+                """
+                    .trimIndent()
+            return connection.prepareStatement(sql).use { ps ->
+                ps.setInt(1, characterId)
+                ps.executeQuery().use { rs ->
+                    buildSet { while (rs.next()) add(nameKey(rs.getString("display_name"))) }
+                }
+            }
+        }
+        return Social(
+            names("character_friends", "friend_character_id"),
+            names("character_ignores", "ignored_character_id"),
+        )
+    }
+
     private fun Channel.removeIfEmpty() {
         if (members.isEmpty()) {
             channels.remove(ownerKey)
@@ -485,6 +519,16 @@ constructor(
                 formatWorldName(config.world, config),
             )
         receiver.client.write(UpdateFriendChatChannelSingleUser(added))
+    }
+
+    private class Social(val friends: Set<String>, val ignores: Set<String>) {
+        companion object {
+            fun of(snapshot: WorldLinkFrameSpecs.CentralSocialSnapshot): Social =
+                Social(
+                    snapshot.friends.mapTo(HashSet()) { nameKey(it.displayName) },
+                    snapshot.ignores.mapTo(HashSet()) { nameKey(it.displayName) },
+                )
+        }
     }
 
     private class OwnerData(
@@ -534,13 +578,13 @@ constructor(
         var ranks: Map<String, Int> = emptyMap()
         var friends: Set<String> = emptySet()
         var ignores: Set<String> = emptySet()
-        var pendingSocial: WorldLinkFrameSpecs.CentralSocialSnapshot? = null
+        var pendingSocial: Social? = null
         val members = LinkedHashSet<Player>()
         val bans = HashMap<String, Int>()
 
-        fun setSocial(snapshot: WorldLinkFrameSpecs.CentralSocialSnapshot) {
-            friends = snapshot.friends.mapTo(HashSet()) { nameKey(it.displayName) }
-            ignores = snapshot.ignores.mapTo(HashSet()) { nameKey(it.displayName) }
+        fun setSocial(social: Social) {
+            friends = social.friends
+            ignores = social.ignores
         }
 
         fun apply(settings: ChannelSettings) {

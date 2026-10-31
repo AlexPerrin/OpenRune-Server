@@ -45,7 +45,7 @@ constructor(
                     onOk = { socialResult ->
                         when (socialResult) {
                             CentralSocialResult.Ok -> {
-                                friendChats.changed(current)
+                                friendChats.socialChanged(current)
                                 val refreshUid = current.uid
 
                                 db.request(

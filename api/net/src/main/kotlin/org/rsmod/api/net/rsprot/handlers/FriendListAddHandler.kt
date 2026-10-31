@@ -42,7 +42,7 @@ constructor(
                 result.fold(
                     onOk = { socialResult ->
                         when (socialResult) {
-                            CentralSocialResult.Ok -> friendChats.changed(current)
+                            CentralSocialResult.Ok -> friendChats.socialChanged(current)
 
                             CentralSocialResult.Ignored -> Unit
 
