@@ -37,7 +37,7 @@ class Repo(unittest.TestCase):
         git(s.repo, "commit", "-q", "-m", msg)
         return git(s.repo, "rev-parse", "HEAD")
 
-    def run(s, script, *args, **env):
+    def row(s, script, *args, **env):
         r = subprocess.run([sys.executable, str(HERE / script), *args], capture_output=True, text=True, env={**os.environ, **s.env, **env})
         return r.returncode, r.stdout + r.stderr
 
@@ -50,16 +50,16 @@ class Gamevals(Repo):
         git(s.repo, "reset", "-q", "--hard", s.base)
         s.write("content/c/gamevals.toml", "[gamevals.varp]\nquest_c = 102\nquest_d = -1\n")
         head = s.commit("feat: ours takes 102 too")
-        rc, out = s.run("gamevals.py", "check", head)
+        rc, out = s.row("gamevals.py", "check", head)
         s.assertEqual(rc, 1); s.assertIn("varp.quest_c = 102 is varp.quest_b on x", out)
-        rc, out = s.run("gamevals.py", "assign", s.repo)
+        rc, out = s.row("gamevals.py", "assign", s.repo)
         s.assertEqual(rc, 0); s.assertIn("varp.quest_d = 65535", out)
         s.assertIn("quest_d = 65535", (Path(s.repo) / "content/c/gamevals.toml").read_text())
 
     def test_missing_max_ids_fails_loudly(s):
         git(s.repo, "rm", "-q", ".data/gamevals-binary/max-ids.toml")
         head = s.commit("fix: no maxes")
-        rc, out = s.run("gamevals.py", "check", head)
+        rc, out = s.row("gamevals.py", "check", head)
         s.assertEqual(rc, 1); s.assertIn("max-ids.toml missing", out)
 
 
@@ -69,22 +69,22 @@ class Text(Repo):
         git(s.repo, "commit", "-q", "-m", "add a thing\n\nClaude-Session: abc\nCo-Authored-By: C <c@c>")
         head = git(s.repo, "rev-parse", "HEAD")
         ev = tempfile.mkdtemp()
-        rc, out = s.run("text.py", "commits", HEAD=head)
+        rc, out = s.row("text.py", "commits", HEAD=head)
         s.assertEqual(rc, 1); s.assertIn("not feat: or fix:", out); s.assertIn("Claude-Session trailer", out)
-        rc, out = s.run("text.py", "dupes", HEAD=head)
+        rc, out = s.row("text.py", "dupes", HEAD=head)
         s.assertEqual(rc, 1); s.assertIn("item flow in mod/src/main/kotlin/A.kt: invAdd", out); s.assertIn("mod moves items with no test", out)
-        rc, out = s.run("text.py", "evidence", EVIDENCE=ev)
+        rc, out = s.row("text.py", "evidence", EVIDENCE=ev)
         s.assertEqual(rc, 1); s.assertIn("accuracy.md missing", out)
         for n, t in (("accuracy.md", "spec"), ("pr-title.txt", "feat: x"), ("pr-body.md", "## Summary\nsee AlexPerrin/OpenRune-Server#9"), ("pr-comment.md", "Updated to " + head[:9])):
             (Path(ev) / n).write_text(t)
-        rc, out = s.run("text.py", "texts", EVIDENCE=ev, HEAD=head)
+        rc, out = s.row("text.py", "texts", EVIDENCE=ev, HEAD=head)
         s.assertEqual(rc, 1); s.assertIn("lacks the template section 'Checklist'", out); s.assertIn("pr-body.md links a fork PR", out)
         (Path(ev) / "pr-body.md").write_text("## Summary\n## Checklist\n")
-        rc, out = s.run("text.py", "texts", EVIDENCE=ev, HEAD=head)
+        rc, out = s.row("text.py", "texts", EVIDENCE=ev, HEAD=head)
         s.assertEqual((rc, out.strip()), (0, "texts: ok"))
         s.write("mod/src/test/kotlin/ATest.kt", "class ATest\n")
         head = s.commit("fix: test the flow")
-        s.assertEqual(s.run("text.py", "dupes", HEAD=head)[0], 0)
+        s.assertEqual(s.row("text.py", "dupes", HEAD=head)[0], 0)
         shutil.rmtree(ev)
 
 
