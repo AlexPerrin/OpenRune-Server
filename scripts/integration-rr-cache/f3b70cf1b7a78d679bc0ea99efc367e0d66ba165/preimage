@@ -1,0 +1,184 @@
+[gamevals.synth]
+mizgog_placebeads = 1632
+mizgog_beads = 1633
+coffin_close = 53
+rg_ghost_approach = 1743
+bigghost_appear = 1595
+rg_place_skull = 1744
+rg_skeleton_awake = 1746
+destroy_object = 2381
+shade_sigh = 748
+kittens_mew = 339
+purr = 340
+cat_hiss = 335
+meeoow = 1169
+skeleton_attack = 776
+skelly_hit = 779
+skeleton_death = 777
+bigdoor_close = 45
+bigdoor_open = 46
+bookcase_open_and_close = 42
+chicken_into_human = 1564
+coffin_open = 54
+creakydoor_open = 56
+cupboard_open = 58
+deadtree_attack = 651
+digspade = 1470
+ernest_clunk = 1565
+ernest_sprinkle = 1566
+fish_swim = 2601
+iron_door_open = 71
+swan_rumble = 1790
+unlock = 2419
+poh_build_furniture = 938
+poh_remove_furniture = 2097
+poh_remove_furniture_alt = 2098
+
+locked = 2402
+pyramid_block = 1395
+throwingknife = 2707
+scythe_double = 2522
+human_hit = 513
+scream2 = 660
+godwars_godsword_special_attack = 3869
+barbarian_grunt_death = 3382
+paper_move = 1412
+tree_rustle_01 = 2073
+tree_rustle_02 = 2074
+skullball_scratchy = 1940
+ds_big_door_unlock = 2972
+explosion = 1487
+climb_wall = 2453
+grim_piano_c4 = 3696
+grim_piano_d4 = 3698
+grim_piano_e4 = 3700
+grim_piano_f4 = 3702
+grim_piano_g4 = 3704
+grim_piano_a4 = 3692
+grim_piano_b4 = 3694
+grim_piano_c5 = 3697
+grim_piano_d5 = 3699
+grim_piano_e5 = 3701
+grim_piano_f5 = 3703
+grim_piano_g5 = 3705
+grim_piano_a5 = 3693
+grim_piano_b5 = 3695
+
+splash_and_river = 1308
+roof_collapse = 1384
+big_wooden_door_open = 44
+big_wooden_door_close = 43
+watersplash = 2496
+smokepuff = 1930
+chest_open = 52
+chest_close = 51
+irondoor_locked = 72
+gobdip_dye_goblin_mail = 2392
+
+[gamevals.varp]
+restless_ghost_rising_tile = 63703
+restless_ghost_return_tile = 63704
+misthalin_return_tile = 63700
+misthalin_mirror_blocker = 63701
+misthalin_puzzle_state = 63702
+vampyre_slayer_state = 63713
+cooks_assistant_ingredients = 63705
+gertrudes_cat_state = 63711
+daddyshome_state = 64064
+waterfall_state = 64310
+sheep_shearer_state = 65472
+<<<<<<<
+=======
+pirates_treasure_state = 64083
+>>>>>>>
+
+[gamevals.varbit]
+vampyre_slayer_progress = 63720
+vampyre_asked_harlow = 63721
+restless_ghost_progress = 63702
+imp_catcher_progress = 63703
+misthalin_reflections = 63700
+misthalin_gem_row_slot = 63701
+cooks_assistant_progress = 63704
+romeo_juliet_progress = 63717
+cooks_assistant_milk = 63705
+cooks_assistant_egg = 63706
+cooks_assistant_flour = 63707
+<<<<<<<
+witchs_potion_progress = 63718
+=======
+witchs_potion_progress = 65447
+>>>>>>>
+gertrudes_cat_progress = 63711
+gertrudes_cat_kitten_crate = 63712
+gertrudes_cat_met_fluffs = 63713
+gertrudes_cat_told_sardines = 63714
+daddyshome_crate_opened = 64064
+dorics_quest_progress = 64470
+knights_sword_progress = 64430
+waterfall_progress = 64310
+waterfall_heard_of_treasure = 64311
+waterfall_met_golrie = 64312
+waterfall_pillar_runes = 64313
+sheep_shearer_progress = 65449
+sheep_shearer_saw_thing = 65448
+pirates_treasure_employed = 63722
+pirates_treasure_crate_bananas = 63723
+pirates_treasure_crate_rum = 63724
+pirates_treasure_gardener_met = 63725
+pirates_treasure_progress = 63726
+
+[gamevals.bas]
+waterfall_wading = 1
+waterfall_swimming = 2
+waterfall_drowning = 3
+waterfall_whirlpool = 4
+
+[gamevals.models]
+misthalin_gem_diamond = 32333
+misthalin_gem_onyx = 32342
+misthalin_gem_zenyte = 32349
+misthalin_gem_ruby = 2586
+misthalin_gem_sapphire = 32345
+misthalin_gem_emerald = 32334
+
+[gamevals.timer]
+restless_ghost_coffin_ghost = 123
+restless_skeleton_attack = 124
+
+[gamevals.dbtable]
+daddys_home_furniture = 65472
+daddys_home_crate = 65473
+glarial_restrictions = 65495
+waterfall_pillar_runes = 65494
+
+[gamevals.dbrow]
+daddys_home_furniture_kitchen_stool = 63420
+daddys_home_furniture_bedroom_stool = 63421
+daddys_home_furniture_chair = 63422
+daddys_home_furniture_kitchen_table = 63423
+daddys_home_furniture_bedroom_table = 63424
+daddys_home_furniture_bed = 63425
+daddys_home_furniture_carpet = 63426
+daddys_home_crate_planks = 63430
+daddys_home_crate_nails = 63431
+daddys_home_crate_steel_bars = 63432
+daddys_home_crate_oak_planks = 63433
+daddys_home_crate_cloth = 63434
+daddys_home_crate_house_tablets = 63435
+daddys_home_crate_falador_tablet = 63436
+glarial_forbidden_names = 63685
+glarial_forbidden_parts = 63684
+glarial_allowed_parts = 63679
+waterfall_rune_air = 63678
+waterfall_rune_water = 63677
+waterfall_rune_earth = 63676
+
+[gamevals.enum]
+daddys_home_hammers = 65460
+daddys_home_saws = 65461
+daddys_home_nails = 65462
+daddys_home_house_cities = 65463
+
+[gamevals.clientscript]
+poh_furniture_creation_entry_old = 7988

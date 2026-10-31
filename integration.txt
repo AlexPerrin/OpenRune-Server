@@ -1,0 +1,65 @@
+# integration = main + these branches, merged in this order by scripts/build-integration.sh.
+# One branch per line; '#' starts a comment. Recorded conflict resolutions: scripts/integration-rr-cache/.
+# Upstream fixes
+fix/06-varrock-single-juliet
+fix/07-juliet-house-stairs
+fix/69-blue-moon-inn-stairs
+fix/10-login-welcome-message
+fix/11-dense-clientscript-ids
+fix/22-music-tab-play
+fix/25-ice-mountain-music-area
+fix/31-friend-add-update
+fix/36-giant-mole-kill-count
+fix/37-kitten-growth-and-wording
+fix/54-ernest-stage-2
+fix/56-misthalin-mystery-mandy-guards
+fix/59-gertrudes-cat-fluffs
+fix/63-gertrudes-cat-shilop-line
+fix/70-missing-mesanims
+fix/71-item-config-tradeable
+fix/73-heldu-dispatch-order
+fix/74-bankside-view-op
+fix/75-coal-bag-messages
+fix/stile-approach
+fix/ground-item-despawn-times
+fix/cannon-drop-tests
+# Content
+content/dragon-specials
+content/reconnect-login
+content/goblin-diplomacy-unstacked
+content/goblin-diplomacy
+content/cannon
+content/witchs-potion
+content/genie
+feat/hunter
+fin/vampyre-slayer
+content/pirates-treasure
+fin/farming
+fin/fairy-rings
+fin/jewellery
+fin/diaries
+fin/grand-exchange
+content/looting-bag
+content/fletching
+fin/quest-test-fixture
+local/quest-test-fixture
+local/romeo-juliet
+acc/cannon
+dev/genie-review-355
+dev/cannon-review-354
+dev/goblin-diplomacy-review-367
+dev/genie-review-355-fbftoua
+dev/goblin-diplomacy-review-367-fftgsrq
+dev/server-friends-chat-clan-channels
+dev/hunter-feat-pr
+# Local only (never upstream)
+local/android
+local/local-auth
+local/test-commands
+local/world-settings
+local/skip-cs2-packs
+local/op-overrides
+local/treasure-trails
+local/integration-tools
+local/spotless-241
+dev/server-world-entities
