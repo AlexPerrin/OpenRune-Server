@@ -37,6 +37,7 @@ dependencies {
     implementation(projects.api.playerOutput)
     implementation(projects.api.realm)
     implementation(projects.api.registry)
+    implementation(projects.api.repo)
     implementation(projects.api.script)
     implementation(projects.api.serverConfig)
     implementation(projects.api.totp)
