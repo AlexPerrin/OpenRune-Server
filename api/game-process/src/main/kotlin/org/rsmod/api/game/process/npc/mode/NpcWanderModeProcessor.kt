@@ -3,6 +3,7 @@ package org.rsmod.api.game.process.npc.mode
 import jakarta.inject.Inject
 import org.rsmod.api.random.CoreRandom
 import org.rsmod.api.random.GameRandom
+import org.rsmod.game.debug.TestFlags
 import org.rsmod.game.entity.Npc
 import org.rsmod.routefinder.collision.CollisionFlagMap
 
@@ -13,6 +14,9 @@ constructor(@CoreRandom private val random: GameRandom, private val collision: C
         get() = wanderIdleCycles >= RESPAWN_IDLE_REQUIREMENT
 
     public fun process(npc: Npc) {
+        if (TestFlags.npcsFrozen) {
+            return
+        }
         val wanderRange = npc.wanderRange
         if (wanderRange > 0) {
             npc.updateIdleCycles()
