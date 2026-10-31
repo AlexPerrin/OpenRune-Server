@@ -13,6 +13,9 @@ import net.rsprot.protocol.game.incoming.events.EventKeyboard
 import net.rsprot.protocol.game.incoming.events.EventMouseClickV1
 import net.rsprot.protocol.game.incoming.events.EventMouseClickV2
 import net.rsprot.protocol.game.incoming.events.EventMouseScroll
+import net.rsprot.protocol.game.incoming.friendchat.FriendChatJoinLeave
+import net.rsprot.protocol.game.incoming.friendchat.FriendChatKick
+import net.rsprot.protocol.game.incoming.friendchat.FriendChatSetRank
 import net.rsprot.protocol.game.incoming.locs.OpLoc6
 import net.rsprot.protocol.game.incoming.locs.OpLocT
 import net.rsprot.protocol.game.incoming.locs.OpLocV2
@@ -49,6 +52,9 @@ import net.rsprot.protocol.message.codec.incoming.provider.DefaultGameMessageCon
 import org.rsmod.api.net.rsprot.handlers.ClickWorldMapHandler
 import org.rsmod.api.net.rsprot.handlers.ClientCheatHandler
 import org.rsmod.api.net.rsprot.handlers.CloseModalHandler
+import org.rsmod.api.net.rsprot.handlers.FriendChatJoinLeaveHandler
+import org.rsmod.api.net.rsprot.handlers.FriendChatKickHandler
+import org.rsmod.api.net.rsprot.handlers.FriendChatSetRankHandler
 import org.rsmod.api.net.rsprot.handlers.FriendListAddHandler
 import org.rsmod.api.net.rsprot.handlers.FriendListDeleteHandler
 import org.rsmod.api.net.rsprot.handlers.IdleHandler
@@ -111,6 +117,9 @@ constructor(
     private val ignoreListAdd: IgnoreListAddHandler,
     private val ignoreListDelete: IgnoreListDeleteHandler,
     private val setChatFilterSettings: SetChatFilterSettingsHandler,
+    private val friendChatJoinLeave: FriendChatJoinLeaveHandler,
+    private val friendChatKick: FriendChatKickHandler,
+    private val friendChatSetRank: FriendChatSetRankHandler,
     private val if1Button: If1ButtonHandler,
     private val if3Button: If3ButtonHandler,
     private val closeModal: CloseModalHandler,
@@ -152,6 +161,9 @@ constructor(
         builder.addListener(IgnoreListAdd::class.java, ignoreListAdd)
         builder.addListener(IgnoreListDel::class.java, ignoreListDelete)
         builder.addListener(SetChatFilterSettings::class.java, setChatFilterSettings)
+        builder.addListener(FriendChatJoinLeave::class.java, friendChatJoinLeave)
+        builder.addListener(FriendChatKick::class.java, friendChatKick)
+        builder.addListener(FriendChatSetRank::class.java, friendChatSetRank)
         builder.addListener(If1Button::class.java, if1Button)
         builder.addListener(If3Button::class.java, if3Button)
         builder.addListener(CloseModal::class.java, closeModal)

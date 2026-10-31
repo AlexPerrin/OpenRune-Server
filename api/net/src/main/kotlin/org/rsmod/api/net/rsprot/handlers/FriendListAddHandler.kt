@@ -8,6 +8,7 @@ import org.rsmod.api.net.central.CentralSocialResult
 import org.rsmod.api.net.central.CentralSocialService
 import org.rsmod.api.net.central.OpenRuneCentralWorldLink
 import org.rsmod.api.net.central.writeCentralAddedFriend
+import org.rsmod.api.net.friendchat.FriendChats
 import org.rsmod.api.social.writeSocialMessage
 import org.rsmod.game.entity.Player
 import org.rsmod.game.entity.PlayerList
@@ -18,6 +19,7 @@ constructor(
     private val playerList: PlayerList,
     private val db: GameDbManager,
     private val social: CentralSocialService,
+    private val friendChats: FriendChats,
 ) : MessageHandler<FriendListAdd> {
     override fun handle(player: Player, message: FriendListAdd) {
         val uid = player.uid
@@ -42,7 +44,10 @@ constructor(
                 result.fold(
                     onOk = { socialResult ->
                         when (socialResult) {
-                            CentralSocialResult.Ok -> refreshAddedFriend(current, requestedName)
+                            CentralSocialResult.Ok -> {
+                                refreshAddedFriend(current, requestedName)
+                                friendChats.changed(current)
+                            }
 
                             CentralSocialResult.Ignored -> Unit
 
