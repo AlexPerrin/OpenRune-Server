@@ -88,4 +88,4 @@ Rows the contract starts from (`check:` rows run with SLUG, HEAD, T, BASE, CLONE
 - texts | template sections present; no fork PR link; pr-comment.md names HEAD | check: tools/server/text.py texts
 - gamevals | custom gameval ids unique across upstream main, the pins and open dev heads | check: tools/server/gamevals.py check
 - dupe-tests | every module whose main sources gain an item-moving call has a test source added or changed | check: tools/server/text.py dupes
-- ci | fork CI and Formatting green on gate/<slug> at T | check: tools/track.sh gate-ci
+- ci | fork CI and Formatting green on gate/<slug> at T | gate: tools/track.sh gate-ci

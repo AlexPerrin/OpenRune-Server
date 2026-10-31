@@ -29,6 +29,7 @@ port() { echo $(( 20000 + 16#$(printf %s "$slug" | sha1sum | cut -c1-3) * 2 + $1
 
 tree() {  # TCOMMIT and T: the pass gives them; a dev's build snapshots the working copy and asks hd
   if [ -n "$arg" ]; then tc=$arg; T=${T:-$(git -C "$repo" rev-parse "$tc^{tree}")}; return; fi
+  [ -d "$dev" ] || git -C "$repo" worktree add -q "$dev" -B "dev/$slug" "$(git -C "$repo" rev-parse -q --verify "fork/dev/$slug" || echo origin/main)"
   idx=$(git -C "$dev" rev-parse --git-path snapshot-index); rm -f "$idx"
   GIT_INDEX_FILE=$idx git -C "$dev" add -A . && snap=$(git -C "$dev" commit-tree "$(GIT_INDEX_FILE=$idx git -C "$dev" write-tree)" -p HEAD -m snapshot)
   read -r tc T < <(HD_ROOT=$root python3 "$root/hd.py" tree "$slug" "$snap")
