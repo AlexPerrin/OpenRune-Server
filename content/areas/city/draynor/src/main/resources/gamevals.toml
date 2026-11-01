@@ -16,6 +16,10 @@ diango_holiday_items_5 = 63614
 diango_holiday_items_6 = 63615
 diango_holiday_items_7 = 63616
 diango_holiday_items_8 = 63617
+ernest_fountain = 65469
 
 [gamevals.timer]
 draynor_crypt_candles = 400
+
+[gamevals.varbit]
+ernest_piranhas_dead = 65394

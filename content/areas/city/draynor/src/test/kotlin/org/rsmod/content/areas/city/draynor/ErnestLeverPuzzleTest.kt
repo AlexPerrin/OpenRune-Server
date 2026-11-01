@@ -7,50 +7,43 @@ import org.rsmod.content.areas.city.draynor.ErnestLeverPuzzle.LeverState
 
 class ErnestLeverPuzzleTest {
     @Test
-    fun `all levers up leave the puzzle doors closed`() {
-        assertEquals(emptySet<String>(), openDoors(LeverState(false, false, false, false, false, false)))
+    fun `every door follows the wiki lever table in all lever states`() {
+        for (bits in 0 until 64) {
+            val down = BooleanArray(6) { bits shr it and 1 == 1 }
+            val state = LeverState(down[0], down[1], down[2], down[3], down[4], down[5])
+            for ((door, rule) in Rules) {
+                val (table, actual) = WikiTable.getValue(door) to rule(state)
+                val expected = table.indices.all { table[it] == 'x' || (table[it] == 'D') == down[it] }
+                assertEquals(expected, actual, "door $door with levers down ${down.toList()}")
+            }
+        }
     }
 
-    @Test
-    fun `opening the first rooms and raising A and B preserves the D passages`() {
-        val firstRooms = LeverState(true, true, false, false, false, false)
-        assertEquals(setOf("4-5", "4-7"), openDoors(firstRooms))
+    private companion object {
+        private val WikiTable =
+            mapOf(
+                "4to7" to "DDUxUU",
+                "4to5" to "DxUxUU",
+                "5to8" to "xxxDUx",
+                "5to6" to "xxxDUx",
+                "3to6" to "xUxDxU",
+                "2to3" to "xUxDxD",
+                "1to2" to "UUxxDD",
+                "2to5" to "xxxDUD",
+                "8to9" to "xxDDxD",
+            )
 
-        val withD = firstRooms.copy(d = true)
-        assertEquals(setOf("4-5", "4-7", "5-6", "5-8"), openDoors(withD))
-        assertEquals(setOf("3-6", "5-6", "5-8"), openDoors(withD.copy(a = false, b = false)))
+        private val Rules: Map<String, (LeverState) -> Boolean> =
+            mapOf(
+                "1to2" to Doors::oneToTwo,
+                "2to3" to Doors::twoToThree,
+                "2to5" to Doors::twoToFive,
+                "3to6" to Doors::threeToSix,
+                "4to5" to Doors::fourToFive,
+                "4to7" to Doors::fourToSeven,
+                "5to6" to Doors::fiveToSix,
+                "5to8" to Doors::fiveToEight,
+                "8to9" to Doors::eightToNine,
+            )
     }
-
-    @Test
-    fun `E and F redirect the northern passages before C opens the oil can route`() {
-        val withD = LeverState(false, false, false, true, false, false)
-        assertEquals(setOf("3-6"), openDoors(withD.copy(e = true)))
-
-        val withEF = withD.copy(e = true, f = true)
-        assertEquals(setOf("1-2", "2-3"), openDoors(withEF))
-        assertEquals(setOf("1-2", "2-3", "8-9"), openDoors(withEF.copy(c = true)))
-        assertEquals(
-            setOf("2-3", "2-5", "5-8", "8-9"),
-            openDoors(withEF.copy(c = true, e = false)),
-        )
-    }
-
-    @Test
-    fun `raising F closes the oil can door and restores the southern crossing`() {
-        val oilCanRoute = LeverState(false, false, true, true, false, true)
-        assertEquals(setOf("3-6", "5-6", "5-8"), openDoors(oilCanRoute.copy(f = false)))
-    }
-
-    private fun openDoors(state: LeverState): Set<String> =
-        mapOf(
-            "1-2" to Doors.oneToTwo(state),
-            "2-3" to Doors.twoToThree(state),
-            "2-5" to Doors.twoToFive(state),
-            "3-6" to Doors.threeToSix(state),
-            "4-5" to Doors.fourToFive(state),
-            "4-7" to Doors.fourToSeven(state),
-            "5-6" to Doors.fiveToSix(state),
-            "5-8" to Doors.fiveToEight(state),
-            "8-9" to Doors.eightToNine(state),
-        ).filterValues { it }.keys
 }

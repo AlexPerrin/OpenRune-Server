@@ -61,6 +61,8 @@ class DraynorManorStairs : PluginScript() {
         anim(ClimbAnim)
         delay(1)
         telejump(ManorGroundCoord)
+        vars["varp.ernestlever"] = 0
+        vars["varp.ernestdoors"] = 0
         mes("You climb up the ladder.")
     }
 

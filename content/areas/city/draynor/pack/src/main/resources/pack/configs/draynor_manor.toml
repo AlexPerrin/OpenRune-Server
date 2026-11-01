@@ -1,0 +1,10 @@
+[[varp]]
+id = "varp.ernest_fountain"
+scope = "Perm"
+transmit = "Never"
+
+[[varbit]]
+id = "varbit.ernest_piranhas_dead"
+varp = "varp.ernest_fountain"
+startBit = 0
+endBit = 0

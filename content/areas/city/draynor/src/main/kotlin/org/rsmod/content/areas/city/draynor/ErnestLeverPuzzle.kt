@@ -123,19 +123,19 @@ class ErnestLeverPuzzle @Inject constructor(private val locRepo: LocRepository) 
     }
 
     internal object Doors {
-        fun oneToTwo(s: LeverState) = s.d && s.e && s.f
+        fun oneToTwo(s: LeverState) = !s.a && !s.b && s.e && s.f
 
-        fun twoToThree(s: LeverState) = s.d && s.f
+        fun twoToThree(s: LeverState) = !s.b && s.d && s.f
 
-        fun twoToFive(s: LeverState) = s.d && s.f && !s.e
+        fun twoToFive(s: LeverState) = s.d && !s.e && s.f
 
-        fun threeToSix(s: LeverState) = s.d && !s.b && !s.f
+        fun threeToSix(s: LeverState) = !s.b && s.d && !s.f
 
-        fun fourToFive(s: LeverState) = s.a && !s.c
+        fun fourToFive(s: LeverState) = s.a && !s.c && !s.e && !s.f
 
-        fun fourToSeven(s: LeverState) = s.a && s.b && !s.c
+        fun fourToSeven(s: LeverState) = s.a && s.b && !s.c && !s.e && !s.f
 
-        fun fiveToSix(s: LeverState) = s.d && !s.e && !s.f
+        fun fiveToSix(s: LeverState) = s.d && !s.e
 
         fun fiveToEight(s: LeverState) = s.d && !s.e
 

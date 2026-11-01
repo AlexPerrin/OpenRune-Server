@@ -1,7 +1,7 @@
 package org.rsmod.content.areas.city.draynor
 
 import jakarta.inject.Inject
-import kotlin.math.abs
+import org.rsmod.api.player.hook.TeleportType
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.repo.loc.LocRepository
 import org.rsmod.api.script.onOpLoc1
@@ -16,7 +16,7 @@ class DraynorManorDoors @Inject constructor(private val locRepo: LocRepository) 
 
     override fun ScriptContext.startup() {
         for (leaf in FrontLeaves) {
-            onOpLoc1(leaf.closed) { enterFront(it.loc) }
+            onOpLoc1(leaf) { enterFront(it.loc) }
         }
         onOpLoc1(BackDoor) { useBackDoor(it.loc) }
     }
@@ -26,19 +26,10 @@ class DraynorManorDoors @Inject constructor(private val locRepo: LocRepository) 
             mes("The doors won't open.")
             return
         }
-
-        val level = door.coords.level
-        val leafX = FrontLeaves.minBy { abs(it.tile.x - player.coords.x) }.tile.x
-        val route = listOf(CoordGrid(leafX, FrontDoorZ, level), CoordGrid(leafX, FrontDoorZ + 1, level))
-        val openTicks = crossingOpenTicks(crossingTiles(route))
-
-        for (leaf in FrontLeaves) {
-            openLeaf(leaf.tile, leaf.inactive, leaf.inactiveAngle, inwardZ = 1, openTicks = openTicks)
-        }
+        arriveDelay()
         soundSynth(FrontOpenSound)
-
-        crossDoorway(route)
-
+        teleport(CoordGrid(door.coords.x, FrontDoorZ + 1, door.coords.level), TeleportType.Exempt)
+        delay(1)
         mes("The doors slam shut behind you.")
         soundSynth(FrontCloseSound)
     }
@@ -76,13 +67,6 @@ class DraynorManorDoors @Inject constructor(private val locRepo: LocRepository) 
         )
     }
 
-    private class Leaf(
-        val tile: CoordGrid,
-        val closed: String,
-        val inactive: String,
-        val inactiveAngle: LocAngle,
-    )
-
     private companion object {
 
         private const val BackDoor = "loc.hauntedbackdoor"
@@ -94,20 +78,6 @@ class DraynorManorDoors @Inject constructor(private val locRepo: LocRepository) 
 
         private const val FrontDoorZ = 3353
 
-        private val FrontLeaves =
-            listOf(
-                Leaf(
-                    CoordGrid(3108, FrontDoorZ, 0),
-                    "loc.haunteddoorl",
-                    "loc.haunteddoorl_inactive",
-                    LocAngle.West,
-                ),
-                Leaf(
-                    CoordGrid(3109, FrontDoorZ, 0),
-                    "loc.haunteddoorr",
-                    "loc.haunteddoorr_inactive",
-                    LocAngle.East,
-                ),
-            )
+        private val FrontLeaves = listOf("loc.haunteddoorl", "loc.haunteddoorr")
     }
 }
