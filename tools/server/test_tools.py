@@ -607,12 +607,52 @@ class Snapshot(Repo):
 
 class GateCi(Repo):
     WF = "jobs:\n  b:\n    steps:\n      - uses: actions/checkout@v7\n      - name: Set up Gradle\n        uses: gradle/actions/setup-gradle@v6\n      - run: ./gradlew test\n"
+    RUNS = staticmethod(lambda st: f'HTTP/2.0 200 OK\nEtag: W/"{st or "running"}"\n\n' + json.dumps({"workflow_runs": [{"name": w, "status": "completed" if st else "in_progress", "conclusion": st or None} for w in ("CI", "Formatting")]}))
+    GREEN = [RUNS("success")]
+
+    @staticmethod
+    def fake_gh(bin, answers):  # `gh api` prints answers[n] at its n-th call (the last repeats), each call's args in bin/calls; sleep is free
+        for i, a in enumerate(answers): (bin / f"a{i}").write_text(a)
+        (bin / "gh").write_text(f'#!/bin/sh\nd=$(dirname "$0"); echo "$*" >> "$d/calls"; [ "$1" = api ] || exit 0\n'
+                                f'n=$(grep -c "^api" "$d/calls"); [ $n -gt {len(answers)} ] && n={len(answers)}; cat "$d/a$((n-1))"; case $(head -1 "$d/a$((n-1))") in *" 200 "*) ;; *) exit 1 ;; esac\n')
+        (bin / "sleep").write_text('#!/bin/sh\necho "$1" >> "$(dirname "$0")/sleeps"\n')
+        for f in ("gh", "sleep"): (bin / f).chmod(0o755)
+
+    def gate(s, answers):  # gate-ci of s1 against a fake GitHub: (result, gh calls, sleeps)
+        for f in ("ci", "format"): s.write(f".github/workflows/{f}.yml", s.WF)
+        t = s.commit("ci")
+        fork = tempfile.mkdtemp(); git(fork, "init", "-q", "--bare"); git(s.repo, "remote", "add", "fork", fork)
+        bin = Path(tempfile.mkdtemp()); s.fake_gh(bin, answers)
+        root = tempfile.mkdtemp(); change(root, "s1")
+        r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "gate-ci"], capture_output=True, text=True,
+                           env={**os.environ, **s.env, "HD_ROOT": root, "TCOMMIT": t, "PATH": f"{bin}:{os.environ['PATH']}"})
+        out = [(bin / f).read_text().splitlines() if (bin / f).exists() else [] for f in ("calls", "sleeps")]
+        for d in (fork, bin, root): shutil.rmtree(d)
+        return r, *out
+
+    def test_status_is_one_conditional_read_free_while_unchanged(s):  # 30 s polls of gh run list per workflow per gate drained the 5000/h quota
+        r, calls, _ = s.gate([s.RUNS(None), "HTTP/2.0 304 Not Modified\n\n", "HTTP/2.0 304 Not Modified\n\n", s.RUNS("success")])
+        s.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        api = [c for c in calls if c.startswith("api")]
+        s.assertEqual(len(api), 4); s.assertTrue(all("actions/runs?branch=gate/s1&head_sha=" in c for c in api))
+        s.assertNotIn("If-None-Match", api[0]); s.assertTrue(all('If-None-Match: W/"running"' in c for c in api[1:]), api)  # a 304 keeps the ETag
+        s.assertFalse([c for c in calls if c.startswith(("run list", "workflow run"))])  # runs were listed: nothing dispatched
+
+    def test_a_quota_refusal_holds_the_row_until_githubs_reset(s):  # genie-355-bank-lamp's gate failed 'HTTP 403: API rate limit exceeded'
+        r, calls, sleeps = s.gate(['HTTP/2.0 403 Forbidden\nX-Ratelimit-Remaining: 0\nX-Ratelimit-Reset: 9999999999\n\n{"message":"API rate limit exceeded"}', s.RUNS("success")])
+        s.assertEqual(r.returncode, 0, r.stdout + r.stderr); s.assertIn("held until its reset", r.stdout)
+        s.assertGreater(int(sleeps[0]), 10 ** 9)
+
+    def test_a_failed_run_fails_the_row_and_no_run_dispatches_each_workflow_once(s):
+        r, calls, _ = s.gate(['HTTP/2.0 200 OK\nEtag: "0"\n\n{"workflow_runs": []}', 'HTTP/2.0 304 Not Modified\n\n', s.RUNS("failure")])
+        s.assertEqual(r.returncode, 1); s.assertIn("CI failure/completed", r.stdout)
+        s.assertEqual(sorted(c.split()[2] for c in calls if c.startswith("workflow run")), ["CI", "Formatting"])
 
     def test_a_row_without_a_slug_pushes_gate_of_the_env_slug(s):  # its CI moves the runner's ephemeral ports above 43594 before gradle: run 41312919759's boot bind failed
         for f in ("ci", "format"): s.write(f".github/workflows/{f}.yml", s.WF)
         t = s.commit("ci")
         fork = tempfile.mkdtemp(); git(fork, "init", "-q", "--bare"); git(s.repo, "remote", "add", "fork", fork)
-        bin = Path(tempfile.mkdtemp()); (bin / "gh").write_text("#!/bin/sh\necho success/completed\n"); (bin / "gh").chmod(0o755)
+        bin = Path(tempfile.mkdtemp()); s.fake_gh(bin, s.GREEN)
         root = tempfile.mkdtemp(); change(root, "s1")
         r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "gate-ci"], capture_output=True, text=True,
                            env={**os.environ, **s.env, "HD_ROOT": root, "TCOMMIT": t, "PATH": f"{bin}:{os.environ['PATH']}"})
@@ -631,7 +671,7 @@ class GateCi(Repo):
         central = tempfile.mkdtemp(); git(central, "init", "-q"); (Path(central) / "settings.gradle.kts").write_text("// central\n")
         git(central, "add", "."); git(central, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "c"); c = git(central, "rev-parse", "HEAD")
         fork = tempfile.mkdtemp(); git(fork, "init", "-q", "--bare"); git(s.repo, "remote", "add", "fork", fork)
-        bin = Path(tempfile.mkdtemp()); (bin / "gh").write_text("#!/bin/sh\necho success/completed\n"); (bin / "gh").chmod(0o755)
+        bin = Path(tempfile.mkdtemp()); s.fake_gh(bin, s.GREEN)
         root = tempfile.mkdtemp(); change(root, "s1")
         r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "gate-ci"], capture_output=True, text=True,
                            env={**os.environ, **s.env, "HD_ROOT": root, "TCOMMIT": t, "CENTRAL": f"{central}:{c}", "PATH": f"{bin}:{os.environ['PATH']}"})
@@ -651,7 +691,7 @@ class GateCi(Repo):
         for f in ("ci", "format"): s.write(f".github/workflows/{f}.yml", s.WF)
         t = s.commit("ci")
         fork = tempfile.mkdtemp(); git(fork, "init", "-q", "--bare"); git(s.repo, "remote", "add", "fork", fork)
-        bin = Path(tempfile.mkdtemp()); (bin / "gh").write_text("#!/bin/sh\necho success/completed\n"); (bin / "gh").chmod(0o755)
+        bin = Path(tempfile.mkdtemp()); s.fake_gh(bin, s.GREEN)
         root = tempfile.mkdtemp(); change(root, "s1"); change(root, "s2")
         gd = Path(s.repo) / ".git"; (gd / "gate-index.lock").write_text("")  # what the old shared index left for a concurrent gate
         ps = [subprocess.Popen(["bash", str(HERE.parent / "track.sh"), "gate-ci", k], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,

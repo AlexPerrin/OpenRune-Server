@@ -10,7 +10,8 @@
 #   spotless          spotlessCheck alone on those modules at TCOMMIT (a contract row; no TCOMMIT: the working copy's T), no build;
 #                     log evidence/<slug>/spotless.log, result state/<slug>/spotless.json
 #   gate TCOMMIT      every check: and gate: row of the contract from the build copy (`hd rows`)
-#   gate-ci           fork CI and Formatting green on gate/<slug> (blocks until both conclude) at a child of TCOMMIT whose
+#   gate-ci           fork CI and Formatting green on gate/<slug> (blocks until both conclude: one conditional read of the
+#                     sha's runs, free while unchanged; a GitHub quota refusal holds until its reset) at a child of TCOMMIT whose
 #                     workflows first move the runner's ephemeral ports above the game port 43594 (an outgoing socket on it
 #                     fails the boot's bind), and with CENTRAL build that Central in, as build does (the change's head unchanged)
 #   tree              prints TCOMMIT and T (a dev: the working copy snapshotted)
@@ -127,16 +128,42 @@ gate_sha() {  # a child of TCOMMIT whose workflows move the ephemeral ports off 
   done
   git -C "$repo" commit-tree "$(GIT_INDEX_FILE=$idx git -C "$repo" write-tree)" -p "$TCOMMIT" -m "gate: $TCOMMIT${CENTRAL:+ with Central ${ccommit:-}}"
 }
-gate_ci() {  # pushes T (gate_sha) to gate/<slug>; a run of each workflow at that sha concludes green, or the row fails
+gate_ci() {  # pushes T (gate_sha) to gate/<slug>; the newest run of each workflow at that sha concludes green, or the row fails
   sha=$(gate_sha); git -C "$repo" push -q --force fork "$sha:refs/heads/gate/$slug"
-  for wf in CI Formatting; do
-    while :; do
-      st=$(gh run list -R "$(git -C "$repo" remote get-url fork | sed -E 's#.*github.com[:/]##; s#\.git$##')" --branch "gate/$slug" --limit 20 \
-             --json headSha,conclusion,status,workflowName -q ".[] | select(.headSha==\"$sha\" and .workflowName==\"$wf\") | (.conclusion // \"\") + \"/\" + .status" | head -1)
-      case $st in success/*) break ;; "") gh workflow run "$wf" -R "$(git -C "$repo" remote get-url fork | sed -E 's#.*github.com[:/]##; s#\.git$##')" --ref "gate/$slug"; sleep 30 ;;
-        */completed) echo "$wf $st on gate/$slug at $sha (T $TCOMMIT)"; return 1 ;; *) sleep 30 ;; esac
+  R=$(git -C "$repo" remote get-url fork | sed -E 's#.*github.com[:/]##; s#\.git$##')
+  q="repos/$R/actions/runs?branch=gate/$slug&head_sha=$sha&per_page=100" etag= runs= ran=
+  while :; do
+    read_runs || return 1; ok=0
+    for wf in CI Formatting; do
+      st=$(grep -m1 "^$wf " <<< "$runs" | cut -d' ' -f2 || true)   # newest first
+      case $st in success/*) ok=$((ok + 1)) ;; */completed) echo "$wf $st on gate/$slug at $sha (T $TCOMMIT)"; return 1 ;;
+        "") case " $ran " in *" $wf "*) ;; *) if gh workflow run "$wf" -R "$R" --ref "gate/$slug"; then ran="$ran $wf"; fi ;; esac ;; esac
     done
+    [ $ok = 2 ] && break
+    sleep 30   # the next read is conditional: while no run changes GitHub answers 304, which costs no quota
   done; echo "CI and Formatting green at $sha (T $TCOMMIT)"
+}
+read_runs() {  # $runs: "<workflow> <conclusion>/<status>" of each run at sha, newest first, read with If-None-Match the last ETag (one read
+  # for both workflows; a 304 leaves $runs and costs no quota). A quota refusal holds the row until GitHub's reset, never fails it.
+  local code tag reset body s
+  while :; do
+    { read -r code tag reset; body=$(cat); } < <(gh api -i ${etag:+-H "If-None-Match: $etag"} "$q" 2>/dev/null | python3 -c '
+import json, re, sys, time
+h, _, b = sys.stdin.read().replace("\r\n", "\n").partition("\n\n"); l = h.splitlines()
+m = re.match(r"HTTP/\S+ (\d{3})", l[0] if l else ""); code = m.group(1) if m else "000"
+k = {a.strip().lower(): v.strip() for a, _, v in (x.partition(":") for x in l[1:])}
+if code in ("403", "429") and (k.get("x-ratelimit-remaining") == "0" or "rate limit" in b.lower()):  # GitHub states its reset: retry-after, else x-ratelimit-reset, else its documented minute
+    print("quota -", int(time.time()) + int(k["retry-after"]) if k.get("retry-after", "").isdigit() else k.get("x-ratelimit-reset") or int(time.time()) + 60)
+else:
+    print(code, k.get("etag", "-"), 0)
+    if code == "200":
+        for r in json.loads(b)["workflow_runs"]: print(r["name"].replace(" ", "_"), (r["conclusion"] or "") + "/" + r["status"])
+')
+    case $code in 200) etag=$tag runs=$body; return ;; 304) return ;;
+      quota) echo "GitHub refused $q on quota: held until its reset $(date -ud "@$reset" +%TZ)"; s=$((reset - $(date +%s))); if [ $s -gt 0 ]; then sleep $s; fi ;;
+      ""|000|5??) sleep 30 ;;   # GitHub did not answer: read again
+      *) echo "$q: HTTP $code"; return 1 ;; esac
+  done
 }
 
 case $verb in build|gate|gate-ci) "${verb//-/_}" ;; test) arg= tests "${@:3}" ;; spotless) arg=${TCOMMIT:-} spotless ;;
