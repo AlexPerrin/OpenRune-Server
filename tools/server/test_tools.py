@@ -285,7 +285,7 @@ class DesktopInstance(unittest.TestCase):
 
     def test_up_records_each_desktop_before_its_login(s):  # a failed login aborts up under set -e; restart and the tools read up.json
         up = (HERE.parent / "track.sh").read_text().split("\nup() {")[1].split("\n}")[0]
-        s.assertLess(up.index('> "$state/up.json"'), up.index('login "$dt"'))
+        s.assertLess(up.index('| atomic "$state/up.json"'), up.index('login "$dt"'))
         s.assertLess(up.index("down >/dev/null"), up.index("desktop_start"))
 
 
@@ -466,7 +466,7 @@ mkdir -p {copy}/mod/build/test-results/test; echo '<testsuite name="ATest" tests
         fn = lambda name: f"{name}() {{" + src.split(f"\n{name}() {{")[1].split("\n}")[0] + "\n}"
         line = lambda pre: next(l for l in src.splitlines() if l.startswith(pre))
         script = "\n".join(["set -euo pipefail", f"slug=s1; repo={s.repo}; copy={copy}; state={root}/st; root={root}; T=t1; tc={tc}",
-                            line("record()"), line("projects()"), line("projdir()"), "build() { :; }", fn("central"), fn("tests"), "tests"])
+                            line("atomic()"), line("record()"), line("projects()"), line("projdir()"), "build() { :; }", fn("central"), fn("tests"), "tests"])
         r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={**os.environ, "EVIDENCE": "", "PATH": f"{root}/bin:{os.environ['PATH']}"})
         s.assertEqual(r.returncode, 0, r.stderr + r.stdout)
         s.assertEqual((root / "tasks").read_text().split(), [":mod:test", ":mod:spotlessCheck"])

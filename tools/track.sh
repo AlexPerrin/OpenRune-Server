@@ -37,7 +37,8 @@ state=$root/state/$slug; mkdir -p "$state"
 dev=$repo/.worktrees/$slug; copy=$repo/.worktrees/$slug-build
 live_image=osrs-openrune:241; compose_dir=$self/server
 export SIDECAR_DATA=${SIDECAR_DATA:-$HOME/src/openrune-work/server-tools/sidecar/data}; sidecar_data=$SIDECAR_DATA  # compose mounts ${SIDECAR_DATA}
-record() { python3 -c 'import json,sys;print(json.dumps({"T":sys.argv[1],"ok":sys.argv[2]=="true","detail":sys.stdin.read()[-2000:]}))' "$T" "$1" > "$state/$2.json"; }
+atomic() { cat > "$1.$$.tmp"; if [ -s "$1.$$.tmp" ]; then mv -f "$1.$$.tmp" "$1"; else rm -f "$1.$$.tmp"; return 1; fi; }   # a state record whole or not at all: hd reads it at any moment
+record() { python3 -c 'import json,sys;print(json.dumps({"T":sys.argv[1],"ok":sys.argv[2]=="true","detail":sys.stdin.read()[-2000:]}))' "$T" "$1" | atomic "$state/$2.json"; }
 ready() {  # ready <container> [since]: blocks until "Server ready in" or the container stops
   while ! docker logs ${2:+--since "$2"} "$1" 2>&1 | grep -q "Server ready in"; do
     [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = true ] || { echo "$1 is not running"; return 1; }; sleep 5
@@ -208,7 +209,7 @@ up() {
   for i in $(seq 1 "$n"); do
     desktop_start
     desktops+=("$inst:$dt"); accounts+=("$(account "$i")")
-    printf '{"game": %s, "http": %s, "desktops": "%s", "accounts": "%s"}\n' "$game" "$http" "${desktops[*]}" "${accounts[*]}" > "$state/up.json"   # before the login: restart and the devtools tools find each desktop
+    printf '{"game": %s, "http": %s, "desktops": "%s", "accounts": "%s"}\n' "$game" "$http" "${desktops[*]}" "${accounts[*]}" | atomic "$state/up.json"   # before the login: restart and the devtools tools find each desktop
     login "$dt" "$(account "$i")"      # creates the account on first login; prints LOGGED_IN or FAILED: reason
   done
   # members and rights are read at login and members written by the save at logout: log out, wait until no character of this up is online, update, log in
@@ -290,8 +291,8 @@ EOF
   since=$(date -u +%FT%TZ)
   (cd "$compose_dir" && docker compose --env-file switch.env up -d --no-deps openrune http http-desktop) >/dev/null
   if ready osrs-openrune "$since"; then
-    python3 -c 'import json,sys;json.dump({"tree":sys.argv[1],"commit":sys.argv[2],"heads":sys.argv[3].split(),"names":sys.argv[4].split(),"rollback":sys.argv[5]},open(sys.argv[6],"w"))' \
-      "$T" "$arg" "${HEADS:-}" "${NAMES:-}" "rollback-${prev:0:12}" "$state/tree.json"; echo "live: $T"
+    python3 -c 'import json,sys;print(json.dumps({"tree":sys.argv[1],"commit":sys.argv[2],"heads":sys.argv[3].split(),"names":sys.argv[4].split(),"rollback":sys.argv[5]}))' \
+      "$T" "$arg" "${HEADS:-}" "${NAMES:-}" "rollback-${prev:0:12}" | atomic "$state/tree.json"; echo "live: $T"
     for c in osrs-openrune-http osrs-openrune-http-desktop; do python3 "$self/server/javcheck.py" "http://127.0.0.1:$(docker port "$c" 8080 | head -1 | cut -d: -f2)/jav_config.ws" || return 6; done
   else
     docker tag "osrs-openrune:rollback-${prev:0:12}" "$live_image"; (cd "$compose_dir" && docker compose --env-file switch.env up -d --no-deps openrune) >/dev/null
@@ -300,10 +301,11 @@ EOF
 }
 measure() {  # the goal's inventory: share of rows whose unit is in PASSES (hd: named by a live change with a passing verdict)
   python3 - "$root/harness/goals/server-content.json" "$state/measure.json" "${TREE:-}" "${PASSES:-}" <<'EOF'
-import json, sys
+import json, os, sys
 rows, passes = json.load(open(sys.argv[1])), set(sys.argv[4].split())
 value = 100.0 * sum(1 for r in rows if r["unit"] in passes) / len(rows) if rows else 0.0
-json.dump({"tree": sys.argv[3], "value": value, "report": sys.argv[1]}, open(sys.argv[2], "w")); print(f"server-content: {value:g}")
+with open(sys.argv[2] + ".tmp", "w") as f: json.dump({"tree": sys.argv[3], "value": value, "report": sys.argv[1]}, f)
+os.replace(sys.argv[2] + ".tmp", sys.argv[2]); print(f"server-content: {value:g}")
 EOF
 }
 token() {  # [TOKEN]: the token the desktop's next login sends, or a valid one for the first desktop's account
