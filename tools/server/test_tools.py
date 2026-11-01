@@ -563,6 +563,31 @@ class TokenLogin(unittest.TestCase):  # a test desktop's token login (auth type 
         (d / "token").write_text("a.b.c\n"); s.assertEqual(get(), {"token": "a.b.c"})
         (d / "token").write_text("x.y.z\n"); s.assertEqual(get(), {"token": "x.y.z"})
 
+    def test_the_apk_signs_in_and_gets_the_official_game_session_shapes(s):
+        import base64, http.server, threading, urllib.error, urllib.parse, urllib.request, issuer as t
+        d = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, d); t.key(d); (d / "account").write_text("hab12\n"); t.GameSession.dir = d
+        srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), t.GameSession); threading.Thread(target=srv.serve_forever, daemon=True).start(); s.addCleanup(srv.shutdown)
+        base = f"http://127.0.0.1:{srv.server_port}/"
+        class Stay(urllib.request.HTTPRedirectHandler):
+            redirect_request = lambda *a: None
+        def call(path, body=None, bearer=None, form=False):
+            r = urllib.request.Request(base + path, data=body if body is None or form else json.dumps(body).encode(), headers={"Authorization": f"Bearer {bearer}"} if bearer else {})
+            try:
+                return json.load(urllib.request.build_opener(Stay).open(r))
+            except urllib.error.HTTPError as e:
+                return e.code, e.headers.get("Location")
+        disc = call(".well-known/openid-configuration"); s.assertEqual(disc["issuer"], base); s.assertEqual(disc["token_endpoint"], base + "oauth2/token")
+        code, loc = call("oauth2/auth?redirect_uri=app%3A%2Fcb&state=s%201&nonce=n1"); s.assertEqual(code, 302)
+        q = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(loc).query)); s.assertEqual(q["state"], "s 1")
+        idt = call("oauth2/token", urllib.parse.urlencode({"code": q["code"], "client_id": "c"}).encode(), form=True)["id_token"]
+        claims = json.loads(base64.urlsafe_b64decode(idt.split(".")[1] + "==")); s.assertEqual((claims["sub"], claims["aud"], claims["nonce"]), ("hab12", "c", "n1"))
+        s.assertEqual(call("game-session/v1/sessions", {"idToken": idt[:-2] + "xx"})[0], 401)   # a forged idToken
+        sid = call("game-session/v1/sessions", {"idToken": idt})["sessionId"]
+        s.assertEqual(call("game-session/v1/accounts", bearer="nope")[0], 401)
+        (acc,) = call("game-session/v1/accounts", bearer=sid); s.assertEqual(acc["displayName"], "hab12")
+        s.assertIsInstance(acc["accountId"], int); s.assertIsInstance(acc["userHash"], int)
+        s.assertEqual(call("game-session/v1/tokens", b"", form=True)["token"].split(".")[0], "hab12")   # no DIR/token: a fresh one for DIR/account
+
     def test_up_token_points_the_desktop_at_the_issuer_and_down_removes_it(s):
         sh = (HERE.parent / "track.sh").read_text()
         up = sh.split("\nup() {")[1].split("\n}")[0]; down = sh.split("\ndown() {")[1].split("\n}")[0]
