@@ -1,5 +1,5 @@
 """The contract's script rows against a throwaway git repo: python3 -m unittest tools/server/test_tools.py"""
-import json, os, shutil, subprocess, sys, tempfile, unittest
+import json, os, shutil, subprocess, sys, tempfile, threading, unittest
 from pathlib import Path
 SUITE_TMP = tempfile.TemporaryDirectory(prefix="tools-suite-", ignore_cleanup_errors=True)   # every temp dir of these tests and of each process they
 tempfile.tempdir = os.environ["TMPDIR"] = SUITE_TMP.name                          # start (mktemp) is under it, removed at the end, a failed test's too
@@ -142,8 +142,30 @@ class BuildAttempts(unittest.TestCase):
     def test_a_run_reads_its_own_copy_of_the_tools(s):  # the tools checkout moved under a running deploy: its Dockerfile vanished
         s.build()
         copies = [d for d in (s.root / "state/tools").iterdir() if not d.name.startswith(".")]
-        s.assertEqual(len(copies), 1); s.assertTrue((copies[0] / "gate/Dockerfile").exists())
+        s.assertEqual(len(copies), 1); s.assertTrue((copies[0] / "tools/gate/Dockerfile").exists())
         s.build(); s.assertEqual(len(list((s.root / "state/tools").iterdir())), 1)   # one copy per content
+
+
+class ToolsShipUnderARun(unittest.TestCase):
+    def test_a_tools_ship_never_changes_a_running_builds_tools(s):  # a deploy's image build lost its Dockerfile to a tools ship mid-run
+        root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, root); change(root, "x"); (root / "bin").mkdir()
+        repo = root / "repo"; repo.mkdir(); git(repo, "init", "-q"); (repo / "game.example.yml").write_text(""); (repo / "settings.gradle.kts").write_text(""); (repo / "or-cache").mkdir(); (repo / "or-cache/x").write_text("")
+        git(repo, "add", "-A"); git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "t"); tc = git(repo, "rev-parse", "HEAD")
+        tools = root / "checkout/tools"; shutil.copytree(HERE.parent, tools, ignore=shutil.ignore_patterns("__pycache__"))   # the tools branch's checkout
+        go = root / "go"; os.mkfifo(go)
+        # docker: the Gradle step blocks on the fifo and leaves the install; the image build needs its -f file
+        (root / "bin/docker").write_text(f'''#!/bin/bash
+case "$*" in "image inspect"*) exit 1;;
+  *"--name build-x"*) while [ "$1" != -w ]; do shift; done; mkdir -p "$2/server/app/build/install/app" "$2/.data"; read _ < {go}; exit 0;;
+  build*) while [ "$1" != -f ]; do shift; done; [ -f "$2" ] || {{ echo "open $2: no such file"; exit 1; }};;
+esac\n'''); (root / "bin/docker").chmod(0o755)
+        p = subprocess.Popen(["bash", str(tools / "track.sh"), "build", "x", tc], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                             env={**os.environ, "HD_ROOT": str(root), "CLONE": str(repo), "PATH": f"{root / 'bin'}:{os.environ['PATH']}", "CENTRAL": ""})
+        threading.Thread(target=lambda: (p.wait(), os.close(os.open(go, os.O_RDONLY | os.O_NONBLOCK))), daemon=True).start()   # a build that ends early never holds the fifo open
+        with open(go, "w") as f:   # opens once the build waits in Gradle: the ship moves the checkout now
+            shutil.rmtree(tools / "gate"); f.write("\n")
+        out = p.communicate()[0]
+        s.assertEqual(p.returncode, 0, out); s.assertIn("built or:", out)
 
 
 class CacheDownload(unittest.TestCase):

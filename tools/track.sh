@@ -29,13 +29,14 @@ self=$(cd "$(dirname "$0")" && pwd)
 repo=${CLONE:-$HOME/src/OpenRune-Server}
 root=${HD_ROOT:-$HOME/osrs-harness}
 [ -f "$root/harness/changes/$slug.md" ] || [ -f "$root/harness/goals/$slug.md" ] || case $slug in live|integration) ;; *) echo "no change or goal \"$slug\": tools/track.sh <verb> <slug> [arg]" >&2; exit 2 ;; esac
-# a run reads its own copy of tools/, one per content under state/tools/: a ship of the tools branch moves the checkout under a
-# running script (bash reads it as it runs; a deploy's image build lost tools/server/Dockerfile mid-run)
-if [ -z "${TOOLS_COPY:-}" ]; then
+# a run reads its own copy of tools/, one per content in state/tools/<hash>/tools (exported: TOOLS_ROOT, its parent, where hd
+# runs a gate's rows; TOOLS_SRC, the checkout): a ship of the tools branch moves the checkout under a running script, and hd's
+# repairs remove a copy once no process or container uses it, and a .<hash>.<pid> being copied once its pid is gone
+case $self in "$root"/state/tools/*) ;; *)
   k=$(cd "$self" && find . -type f ! -path '*/__pycache__/*' -print0 | sort -z | xargs -0 sha1sum | sha1sum | cut -c1-12); c=$root/state/tools/$k
-  [ -d "$c" ] || { mkdir -p "$root/state/tools"; d=$(mktemp -d "$root/state/tools/.$k.XXXXXX"); cp -a "$self/." "$d/"; mv -T "$d" "$c" 2>/dev/null || rm -rf "$d"; }   # shortcut: old copies stay, remove state/tools/ when no run is up
-  TOOLS_COPY=$c exec bash "$c/track.sh" "$@"
-fi
+  [ -d "$c" ] || { d=$root/state/tools/.$k.$$; rm -rf "$d"; mkdir -p "$d/tools"; cp -a "$self/." "$d/tools/"; mv -T "$d" "$c" 2>/dev/null || rm -rf "$d"; }
+  TOOLS_SRC=$self TOOLS_ROOT=$c exec bash "$c/tools/track.sh" "$@" ;;
+esac
 case $verb in build|test|spotless|gate|gate-ci|tree) exec "$self/gate/gate.sh" "$@" ;; esac
 state=$root/state/$slug; mkdir -p "$state"
 live_image=osrs-openrune:241; compose_dir=$self/server
