@@ -1,0 +1,27 @@
+[[varp]]
+id = "varp.friendchat_setup"
+scope = "Perm"
+transmit = "Never"
+
+[[varbit]]
+id = "varbit.friendchat_enter_option"
+varp = "varp.friendchat_setup"
+startBit = 0
+endBit = 3
+
+[[varbit]]
+id = "varbit.friendchat_talk_option"
+varp = "varp.friendchat_setup"
+startBit = 4
+endBit = 7
+
+[[varbit]]
+id = "varbit.friendchat_kick_option"
+varp = "varp.friendchat_setup"
+startBit = 8
+endBit = 11
+
+[[varp]]
+id = "varp.friendchat_changes_pending"
+scope = "Temp"
+transmit = "Never"

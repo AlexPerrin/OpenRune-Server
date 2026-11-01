@@ -4,6 +4,7 @@ import dev.openrune.ServerCacheManager
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import jakarta.inject.Inject
+import org.rsmod.api.net.friendchat.FriendChats
 import org.rsmod.api.player.midiJingle
 import org.rsmod.api.player.midiSong
 import org.rsmod.api.player.output.ChatType
@@ -26,8 +27,11 @@ import org.rsmod.plugin.scripts.ScriptContext
 
 public class LevelUpScript
 @Inject
-constructor(private val worldRepo: WorldRepository, private val worldQueues: WorldQueueList) :
-    PluginScript() {
+constructor(
+    private val worldRepo: WorldRepository,
+    private val worldQueues: WorldQueueList,
+    private val friendChats: FriendChats,
+) : PluginScript() {
     private val unlocks by lazy { SkillUnlocks.load() }
     private val guideUnlocks by lazy { LevelUpUnlocks.load() }
 
@@ -49,6 +53,7 @@ constructor(private val worldRepo: WorldRepository, private val worldQueues: Wor
         val type = advance.stat
         val stat = LevelUpStat.of(type) ?: return
         val level = statBase(type.internalName)
+        friendChats.updateBlocked(player)
         val guideList = vars[GUIDE_LIST_DISABLED_VARBIT] == 0
         val jingle =
             stat.jingle.select(level, type.maxLevel, unlocks.contains(type.id, level), guideList)
