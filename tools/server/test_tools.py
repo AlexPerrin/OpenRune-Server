@@ -45,7 +45,10 @@ class Central(unittest.TestCase):
         s.assertIn('read -r cpath ccommit <<< "$CENTRAL"', b)
         s.assertIn('worktree add -q --detach "$cdir" "$ccommit"', b)
         s.assertIn('-v "$cdir:$cdir"', b)
-        s.assertIn("${CDIR:+ -Popenrune.central.includeBuild=$CDIR}", b)
+        s.assertIn("${CDIR:+ --init-script /central.init.gradle}", b)
+        init = (HERE / "central.init.gradle").read_text()  # openrune-central is named unlike its project: substituted explicitly
+        for m, p in (("openrune-central", "central-app"), ("central-common", "central-common"), ("central-worldlink", "central-worldlink")):
+            s.assertIn(f"substitute module('dev.or2:{m}') using project(':{p}')", init)
         s.assertIn("CENTRAL=${CENTRAL:-$cen}", (HERE.parent / "track.sh").read_text())
 
 
