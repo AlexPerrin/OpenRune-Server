@@ -56,8 +56,8 @@ build() {
       $g generateRsa :server:app:installDist -x test' > "$log" 2>&1 || { record false build < "$log"; echo "build failed: $log"; return 1; }
   st=$copy/.image; rm -rf "$st"; mkdir -p "$st/data"
   cp -a "$copy/server/app/build/install/app" "$st/server"; cp "$copy/game.yml" "$st/"
-  cp -a "$copy/.data/." "$st/data/"; rm -rf "$st/data/rsa.properties" "$st/data/game.key" "$st/data/postgres"
-  mkdir -p "$state/key" && cp "$copy/.data/game.key" "$copy/.data/rsa.properties" "$state/key/"
+  cp -a "$copy/.data/." "$st/data/"; rm -rf "$st/data/client.key" "$st/data/game.key" "$st/data/postgres"
+  mkdir -p "$state/key" && cp "$copy/.data/game.key" "$copy/.data/client.key" "$state/key/"
   docker build -q -f "$self/server/Dockerfile" -t "or:$T" "$st" >> "$log" 2>&1
   record true build < "$log"; echo "built or:$T"
 }
@@ -67,7 +67,7 @@ up() {
   game=$(port 0); http=$(port 1)
   docker rm -f "server-$slug" "http-$slug" >/dev/null 2>&1 || true
   docker run -d --name "server-$slug" --cpus=4 --memory=4g -p "$game:43594" --tmpfs /app/.data/postgres:uid=1000,gid=1000,mode=0700 \
-    -v "$state/key/game.key:/app/.data/game.key:ro" -v "$state/key/rsa.properties:/app/.data/rsa.properties:ro" "or:$T" >/dev/null
+    -v "$state/key/game.key:/app/.data/game.key:ro" -v "$state/key/client.key:/app/.data/client.key:ro" "or:$T" >/dev/null
   docker run --rm --entrypoint cat osrs-rsps-test:241 /app/protocol/jav_config.ws.template \
     | sed -E "s#https?://[A-Za-z0-9.-]*(jagex|runescape)\.com[^[:space:]]*#http://127.0.0.1:$http/#g" > "$state/jav_config.ws.template"
   docker run -d --name "http-$slug" -p "$http:8080" -v "$sidecar_data:/data:ro" -v "$state/jav_config.ws.template:/app/protocol/jav_config.ws.template:ro" \
@@ -115,10 +115,10 @@ ship() {  # the integration tree → the live test server
   build
   cat > "$state/Dockerfile" <<EOF
 FROM or:$T
-COPY --from=$live_image --chown=1000:1000 /app/.data/game.key /app/.data/rsa.properties /app/.data/
+COPY --from=$live_image --chown=1000:1000 /app/.data/game.key /app/.data/client.key /app/.data/
 EOF
   docker build -q -f "$state/Dockerfile" -t "osrs-openrune:$T" "$state" >/dev/null
-  a=$(docker run --rm --entrypoint sha256sum "$live_image" /app/.data/rsa.properties | cut -c1-16); b=$(docker run --rm --entrypoint sha256sum "osrs-openrune:$T" /app/.data/rsa.properties | cut -c1-16)
+  a=$(docker run --rm --entrypoint sha256sum "$live_image" /app/.data/client.key | cut -c1-16); b=$(docker run --rm --entrypoint sha256sum "osrs-openrune:$T" /app/.data/client.key | cut -c1-16)
   [ "$a" = "$b" ] && echo "key hash: match" || { echo "key hash: MISMATCH"; return 4; }
   docker rm -f "boot-$T" >/dev/null 2>&1 || true
   docker run -d --name "boot-$T" --tmpfs /app/.data/postgres:uid=1000,gid=1000,mode=0700 "osrs-openrune:$T" >/dev/null
