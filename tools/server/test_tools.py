@@ -146,6 +146,48 @@ class DesktopInstance(unittest.TestCase):
         s.assertLess(up.index("down >/dev/null"), up.index("desktop_start"))
 
 
+class DesktopLogin(unittest.TestCase):
+    def fake(s, states):  # a devtools endpoint whose game state walks through states, one per read, staying on the last
+        import desktop_login as d
+        sent, states = [], list(states)
+        def call(port, name, **a):
+            sent.append((name, a))
+            if name == "press_key" and len(a["key"]) > 1 and a["key"] not in ("ENTER", "ESCAPE", "SPACE", "TAB", "BACKSPACE"):
+                raise d.Refused("Unknown key: " + a["key"])  # the endpoint's named keys
+            return json.dumps({"gameState": states.pop(0) if len(states) > 1 else states[0]}) if name == "get_client_state" else "{}"
+        s.addCleanup(setattr, d, "call", d.call); s.addCleanup(setattr, d.time, "sleep", d.time.sleep)
+        d.call, d.time.sleep = call, lambda _: None
+        return d, sent
+
+    def test_login_screen_right_after_enter_is_not_a_result(s):  # a fresh account's first login read LOGIN_SCREEN before the attempt began
+        d, _ = s.fake(["LOGIN_SCREEN"] * 4 + ["LOGGING_IN", "LOADING", "LOGGED_IN"])  # the wait, the two frame reads, then right after Enter
+        s.assertEqual(d.login(1, "u", "p"), "LOGGED_IN")
+        d, _ = s.fake(["LOGIN_SCREEN"] * 4 + ["LOGGING_IN", "LOGIN_SCREEN"])
+        s.assertTrue(d.login(1, "u", "p").startswith("FAILED"))
+
+    def test_a_refused_call_raises(s):  # press_key BACK_SPACE was refused as an unknown key and the login went on
+        import desktop_login as d, io
+        body = json.dumps({"result": {"isError": True, "content": [{"type": "text", "text": "Unknown key: BACK_SPACE"}]}}).encode()
+        s.addCleanup(setattr, d.urllib.request, "urlopen", d.urllib.request.urlopen)
+        d.urllib.request.urlopen = lambda *a, **k: io.BytesIO(body)
+        with s.assertRaisesRegex(d.Refused, "Unknown key"):
+            d.call(1, "press_key", key="BACK_SPACE")
+        s.assertEqual(d.state(1), {})  # a refused state read is no state yet, read again
+
+    def test_logout_uses_the_logout_button_not_a_command(s):  # the server has no ::drop; relog hung on it
+        d, sent = s.fake(["LOGGED_IN", "LOGIN_SCREEN"])
+        s.assertEqual(d.logout(1), "LOGIN_SCREEN")
+        s.assertFalse([a for n, a in sent if n == "type_chat"])
+        s.assertIn(("invoke_menu_action", {"param0": -1, "param1": d.LOGOUT_BUTTON, "type": "CC_OP", "identifier": 1, "option": "Logout"}), sent)
+
+    def test_up_sets_members_while_its_characters_are_offline(s):  # the logout save wrote members back to false over an update made in game
+        up = (HERE.parent / "track.sh").read_text().split("\nup() {")[1].split("\n}")[0]
+        s.assertLess(up.index('desktop_login.py" "$(cut -d: -f2 <<< "$c")" logout'), up.index("online_central_world_id is not null"))
+        s.assertLess(up.index("online_central_world_id is not null"), up.index("set members = true"))
+        s.assertLess(up.index("set members = true"), up.rindex('desktop_login.py" "$(cut -d: -f2 <<< "${desktops[$i]}")"'))
+        s.assertNotIn("::", (HERE / "desktop_login.py").read_text())
+
+
 class Repo(unittest.TestCase):
     def setUp(s):
         s.repo = tempfile.mkdtemp()

@@ -132,10 +132,14 @@ up() {
     flock -u 9   # listed: a later sweep sees this desktop owned
     python3 "$self/server/desktop_login.py" "$dt" "$(account "$i")" "$(account "$i")"      # creates the account on first login; prints LOGGED_IN or FAILED: reason
   done
+  # members is written by the character save at logout: log out, wait until no character of this up is online, update, log in
+  for c in "${desktops[@]}"; do python3 "$self/server/desktop_login.py" "$(cut -d: -f2 <<< "$c")" logout; done
   pg=$(docker logs "server-$slug" 2>&1 | grep -oE 'jdbc:postgresql://localhost:[0-9]+' | tail -1 | grep -oE '[0-9]+$')
-  docker run --rm --network "container:server-$slug" postgres:16-alpine psql -h 127.0.0.1 -p "$pg" -U postgres -d postgres -q -c \
-    "update account_characters set members = true where account_id in (select id from accounts where lower(account_name) like '$(account)%')" >/dev/null
-  for c in "${desktops[@]}"; do python3 "$self/server/desktop_login.py" "$(cut -d: -f2 <<< "$c")" relog; done   # members applies at login
+  sql() { docker run --rm --network "container:server-$slug" postgres:16-alpine psql -h 127.0.0.1 -p "$pg" -U postgres -d postgres -tAq -c "$1"; }
+  mine="select c.id from account_characters c join accounts a on a.id = c.account_id where lower(a.account_name) like '$(account)%'"
+  until [ "$(sql "select count(*) from main.character_progress where online_central_world_id is not null and character_id in ($mine)")" = 0 ]; do sleep 1; done
+  sql "update account_characters set members = true where id in ($mine)" >/dev/null
+  for i in "${!desktops[@]}"; do python3 "$self/server/desktop_login.py" "$(cut -d: -f2 <<< "${desktops[$i]}")" "${accounts[$i]}" "${accounts[$i]}"; done
   echo "up: game $game http $http desktops ${desktops[*]}"
 }
 down() {
