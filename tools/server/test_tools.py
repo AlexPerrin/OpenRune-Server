@@ -140,73 +140,57 @@ class DesktopInstance(unittest.TestCase):
         exe = lambda p, body: (p.write_text("#!/bin/bash\n" + body), p.chmod(0o755))
         exe(t / "sys32/netstat.exe", f'for f in {t}/win/*.port; do [ -e "$f" ] && echo "  TCP 127.0.0.1:$(cat $f) 0.0.0.0:0 LISTENING $(basename $f .port)"; done; true\n')
         exe(t / "sys32/taskkill.exe", f'echo "$4" >> {t}/killed; rm -f {t}/win/$4.*\n')
-        exe(t / "bin/wslpath", 'sleep 0.5; echo "$2"\n')   # widens the window between picking an instance and listing it
-        exe(t / "bin/docker", f'[ -e {t}/live-$4 ] && echo true || echo false\n')   # inspect -f <fmt> server-<slug>
-        for i in range(1, 6):
-            d = t / f"desk{'' if i == 1 else i}"; (d / "home/.rsprox").mkdir(parents=True); (d / "jdk/bin").mkdir(parents=True)
-            exe(d / "jdk/bin/java.exe", f'echo "$$ OsrsTestLauncher $*" > {t}/win/$$.jvm; echo $((7779 + ${{1##*-}})) > {t}/win/$$.port; exec sleep 30\n')
-            exe(d / "jdk/bin/jps.exe", f'cat {t}/win/*.jvm 2>/dev/null; true\n')
+        exe(t / "sys32/robocopy.exe", 'cp -r "$1" "${2//\\\\//}"; exit 1\n')   # 1: files copied
+        exe(t / "bin/wslpath", 'sleep 0.5; echo "$2"\n')   # widens the window between picking an instance and claiming it
+        d = t / "desk"; (d / "home/.rsprox").mkdir(parents=True); (d / "home/.rlcustom/profiles2").mkdir(parents=True); (d / "jdk/bin").mkdir(parents=True)
+        (d / "home/.rlcustom/settings.properties").write_text("a=1\n"); (d / "home/.rlcustom/profiles2/p.properties").write_text("openrunedevtools.port=7780\n")
+        exe(d / "jdk/bin/java.exe", f'echo "$$ OsrsTestLauncher $*" > {t}/win/$$.jvm; echo $((7779 + ${{1##*run}})) > {t}/win/$$.port; exec sleep 30\n')
+        exe(d / "jdk/bin/jps.exe", f'cat {t}/win/*.jvm 2>/dev/null; true\n')
         (t / "devtools.jar").write_text("jar")
         src = (HERE.parent / "track.sh").read_text()
         s.fns = src[src.index("sys32="):src.index("\ntree() {")]
-        s.env = {**os.environ, "PATH": f"{t / 'bin'}:{os.environ['PATH']}", "WINDOWS_SYSTEM32": str(t / "sys32"), "DESKTOP_DIR": str(t / "desk")}
+        s.env = {**os.environ, "PATH": f"{t / 'bin'}:{os.environ['PATH']}", "WINDOWS_SYSTEM32": str(t / "sys32"), "DESKTOP_DIR": str(d)}
 
     def tearDown(s):
         for f in s.t.glob("win/*.jvm"): subprocess.run(["kill", f.stem], capture_output=True)
         shutil.rmtree(s.t, ignore_errors=True)
 
     def proc(s, pid, cls, marker=None, port=None):
-        (s.t / f"win/{pid}.jvm").write_text(f"{pid} {cls} -Duser.home=C:\\x" + (f" -Dosrstest.marker=osrs-test-{marker}" if marker else "") + "\n")
+        (s.t / f"win/{pid}.jvm").write_text(f"{pid} {cls} -Duser.home=C:\\x" + (f" -Dosrstest.marker=osrs-test-run{marker}" if marker else "") + "\n")
         if port: (s.t / f"win/{pid}.port").write_text(f"{port}\n")
 
-    def up(s, slug, desktops, live=True):
-        (s.t / "state" / slug).mkdir(); (s.t / "state" / slug / "up.json").write_text(json.dumps({"desktops": desktops}))
-        if live: (s.t / f"live-server-{slug}").touch()
-
     def sh(s, slug, body):
-        return subprocess.Popen(["bash", "-c", f"set -euo pipefail; root={s.t}; slug={slug}; http=1; game=2; modulus=3; jar={s.t}/devtools.jar\n{s.fns}\n{body}"], stdout=subprocess.PIPE, text=True, env=s.env)
+        return subprocess.Popen(["bash", "-c", f"set -euo pipefail; root={s.t}; slug={slug}; state={s.t}/state/{slug}; http=1; game=2; modulus=3; jar={s.t}/devtools.jar\n{s.fns}\n{body}"], stdout=subprocess.PIPE, text=True, env=s.env)
 
     def killed(s):
         return sorted((s.t / "killed").read_text().split()) if (s.t / "killed").exists() else []
 
-    def test_concurrent_ups_take_distinct_instances(s):  # two ups once took the same desktop and one acted on the other's server
-        start = 'desktop_start; mkdir -p "$root/state/$slug"; echo "{\\"desktops\\": \\"$inst:$dt:$pids\\"}" > "$root/state/$slug/up.json"; touch "$root/live-server-$slug"; echo $inst'
-        ps = [s.sh(f"s{k}", start) for k in range(3)]
-        got = [p.communicate(timeout=60)[0].split()[0] for p in ps]
-        s.assertEqual(len(set(got)), 3, got); s.assertEqual(s.killed(), [])
+    def test_concurrent_ups_each_create_their_own_instances(s):  # five shared instances: concurrent ups raced and retried for two at once
+        ps = [s.sh(f"s{k}", "desktop_start; echo $inst:$dt; desktop_start; echo $inst:$dt") for k in range(3)]
+        got = [l for p in ps for l in p.communicate(timeout=60)[0].split()]
+        s.assertEqual(len(set(got)), 6, got); s.assertEqual(s.killed(), [])
+        for g in got:
+            n, port = g[len("desktop"):].split(":")
+            s.assertEqual((s.t / f"desk/run/{n}/home/.rlcustom/profiles2/p.properties").read_text(), f"openrunedevtools.port={port}\n")
+            s.assertTrue((s.t / f"desk/run/{n}/home/.rlcustom/sideloaded-plugins/OpenRune-Developer-Tools.jar").exists())
+        s.assertEqual(sorted((s.t / "desk/run" / g[len("desktop"):].split(":")[0] / "owner").read_text().strip() for g in got), ["s0", "s0", "s1", "s1", "s2", "s2"])
 
-    def test_a_desktop_no_live_run_lists_is_stopped_and_no_unmarked_jvm_is_touched(s):  # an orphan on desktop4 took a judge's login keys
-        s.proc(100, "OsrsTestLauncher", 1, 7780); s.up("a", "desktop1:7780:100")     # a live run's desktop
-        s.proc(200, "RuneLite", 2, 7781); s.up("gone", "desktop2:7781:200", live=False)   # its run's server is gone
-        s.proc(500, "RuneLite", None, 7782)                                          # the user's own RuneLite on a harness port
-        s.proc(400, "RuneLite", 4, 7783); s.proc(401, "Launcher", 4)                 # no up.json lists it
+    def test_a_port_another_program_holds_is_skipped_and_never_stopped(s):  # the user's own RuneLite on a harness port
+        s.proc(500, "RuneLite", None, 7780)
         out = s.sh("b", "desktop_start; echo $inst $dt").communicate(timeout=60)[0].split()
-        s.assertEqual(s.killed(), ["200", "400", "401"])
-        s.assertEqual(out, ["desktop2", "7781"])
-        s.assertTrue((s.t / "win/500.jvm").exists()); s.assertTrue((s.t / "win/100.jvm").exists())
+        s.assertEqual(out, ["desktop2", "7781"]); s.assertEqual(s.killed(), []); s.assertFalse((s.t / "desk/run/1").exists())
 
-    def test_a_live_up_json_from_before_the_rename_still_owns_its_desktop(s):  # field "clients", written before "desktops"
-        (s.t / "state/old").mkdir(); (s.t / "state/old/up.json").write_text(json.dumps({"clients": "desktop1:7780:100"})); (s.t / "live-server-old").touch()
-        s.up("new", "desktop2:7781:200")
-        s.assertEqual(sorted(s.sh("b", "owned").communicate(timeout=60)[0].split()), ["desktop1:7780:100", "desktop2:7781:200"])
+    def test_down_stops_and_removes_exactly_its_own_instances(s):  # an orphan once took a judge's login keys
+        for slug in ("a", "b", "a"): s.sh(slug, "desktop_start").communicate(timeout=60)
+        s.proc(500, "RuneLite", None, 7790)
+        mine = sorted(f.stem for f in s.t.glob("win/*.jvm") if any(f"osrs-test-run{n} " in f.read_text() for n in (1, 3)))
+        s.sh("a", "desktops_remove").communicate(timeout=60)
+        s.assertEqual(s.killed(), mine)
+        s.assertEqual(sorted(p.name for p in (s.t / "desk/run").iterdir()), ["2"])
+        s.assertTrue((s.t / "win/500.jvm").exists())
 
-    def test_an_instance_is_claimed_only_when_no_desktop_answers_on_it(s):  # whatever a pid file says
-        for i in range(1, 6): s.up(f"r{i}", f"desktop{i}:{7779 + i}:{i}") if i != 3 else None
-        s.proc(500, "RuneLite", None, 7782)                                          # not marked: never stopped, its port stays taken
-        p = s.sh("b", "desktop_start"); p.communicate(timeout=60)
-        s.assertNotEqual(p.returncode, 0); s.assertEqual(s.killed(), [])
-
-    def test_stop_takes_the_recorded_pids_that_carry_the_marker(s):  # a PID reused by another program is never stopped
-        s.proc(200, "OsrsTestLauncher", 2); s.proc(201, "RuneLite", 2, 7781); s.proc(999, "RuneLite", None, 7781)
-        s.sh("b", "desktop_stop desktop2 200,201,999").communicate(timeout=60)
-        s.assertEqual(s.killed(), ["200", "201"])
-        s.proc(300, "Launcher", 3); s.proc(301, "RuneLite", 3); (s.t / "killed").unlink()
-        s.sh("b", "desktop_stop desktop3").communicate(timeout=60)              # an up.json from before the PIDs were recorded
-        s.assertEqual(s.killed(), ["300", "301"]); s.assertTrue((s.t / "win/999.jvm").exists())
-
-    def test_up_records_each_desktop_before_its_login(s):  # a failed login aborts up under set -e; down must still stop that desktop
+    def test_up_records_each_desktop_before_its_login(s):  # a failed login aborts up under set -e; restart and the tools read up.json
         up = (HERE.parent / "track.sh").read_text().split("\nup() {")[1].split("\n}")[0]
-        s.assertLess(up.index('> "$state/up.json"'), up.index("flock -u 9"))
         s.assertLess(up.index('> "$state/up.json"'), up.index("desktop_login.py\" \"$dt\""))
         s.assertLess(up.index("down >/dev/null"), up.index("desktop_start"))
 

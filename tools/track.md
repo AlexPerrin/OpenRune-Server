@@ -70,13 +70,13 @@ it runs every script row of the contract and refuses on any failure. `hd ask <sl
 yours; `hd show <slug>` first, always.
 
 The desktops are Windows programs run from bash through WSL interop by absolute path, located by
-`WINDOWS_SYSTEM32` (default `/mnt/c/Windows/System32`: netstat.exe, taskkill.exe) and `DESKTOP_DIR` (default
-`/mnt/c/osrs-test`, the Nth instance `DESKTOP_DIR<N>`, devtools port 7779+N; jps.exe locates JVMs). Every JVM of
-instance N carries `-Dosrstest.marker=osrs-test-N`, and only such a JVM is ever stopped (never the user's own RuneLite).
-An up, under `state/desktop.lock`, first stops the desktops of every instance no live run's `up.json` lists (a live run's
-server container runs), then claims the first instance that no run lists and no desktop answers on, and keeps the lock
-until it lists that desktop in `up.json` (field `desktops`: `desktopN:port:pids`, the launcher's and the port's Windows PIDs) before its
-login; `down` stops exactly those PIDs.
+`WINDOWS_SYSTEM32` (default `/mnt/c/Windows/System32`: netstat.exe, taskkill.exe, robocopy.exe) and `DESKTOP_DIR`
+(default `/mnt/c/osrs-test`: the template, its JDK, RSProx launcher and staged home; jps.exe locates JVMs). Each up
+creates the desktops it needs: instance N is `DESKTOP_DIR/run/N`, claimed by its mkdir (the first N whose devtools port
+7779+N no program holds), naming the up's slug in `run/N/owner`, with its own home copied from the template's. Every JVM
+of instance N carries `-Dosrstest.marker=osrs-test-runN`, and only such a JVM is ever stopped (never the user's own
+RuneLite). up lists each desktop in `up.json` (field `desktops`: `desktopN:port`) before its login; `down` stops the
+JVMs of every instance its slug owns and removes those instances.
 
 ## The reviewer
 Never writes the code it checks. Judges every contract row from the same build (`tools/track.sh up <slug>`),

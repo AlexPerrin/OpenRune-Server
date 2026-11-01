@@ -18,8 +18,8 @@
 #   log <slug> PATTERN  the change's server log since the run's marker (slug `live`: the live server)
 #   recordings <slug> REGEX  the RSProx transcripts holding a packet type or text
 # Windows locations, run through WSL interop (override in the environment):
-#   WINDOWS_SYSTEM32  /mnt/c/Windows/System32   netstat.exe, taskkill.exe
-#   DESKTOP_DIR       /mnt/c/osrs-test          the first desktop; the Nth is DESKTOP_DIR<N> (jdk/bin/java.exe, jps.exe)
+#   WINDOWS_SYSTEM32  /mnt/c/Windows/System32   netstat.exe, taskkill.exe, robocopy.exe
+#   DESKTOP_DIR       /mnt/c/osrs-test          the desktops' template; each up's instances are DESKTOP_DIR/run/N (jdk/bin/java.exe, jps.exe)
 set -euo pipefail
 verb=$1; slug=${2:-${SLUG:-}}; arg=${3:-}   # a contract row passes no slug: hd exports SLUG
 self=$(cd "$(dirname "$0")" && pwd)
@@ -49,44 +49,45 @@ offline() { until [ "$(sql "select count(*) from main.character_progress where o
 sys32=${WINDOWS_SYSTEM32:-/mnt/c/Windows/System32}; desk=${DESKTOP_DIR:-/mnt/c/osrs-test}
 need() { [ -x "$1" ] || { echo "$1 not found: set $2" >&2; exit 2; }; }   # need <program> <the variable that locates it>
 tcp() { "$sys32/netstat.exe" -ano -p TCP | tr -d '\r' | awk '$4=="LISTENING"{n=split($2,a,":");print a[n], $5}'; }   # "<port> <Windows PID>" of each Windows listening socket
-marked() { "$desk/jdk/bin/jps.exe" -v | tr -d '\r' | awk -v m="-Dosrstest.marker=osrs-test-$1" '{for (f = 3; f <= NF; f++) if ($f == m) {print $1, $2; next}}'; }   # "<Windows PID> <main class>" of instance N's JVMs: only desktop_start sets the marker
-owned() {  # the desktops a live run's up.json lists (its server container runs), one "desktopN:port[:pids]" per line
-  for f in "$root"/state/*/up.json; do
-    [ -e "$f" ] && [ "$(docker inspect -f '{{.State.Running}}' "server-$(basename "$(dirname "$f")")" 2>/dev/null)" = true ] || continue
-    python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print("\n".join(d.get("desktops", d.get("clients", "")).split()))' "$f"   # shortcut: reads an up.json written before the rename to desktops; drop "clients" once no live run's up.json carries it
+marked() { "$desk/jdk/bin/jps.exe" -v | tr -d '\r' | awk -v m="-Dosrstest.marker=osrs-test-run$1" '{for (f = 3; f <= NF; f++) if ($f == m) {print $1, $2; next}}'; }   # "<Windows PID> <main class>" of instance N's JVMs: only desktop_start sets the marker
+# The desktops: each up creates its own instances. DESKTOP_DIR is the template (JDK, RSProx and its launcher, a staged
+# home); instance N is the dir DESKTOP_DIR/run/N, claimed by its mkdir and naming its up's slug in run/N/owner, with its
+# own home copied from the template's (devtools plugin: the live client's build), devtools port 7779+N and RSProx ports
+# moved up by N-1 (the launcher takes 0..50). Every JVM of instance N carries -Dosrstest.marker=osrs-test-runN;
+# nothing without it is ever stopped (the user's own RuneLite). down stops and removes the instances its slug owns.
+desktop_start() {  # sets inst dt (desktopN, its devtools port)
+  local i d dp w t busy
+  need "$sys32/netstat.exe" WINDOWS_SYSTEM32; need "$sys32/robocopy.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/java.exe" DESKTOP_DIR; need "$desk/jdk/bin/jps.exe" DESKTOP_DIR
+  mkdir -p "$desk/run"; busy=$(tcp | cut -d' ' -f1)
+  for i in $(seq 1 51); do d=$desk/run/$i; dp=$((7779 + i))
+    grep -qx "$dp" <<< "$busy" || ! mkdir "$d" 2>/dev/null || break; d=   # mkdir is the claim: no two ups get one N
   done
-}
-# The desktops: the staged dirs DESKTOP_DIR, DESKTOP_DIR2 .. DESKTOP_DIR5 (JDK, RSProx launcher, RuneLite; the devtools
-# plugin is the live client's build, copied in at each start), devtools port 7779+N for the Nth, run through WSL interop by absolute path. Every JVM of instance N
-# carries -Dosrstest.marker=osrs-test-N; nothing without it is ever stopped (the user's own RuneLite).
-desktop_start() {  # under state/desktop.lock: stops the desktops no live run owns, starts the first instance no desktop answers on;
-  # sets inst dt pids (desktopN, its devtools port, the launcher's and the port's Windows PIDs) and keeps the lock until the caller lists the desktop in up.json
-  local i d dp w own busy
-  need "$sys32/netstat.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/java.exe" DESKTOP_DIR; need "$desk/jdk/bin/jps.exe" DESKTOP_DIR
-  exec 9> "$root/state/desktop.lock"; flock 9
-  own=$(owned | cut -d: -f1)
-  for i in 1 2 3 4 5; do grep -qx "desktop$i" <<< "$own" || desktop_stop "desktop$i"; done   # the sweep: a desktop no live run lists is an orphan
-  busy=$(tcp | cut -d' ' -f1)
-  for i in 1 2 3 4 5; do d=$desk${i#1}; dp=$((7779 + i)); grep -qx "desktop$i" <<< "$own" || grep -qx "$dp" <<< "$busy" || [ -n "$(marked "$i")" ] || break; d=; done
   [ -n "$d" ] || { echo "no free desktop instance" >&2; return 1; }
+  echo "$slug" > "$d/owner"; w=$(wslpath -w "$d")
+  "$sys32/robocopy.exe" "$(wslpath -w "$desk/home")" "$w\\home" /E /MT:16 /NFL /NDL /NJH /NJS /NP /XD screenshots logs > /dev/null || [ $? -lt 8 ]   # robocopy: below 8 is success
+  sed -i "s/^openrunedevtools\.port=.*/openrunedevtools.port=$dp/" "$d"/home/.rlcustom/settings.properties "$d"/home/.rlcustom/profiles2/*.properties
   mkdir -p "$d/home/.rlcustom/sideloaded-plugins" && cp "$jar" "$d/home/.rlcustom/sideloaded-plugins/OpenRune-Developer-Tools.jar"
-  w=$(wslpath -w "$d")
   printf '%s\n' "- name: OpenRune Test - $slug" "  jav_config_url: http://127.0.0.1:$http/jav_config.ws" "  modulus: $modulus" "  revision: 241.1" \
     "  game_server_port: $game" "  runelite_bootstrap_commithash: e617bef1a7f5c39fbe8768994d27d638941efd5d" "  binary_folder: openrune-qa" > "$d/home/.rsprox/proxy-targets.yaml"
-  (cd "$d" && JAVA_TOOL_OPTIONS="-Duser.home=$w\\home -Dosrstest.marker=osrs-test-$i" WSLENV=${WSLENV:+$WSLENV:}JAVA_TOOL_OPTIONS \
-    exec setsid "$d/jdk/bin/java.exe" "-Dosrstest.marker=osrs-test-$i" "-Dosrstest.portskip=$((20 * (i - 1)))" "-Dosrstest.target=OpenRune Test - $slug" \
-    -cp "$w\\rsprox\\launcher;$w\\rsprox\\lib\\*" OsrsTestLauncher) < /dev/null > /dev/null 2>&1 9>&- &   # nothing may hold the caller's pipe or the lock
+  t=$(wslpath -w "$desk")
+  (cd "$d" && JAVA_TOOL_OPTIONS="-Duser.home=$w\\home -Dosrstest.marker=osrs-test-run$i" WSLENV=${WSLENV:+$WSLENV:}JAVA_TOOL_OPTIONS \
+    exec setsid "$desk/jdk/bin/java.exe" "-Dosrstest.marker=osrs-test-run$i" "-Dosrstest.portskip=$((i - 1))" "-Dosrstest.target=OpenRune Test - $slug" \
+    -cp "$t\\rsprox\\launcher;$t\\rsprox\\lib\\*" OsrsTestLauncher) < /dev/null > /dev/null 2>&1 &   # nothing may hold the caller's pipe
   w=$!
   until tcp | grep -q "^$dp "; do   # the devtools endpoint answers, or the desktop died
     kill -0 "$w" 2>/dev/null || { echo "desktop $i exited" >&2; return 1; }; sleep 2
   done
   inst=desktop$i; dt=$dp
-  pids=$( { marked "$i" | awk '$2=="OsrsTestLauncher"{print $1}'; tcp | awk -v p="$dp" '$1==p{print $2}'; } | paste -sd, -)
 }
-desktop_stop() {  # desktopN [pids]: the process tree of each recorded Windows PID, or with none every JVM of the instance; only JVMs carrying its marker
-  local i=${1#desktop} m p t=${2:-}; need "$sys32/taskkill.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/jps.exe" DESKTOP_DIR
-  m=$(marked "$i" | cut -d' ' -f1)
-  t=${t//,/ }; for p in ${t:-$m}; do grep -qx "$p" <<< "$m" && "$sys32/taskkill.exe" /F /T /PID "$p" > /dev/null 2>&1 || true; done
+desktops_remove() {  # stops every JVM carrying the marker of an instance this slug owns, then removes the instance
+  local o i p; need "$sys32/taskkill.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/jps.exe" DESKTOP_DIR
+  for o in "$desk"/run/*/owner; do
+    [ -f "$o" ] && [ "$(cat "$o")" = "$slug" ] || continue; i=$(basename "$(dirname "$o")")
+    until [ -z "$(marked "$i")" ]; do   # a running JVM holds its files
+      for p in $(marked "$i" | cut -d' ' -f1); do "$sys32/taskkill.exe" /F /T /PID "$p" > /dev/null 2>&1 || true; done; sleep 1
+    done
+    rm -rf "${o%/owner}"
+  done
 }
 
 devtools_jar() {  # sets jar: the devtools classes jar of the client track's build of slug live (origin/HEAD of the client), cached by its T
@@ -158,9 +159,8 @@ up() {
   desktops=(); accounts=()
   for i in $(seq 1 "$n"); do
     desktop_start
-    desktops+=("$inst:$dt:$pids"); accounts+=("$(account "$i")")
-    printf '{"game": %s, "http": %s, "desktops": "%s", "accounts": "%s"}\n' "$game" "$http" "${desktops[*]}" "${accounts[*]}" > "$state/up.json"   # before the login: down stops exactly the desktops this up started
-    flock -u 9   # listed: a later sweep sees this desktop owned
+    desktops+=("$inst:$dt"); accounts+=("$(account "$i")")
+    printf '{"game": %s, "http": %s, "desktops": "%s", "accounts": "%s"}\n' "$game" "$http" "${desktops[*]}" "${accounts[*]}" > "$state/up.json"   # before the login: restart and the devtools tools find each desktop
     python3 "$self/server/desktop_login.py" "$dt" "$(account "$i")" "$(account "$i")"      # creates the account on first login; prints LOGGED_IN or FAILED: reason
   done
   # members and rights are read at login and members written by the save at logout: log out, wait until no character of this up is online, update, log in
@@ -179,9 +179,7 @@ restart() {  # the server container restarted with its game.yml and database; th
   echo "restarted: quest-requirements $(sed -n '/quest-requirements:/,/mode:/p' "$state/game.yml" | grep -o 'mode:.*')"
 }
 down() {
-  for c in $(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d.get("desktops", d.get("clients", "")))' "$state/up.json" 2>/dev/null); do
-    (desktop_stop "$(cut -d: -f1 <<< "$c")" "$(cut -d: -f3 <<< "$c")") || true   # a missing program still lets the containers go
-  done
+  (desktops_remove) || true   # a missing program still lets the containers go
   if [ "$(docker inspect -f '{{.State.Running}}' "server-$slug" 2>/dev/null)" = true ] && docker logs "server-$slug" 2>&1 | grep -q "Server ready in"; then offline; fi   # the server drops each disconnected character and saves it: RESUME starts there
   docker rm -f "server-$slug" "http-$slug" >/dev/null 2>&1 || true; rm -f "$state/up.json"; echo "down"
 }
