@@ -32,7 +32,9 @@ public data class CentralPostgresYaml(
 }
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public data class TokenLoginYaml(val secret: String = "")
+public data class TokenLoginYaml(val secret: String = "") {
+    override fun toString(): String = "TokenLoginYaml(secret=${redactSecret(secret)})"
+}
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public data class GameDatabaseYaml(
