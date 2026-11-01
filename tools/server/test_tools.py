@@ -40,12 +40,16 @@ class CacheStore(unittest.TestCase):
 
 
 class Central(unittest.TestCase):
-    def test_a_build_with_central_includes_that_central_at_its_commit(s):  # a server change needing a Central change built against the published dev.or2
-        b = (HERE.parent / "track.sh").read_text().split("\nbuild() {")[1].split("\n}")[0]
-        s.assertIn('read -r cpath ccommit <<< "$CENTRAL"', b)
-        s.assertIn('worktree add -q --detach "$cdir" "$ccommit"', b)
-        s.assertIn('-v "$cdir:$cdir"', b)
-        s.assertIn("${CDIR:+ --init-script /central.init.gradle}", b)
+    def test_build_and_test_include_that_central_at_its_commit(s):  # a server change needing a Central change built, then tested, against the published dev.or2
+        src = (HERE.parent / "track.sh").read_text()
+        c = src.split("\ncentral() {")[1].split("\n}")[0]
+        s.assertIn('read -r cpath ccommit <<< "$CENTRAL"', c)
+        s.assertIn('worktree add -q --detach "$cdir" "$ccommit"', c)
+        s.assertIn('-v "$cdir:$cdir"', c)
+        for verb in ("build", "tests"):
+            b = src.split(f"\n{verb}() {{")[1].split("\n}")[0]
+            for want in ("central;", '"${cvols[@]}"', 'CDIR="$cdir"', "${CDIR:+ --init-script /central.init.gradle}"):
+                s.assertIn(want, b, verb)
         init = (HERE / "central.init.gradle").read_text()  # openrune-central is named unlike its project: substituted explicitly
         for m, p in (("openrune-central", "central-app"), ("central-common", "central-common"), ("central-worldlink", "central-worldlink")):
             s.assertIn(f"substitute module('dev.or2:{m}') using project(':{p}')", init)
@@ -427,7 +431,7 @@ mkdir -p {copy}/mod/build/test-results/test; echo '<testsuite name="ATest" tests
         fn = lambda name: f"{name}() {{" + src.split(f"\n{name}() {{")[1].split("\n}")[0] + "\n}"
         line = lambda pre: next(l for l in src.splitlines() if l.startswith(pre))
         script = "\n".join(["set -euo pipefail", f"slug=s1; repo={s.repo}; copy={copy}; state={root}/st; root={root}; T=t1; tc={tc}",
-                            line("record()"), line("projects()"), line("projdir()"), "build() { :; }", fn("tests"), "tests"])
+                            line("record()"), line("projects()"), line("projdir()"), "build() { :; }", fn("central"), fn("tests"), "tests"])
         r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={**os.environ, "EVIDENCE": "", "PATH": f"{root}/bin:{os.environ['PATH']}"})
         s.assertEqual(r.returncode, 0, r.stderr + r.stdout)
         s.assertEqual((root / "tasks").read_text().split(), [":mod:test", ":mod:spotlessCheck"])
