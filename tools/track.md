@@ -56,7 +56,9 @@ up <slug> [N]` starts the server from that build with N logged-in desktops and p
 `tools/track.sh log <slug> <pattern>` reads the server log; `tools/track.sh restart <slug>` restarts that server,
 its game.yml and database kept, and logs the desktops in again. Each up starts a fresh database; `RESUME=1
 tools/track.sh up <slug>` starts from the accounts as the change's last `down` saved them (down waits until the server
-has saved and dropped every character), so a run resumes where the last stopped. The server `up` starts runs the image's game.yml with
+has saved and dropped every character), so a run resumes where the last stopped. The realm is live's (`dev_mode` off) and every
+desktop's account a member at rank 0, as a player on live; `STAFF=<N>` on one `up` makes the Nth desktop's account an
+administrator, for a row that needs staff. The server `up` starts runs the image's game.yml with
 `quest-requirements` `mode` set by the change's front matter `quest-mode:`: `respect-progress` by default, so every
 quest requirement is judged for real, or `assume-completed` (upstream's default, which skips every quest check) for
 content gated by a quest main does not register; `QUEST_MODE=<mode>` on one `up` overrides it (a refusal row of

@@ -404,3 +404,26 @@ class JavConfig(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RealmLikeLive(unittest.TestCase):  # Central seeds a dev realm: every login an administrator, unlike live
+    t = (HERE.parent / "track.sh").read_text()
+    up = t.split("\nup() {")[1].split("\n}")[0]
+    fn = next(l for l in t.splitlines() if l.startswith("account()"))
+
+    def test_up_turns_the_dev_realm_off_and_restarts_before_any_login(s):
+        line = next(l for l in s.up.splitlines() if "dev_mode = 0" in l)
+        s.assertLess(s.up.index(line), s.up.index("desktop_start"))
+        call = lambda out: subprocess.run(["bash", "-c", f'set -euo pipefail\nsql() {{ echo "{out}"; }}\ndocker() {{ echo "docker $*" >&2; }}\nready() {{ echo "ready $*" >&2; }}\nslug=s\n{line}'], capture_output=True, text=True)
+        r = call("1"); s.assertEqual(r.returncode, 0, r.stderr); s.assertIn("docker restart server-s", r.stderr); s.assertRegex(r.stderr, r"ready server-s \d")
+        r = call(""); s.assertEqual(r.returncode, 0, r.stderr); s.assertEqual(r.stderr, "")   # already live (RESUME): no restart
+
+    def test_every_account_is_a_player_unless_staff_names_its_desktop(s):
+        line = next(l for l in s.up.splitlines() if "update accounts set rights" in l)
+        s.assertLess(s.up.index("  offline"), s.up.index(line))
+        q = lambda staff: subprocess.run(["bash", "-c", f'set -euo pipefail\nsql() {{ echo "$1"; }}\n{s.fn}\nslug=s\n{line.replace(">/dev/null", "")}'],
+                                         capture_output=True, text=True, env={**os.environ, **({"STAFF": staff} if staff else {})}).stdout
+        name = lambda i: subprocess.run(["bash", "-c", f'{s.fn}\nslug=s; account {i}'], capture_output=True, text=True).stdout.strip()
+        s.assertIn(f"lower(account_name) = '{name(0)}' then", q(None))   # no desktop is numbered 0
+        s.assertIn(f"lower(account_name) = '{name(2)}' then 'ADMINISTRATOR' else ''", q("2"))
+        s.assertIn(f"like '{name('')}%'", q("2"))

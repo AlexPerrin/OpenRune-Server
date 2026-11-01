@@ -7,7 +7,8 @@
 #   up [N]            server-<slug> and http-<slug> from or:<T> on the change's ports (quest mode: QUEST_MODE, else the change's front
 #                     matter quest-mode, else respect-progress; or assume-completed), N desktops logged in,
 #                     each loading the live client's devtools jar (CLIENT_TRACK: the client track's script, its build of slug live);
-#                     a fresh database, or with RESUME=1 the accounts as the change's last down saved them
+#                     a fresh database, or with RESUME=1 the accounts as the change's last down saved them; the realm as live
+#                     (dev_mode off), every account a member at rank 0, or with STAFF=N the Nth desktop's an administrator
 #   restart           restarts server-<slug>, its game.yml and database kept, and logs up's desktops in again
 #   down              stops the desktops, waits until the server has saved and dropped their characters, removes the containers
 #   gate TCOMMIT      every check: and gate: row of the contract from the build copy (`hd rows`)
@@ -150,6 +151,8 @@ up() {
     -e WORLD_HOST=127.0.0.1 -e HTTP_PUBLIC_PORT="$http" -e WORLD_ID=255 -e SAVE_DIR=/tmp/saves -e JAV_CONFIG_TEMPLATE=/app/protocol/jav_config.ws.template \
     -e LOCAL_AUTH=false -e PROOF_OF_WORK=false -e VALIDATE_CRCS=false osrs-rsps-test:241 >/dev/null
   ready "server-$slug"
+  # Central seeds a dev realm (every login an administrator); the server reads its realm at boot: as live, then restarted
+  if [ -n "$(sql "update realms set dev_mode = 0 where dev_mode <> 0 returning 1")" ]; then since=$(date -u +%FT%TZ); docker restart "server-$slug" >/dev/null; ready "server-$slug" "$since"; fi
   python3 "$self/server/javcheck.py" "http://127.0.0.1:$http/jav_config.ws" || { down; return 1; }   # no desktop is pointed at a foreign host
   modulus=$(openssl rsa -in "$state/key/game.key" -noout -modulus | cut -d= -f2 | tr A-F a-f)
   desktops=(); accounts=()
@@ -160,10 +163,11 @@ up() {
     flock -u 9   # listed: a later sweep sees this desktop owned
     python3 "$self/server/desktop_login.py" "$dt" "$(account "$i")" "$(account "$i")"      # creates the account on first login; prints LOGGED_IN or FAILED: reason
   done
-  # members is written by the character save at logout: log out, wait until no character of this up is online, update, log in
+  # members and rights are read at login and members written by the save at logout: log out, wait until no character of this up is online, update, log in
   for c in "${desktops[@]}"; do python3 "$self/server/desktop_login.py" "$(cut -d: -f2 <<< "$c")" logout; done
   offline
   sql "update account_characters set members = true where id in ($mine)" >/dev/null
+  sql "update accounts set rights = case when lower(account_name) = '$(account "${STAFF:-0}")' then 'ADMINISTRATOR' else '' end where lower(account_name) like '$(account)%'" >/dev/null   # players as on live; STAFF=N: the Nth desktop's account an administrator
   for i in "${!desktops[@]}"; do python3 "$self/server/desktop_login.py" "$(cut -d: -f2 <<< "${desktops[$i]}")" "${accounts[$i]}" "${accounts[$i]}"; done
   echo "up: game $game http $http desktops ${desktops[*]}"
 }
