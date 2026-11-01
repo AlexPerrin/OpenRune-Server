@@ -1,5 +1,5 @@
 """The contract's script rows against a throwaway git repo: python3 -m unittest tools/server/test_tools.py"""
-import os, shutil, subprocess, sys, tempfile, unittest
+import json, os, shutil, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -115,6 +115,17 @@ class Snapshot(Repo):
         subprocess.run(["bash", str(HERE.parent / "track.sh"), "build", "s1"], capture_output=True, env={**os.environ, "CLONE": s.repo, "HD_ROOT": root, "T": ""})
         files = out.read_text().split()
         s.assertIn("generated/build.gradle.kts", files); s.assertIn("new.kt", files)
+        shutil.rmtree(root)
+
+
+class Measure(unittest.TestCase):
+    def test_measure_writes_under_the_goal_not_the_target(s):
+        root = Path(tempfile.mkdtemp()); (root / "harness/goals").mkdir(parents=True)
+        (root / "harness/goals/server-content.json").write_text("[]")
+        r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "measure", "server-content", "abc123"], capture_output=True, text=True, env={**os.environ, "HD_ROOT": str(root), "TREE": "t1"})
+        s.assertEqual(r.returncode, 0, r.stderr)
+        s.assertEqual(json.loads((root / "state/server-content/measure.json").read_text())["value"], 0.0)
+        s.assertFalse((root / "state/abc123").exists())
         shutil.rmtree(root)
 
 

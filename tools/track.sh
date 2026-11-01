@@ -136,7 +136,7 @@ EOF
   fi
 }
 measure() {  # the goal's inventory: share of rows passing
-  python3 - "$root/harness/goals/server-content.json" "$root/state/$arg/measure.json" "${TREE:-}" <<'EOF'
+  python3 - "$root/harness/goals/server-content.json" "$state/measure.json" "${TREE:-}" <<'EOF'
 import json, sys
 rows = json.load(open(sys.argv[1])); value = 100.0 * sum(1 for r in rows if r.get("passes")) / len(rows) if rows else 0.0
 json.dump({"tree": sys.argv[3], "value": value, "report": sys.argv[1]}, open(sys.argv[2], "w")); print(f"server-content: {value:g}")
