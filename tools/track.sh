@@ -50,7 +50,8 @@ offline() { until [ "$(sql "select count(*) from main.character_progress where o
 
 sys32=${WINDOWS_SYSTEM32:-/mnt/c/Windows/System32}; desk=${DESKTOP_DIR:-/mnt/c/osrs-test}
 need() { [ -x "$1" ] || { echo "$1 not found: set $2" >&2; exit 2; }; }   # need <program> <the variable that locates it>
-tcp() { "$sys32/netstat.exe" -ano -p TCP | tr -d '\r' | awk '$4=="LISTENING"{n=split($2,a,":");print a[n], $5}'; }   # "<port> <Windows PID>" of each Windows listening socket
+# a loaded host's WSL interop can leave a Windows program hanging (accept4 failed 110): each listing ends, failed, and is asked again
+tcp() { timeout 20 "$sys32/netstat.exe" -ano -p TCP | tr -d '\r' | awk '$4=="LISTENING"{n=split($2,a,":");print a[n], $5}'; }   # "<port> <Windows PID>" of each Windows listening socket
 marked() { "$desk/jdk/bin/jps.exe" -v | tr -d '\r' | awk -v m="-Dosrstest.marker=osrs-test-run$1" '{for (f = 3; f <= NF; f++) if ($f == m) {print $1, $2; next}}'; }   # "<Windows PID> <main class>" of instance N's JVMs: only desktop_start sets the marker
 # The desktops: each up creates its own instances. DESKTOP_DIR is the template (JDK, RSProx and its launcher, a staged
 # home); instance N is the dir DESKTOP_DIR/run/N, claimed by its mkdir and naming its up's slug in run/N/owner, with its
@@ -60,7 +61,7 @@ marked() { "$desk/jdk/bin/jps.exe" -v | tr -d '\r' | awk -v m="-Dosrstest.marker
 desktop_start() {  # sets inst dt (desktopN, its devtools port)
   local i d dp w t busy
   need "$sys32/netstat.exe" WINDOWS_SYSTEM32; need "$sys32/robocopy.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/java.exe" DESKTOP_DIR; need "$desk/jdk/bin/jps.exe" DESKTOP_DIR
-  mkdir -p "$desk/run"; busy=$(tcp | cut -d' ' -f1)
+  mkdir -p "$desk/run"; until busy=$(tcp); do sleep 1; done; busy=$(cut -d' ' -f1 <<< "$busy")
   for i in $(seq 1 51); do d=$desk/run/$i; dp=$((7779 + i))
     grep -qx "$dp" <<< "$busy" || ! mkdir "$d" 2>/dev/null || break; d=   # mkdir is the claim: no two ups get one N
   done
@@ -74,10 +75,10 @@ desktop_start() {  # sets inst dt (desktopN, its devtools port)
   t=$(wslpath -w "$desk")
   (cd "$d" && JAVA_TOOL_OPTIONS="-Duser.home=$w\\home -Dosrstest.marker=osrs-test-run$i" WSLENV=${WSLENV:+$WSLENV:}JAVA_TOOL_OPTIONS \
     exec setsid "$desk/jdk/bin/java.exe" "-Dosrstest.marker=osrs-test-run$i" "-Dosrstest.portskip=$((i - 1))" "-Dosrstest.target=OpenRune Test - $slug" \
-    -cp "$t\\rsprox\\launcher;$t\\rsprox\\lib\\*" OsrsTestLauncher) < /dev/null > /dev/null 2>&1 &   # nothing may hold the caller's pipe
+    -cp "$t\\rsprox\\launcher;$t\\rsprox\\lib\\*" OsrsTestLauncher) < /dev/null > "$state/desktop$i.log" 2>&1 &   # nothing may hold the caller's pipe
   w=$!
   until tcp | grep -q "^$dp "; do   # the devtools endpoint answers, or the desktop died
-    kill -0 "$w" 2>/dev/null || { echo "desktop $i exited" >&2; return 1; }; sleep 2
+    kill -0 "$w" 2>/dev/null || { echo "desktop $i exited: $(tail -3 "$state/desktop$i.log")" >&2; return 1; }; sleep 2
   done
   inst=desktop$i; dt=$dp
 }

@@ -145,7 +145,7 @@ class DesktopInstance(unittest.TestCase):
     def setUp(s):
         s.t = t = Path(tempfile.mkdtemp()); (t / "state").mkdir(); (t / "bin").mkdir(); (t / "sys32").mkdir(); (t / "win").mkdir()
         exe = lambda p, body: (p.write_text("#!/bin/bash\n" + body), p.chmod(0o755))
-        exe(t / "sys32/netstat.exe", f'for f in {t}/win/*.port; do [ -e "$f" ] && echo "  TCP 127.0.0.1:$(cat $f) 0.0.0.0:0 LISTENING $(basename $f .port)"; done; true\n')
+        exe(t / "sys32/netstat.exe", f'[ -e {t}/interop-fails ] && {{ rm {t}/interop-fails; echo "<3>WSL ERROR: UtilAcceptVsock:273: accept4 failed 110" >&2; exit 1; }}; for f in {t}/win/*.port; do [ -e "$f" ] && echo "  TCP 127.0.0.1:$(cat $f) 0.0.0.0:0 LISTENING $(basename $f .port)"; done; true\n')
         exe(t / "sys32/taskkill.exe", f'echo "$4" >> {t}/killed; [ -e {t}/win/$4.dir ] && chmod u+w "$(cat {t}/win/$4.dir)/held"; rm -f {t}/win/$4.*\n')
         exe(t / "sys32/robocopy.exe", 'cp -r "$1" "${2//\\\\//}"; exit 1\n')   # 1: files copied
         exe(t / "bin/wslpath", 'sleep 0.5; echo "$2"\n')   # widens the window between picking an instance and claiming it
@@ -168,7 +168,7 @@ class DesktopInstance(unittest.TestCase):
         if port: (s.t / f"win/{pid}.port").write_text(f"{port}\n")
 
     def sh(s, slug, body):
-        return subprocess.Popen(["bash", "-c", f"set -euo pipefail; root={s.t}; slug={slug}; state={s.t}/state/{slug}; http=1; game=2; modulus=3; jar={s.t}/devtools.jar\n{s.fns}\n{body}"], stdout=subprocess.PIPE, text=True, env=s.env)
+        return subprocess.Popen(["bash", "-c", f"set -euo pipefail; root={s.t}; slug={slug}; state={s.t}/state/{slug}; mkdir -p $state; http=1; game=2; modulus=3; jar={s.t}/devtools.jar\n{s.fns}\n{body}"], stdout=subprocess.PIPE, text=True, env=s.env)
 
     def killed(s):
         return sorted((s.t / "killed").read_text().split()) if (s.t / "killed").exists() else []
@@ -182,6 +182,13 @@ class DesktopInstance(unittest.TestCase):
             s.assertEqual((s.t / f"desk/run/{n}/home/.rlcustom/profiles2/p.properties").read_text(), f"openrunedevtools.port={port}\n")
             s.assertTrue((s.t / f"desk/run/{n}/home/.rlcustom/sideloaded-plugins/OpenRune-Developer-Tools.jar").exists())
         s.assertEqual(sorted((s.t / "desk/run" / g[len("desktop"):].split(":")[0] / "owner").read_text().strip() for g in got), ["s0", "s0", "s1", "s1", "s2", "s2"])
+
+    def test_a_failed_windows_listing_is_asked_again_and_the_launcher_logs(s):  # a loaded host: netstat.exe through WSL interop failed or hung, up waited forever
+        (s.t / "interop-fails").write_text("")
+        p = s.sh("a", "desktop_start; echo $inst $dt"); out = p.communicate(timeout=60)[0].split()
+        s.assertEqual((p.returncode, out), (0, ["desktop1", "7780"])); s.assertFalse((s.t / "interop-fails").exists())
+        s.assertTrue((s.t / "state/a/desktop1.log").exists())   # the launcher's output, read when a desktop never opens its port
+        s.assertIn('timeout 20 "$sys32/netstat.exe"', (HERE.parent / "track.sh").read_text())   # a hung listing ends and is asked again
 
     def test_a_port_another_program_holds_is_skipped_and_never_stopped(s):  # the user's own RuneLite on a harness port
         s.proc(500, "RuneLite", None, 7780)

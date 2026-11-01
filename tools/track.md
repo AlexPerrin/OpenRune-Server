@@ -78,7 +78,12 @@ creates the desktops it needs: instance N is `DESKTOP_DIR/run/N`, claimed by its
 7779+N no program holds), naming the up's slug in `run/N/owner`, with its own home copied from the template's. Every JVM
 of instance N carries `-Dosrstest.marker=osrs-test-runN`, and only such a JVM is ever stopped (never the user's own
 RuneLite). up lists each desktop in `up.json` (field `desktops`: `desktopN:port`) before its login; `down` stops the
-JVMs of every instance its slug owns until none is alive and none holds a file (jps can miss a live one), then removes those instances, each owner file last so a failed down re-runs; a build waits for a running build of its slug (`state/<slug>/build.lock`) and reuses its image.
+JVMs of every instance its slug owns until none is alive and none holds a file (jps can miss a live one), then removes those instances, each owner file last so a failed down re-runs; The server logs out a desktop that sends no input
+for a while, as live does: a script that only reads (a sampler) presses a key now and then, and reads `gameState`
+from `get_client_state`; the `osrs-devtools-desktop` answers name a session that dropped. A dropped desktop logs in
+again with `python3 tools/server/desktop_login.py <port> <account> <account>` (both from `up.json`). Each launcher's
+output is `state/<slug>/desktopN.log`; the client's own is `DESKTOP_DIR/run/N/home/.runelite/logs/client.log` while the
+instance lives. a build waits for a running build of its slug (`state/<slug>/build.lock`) and reuses its image.
 
 ## The reviewer
 Never writes the code it checks. Judges every contract row from the same build (`tools/track.sh up <slug>`),
