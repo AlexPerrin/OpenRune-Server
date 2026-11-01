@@ -17,7 +17,7 @@ import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.player.ui.ifOpenOverlay
 import org.rsmod.api.player.ui.ifSetEvents
 import org.rsmod.api.player.vars.VarPlayerIntMapSetter
-import org.rsmod.api.script.advanced.onOpPlayer2
+import org.rsmod.api.script.advanced.onOpPlayer5
 import org.rsmod.api.script.onArea
 import org.rsmod.api.script.onAreaExit
 import org.rsmod.api.script.onEvent
@@ -36,7 +36,7 @@ private const val FOUNDERS = 5
 private const val FOUNDER_SLOTS = 5
 private const val FOUNDER_PLAYTIME = 25 * 60 * 100
 private const val CLAN_TAB = 1
-private const val RECRUIT_OP = 2
+private const val RECRUIT_OP = 5
 private const val LIST_PLAYERS = "clientscript.[clientscript,clan_create_side_list_players]"
 private const val UPDATE_BUTTON_TEXT = "clientscript.[clientscript,script4447]"
 
@@ -66,7 +66,7 @@ class ClanFoundingScript @Inject constructor(private val clans: Clans, private v
         onOpPlayerT("component.clans_creation_sidepanel:invite") { invite(it.target) }
         onArea("area.clan_hub") { MiscOutput.setPlayerOp(player, RECRUIT_OP, "Recruit") }
         onAreaExit("area.clan_hub") { MiscOutput.clearPlayerOp(player, RECRUIT_OP, "Recruit") }
-        onOpPlayer2 { if (player.isInRecruitArea()) invite(it.target) }
+        onOpPlayer5 { if (player.isInRecruitArea()) invite(it.target) }
         onEvent<ClanFounderAccept> { accept(player, leader) }
         onEvent<SessionStateEvent.Logout> { leaveFounding(player) }
         onEvent<SessionStateEvent.Delete> { leaveFounding(player) }
