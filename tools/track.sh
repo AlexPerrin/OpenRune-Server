@@ -51,7 +51,7 @@ build() {
       if [ -d /store/$CK ]; then cp -a /store/$CK/. .data/cache/; else
         $g :or-cache:freshCache :or-cache:mergePluginGamevals :or-cache:buildCache
         mkdir -p /store/$CK && cp -a .data/cache/. /store/$CK/
-        for z in ~/.openrune/caches/*/*/*-disk.zip; do d=/dl/$(basename $(dirname $(dirname $z)))/$(basename $(dirname $z)); mkdir -p $d; cp -n $z $d/; done
+        for z in ~/.openrune/caches/*/*/*-disk.zip; do [ -e "$z" ] || continue; d=/dl/$(basename $(dirname $(dirname $z)))/$(basename $(dirname $z)); mkdir -p $d; cp -n $z $d/; done
       fi
       $g generateRsa :server:app:installDist -x test' > "$log" 2>&1 || { record false build < "$log"; echo "build failed: $log"; return 1; }
   st=$copy/.image; rm -rf "$st"; mkdir -p "$st/data"
