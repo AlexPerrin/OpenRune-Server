@@ -4,6 +4,7 @@ import dev.openrune.util.Wearpos
 import org.rsmod.api.config.constants
 import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.script.onOpNpc1
+import org.rsmod.content.other.gravestones.deathOffice
 import org.rsmod.content.quest.manager.Quest
 import org.rsmod.game.inv.isType
 import org.rsmod.plugin.scripts.ScriptContext
@@ -258,7 +259,7 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
             choice2(
                 "Repeated failure on mortgage repayments.",
                 1,
-                "I don't know, I just wanted this house.",
+                "I don't know. I just wanted this house.",
                 2,
             )
         if (grounds != 1) {
@@ -346,7 +347,7 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
             return
         }
 
-        if (access.bank.contains(Amulet)) {
+        if (access.bank.contains(Amulet) || player.deathOffice.contains(Amulet)) {
             chatNpc(
                 angry,
                 "You come here wasting my time... Has it even occurred to you that you've got it " +
@@ -456,7 +457,7 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
                     "I'm impressed. You must be very powerful. I don't suppose you can stop me " +
                         "being a ghost?",
                 )
-                ghostOfferHelp()
+                ghostOfferHelp("Yes, ok. Do you know WHY you're a ghost?")
             }
 
             else -> {
@@ -466,13 +467,13 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
                     "Oh! It's your amulet that's doing it! I did wonder. I don't suppose you can " +
                         "help me? I don't like being a ghost.",
                 )
-                ghostOfferHelp()
+                ghostOfferHelp("Yes, ok. Do you know why you're a ghost?")
             }
         }
     }
 
-    private suspend fun Dialogue.ghostOfferHelp() {
-        val help = choice2("Yes, ok. Do you know why you're a ghost?", 1, "No, you're scary!", 2)
+    private suspend fun Dialogue.ghostOfferHelp(yes: String) {
+        val help = choice2(yes, 1, "No, you're scary!", 2)
         if (help != 1) {
             chatPlayer(worried, "No, you're scary!")
             chatNpc(angry, "Great.")

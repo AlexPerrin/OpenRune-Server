@@ -79,7 +79,6 @@ internal class TheRestlessGhostScenery(
     // Use a soft timer for cleanup; soft queues would close unrelated modals while pending.
     private suspend fun ProtectedAccess.openCoffin(coffin: BoundLocInfo) {
         arriveDelay()
-        mes("You open the coffin.")
         faceSquare(coffin.coords)
         delay(1)
 
@@ -88,7 +87,11 @@ internal class TheRestlessGhostScenery(
         delay(1)
 
         locRepo.change(coffin, OpenCoffin, CoffinOpenTicks)
+        raiseGhost(coffin)
+        mesbox("You open the coffin.")
+    }
 
+    private fun ProtectedAccess.raiseGhost(coffin: BoundLocInfo) {
         if (!player.ghostCanRise()) {
             return
         }

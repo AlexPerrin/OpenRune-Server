@@ -11,6 +11,7 @@ dependencies {
     testImplementation(projects.api.registry)
     testImplementation(libs.fastutil)
     implementation(projects.content.other.sawmill)
+    implementation(projects.content.other.gravestones)
     implementation(projects.api.pluginCommons)
     implementation(projects.api.attr)
     implementation(projects.api.bottomlessMilk)
