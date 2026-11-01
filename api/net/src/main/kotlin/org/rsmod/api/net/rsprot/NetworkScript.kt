@@ -140,7 +140,11 @@ constructor(
     private fun SessionStart.startSession() {
         val slot = player.slotId
 
-        val infos = service.infoProtocols.alloc(slot, OldSchoolClientType.DESKTOP)
+        val clientType =
+            session.loginBlock.header.clientType.toOldSchoolClientType()
+                ?: OldSchoolClientType.DESKTOP
+        player.mobileClient = clientType == OldSchoolClientType.ANDROID
+        val infos = service.infoProtocols.alloc(slot, clientType)
 
         val client = RspClient(session, infos) as Client<Any, Any>
         val cycle = RspCycle(session, infos, regionReg)
