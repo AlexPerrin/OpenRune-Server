@@ -30,7 +30,7 @@ ready() {  # ready <container> [since]: blocks until "Server ready in" or the co
   done
 }
 port() { echo $(( 20000 + 16#$(printf %s "$slug" | sha1sum | cut -c1-3) * 2 + $1 )); }   # game +0, http +1; shortcut: two slugs may hash alike, pick from up.json when it happens
-account() { echo "h$(printf %s "$slug" | sha1sum | cut -c1-9)$1"; }   # the Nth client's login name and password: 11 characters (a login name takes 12 at most), listed in the slug's up.json
+account() { echo "h$(printf %s "$slug" | sha1sum | cut -c1-9)${1:-}"; }   # the Nth client's login name and password (no N: the prefix of this slug's names): 11 characters (a login name takes 12 at most), listed in the slug's up.json
 
 sys32=${WINDOWS_SYSTEM32:-/mnt/c/Windows/System32}; desk=${DESKTOP_DIR:-/mnt/c/osrs-test}
 need() { [ -x "$1" ] || { echo "$1 not found: set $2" >&2; exit 2; }; }   # need <program> <the variable that locates it>

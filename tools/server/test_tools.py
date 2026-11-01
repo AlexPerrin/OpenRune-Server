@@ -47,6 +47,13 @@ class AccountName(unittest.TestCase):
         s.assertEqual(len(names), 4)
         for n in names: s.assertRegex(n, r"^[a-z][a-z0-9]{1,11}$")
 
+    def test_without_an_index_it_is_the_prefix_of_every_name_under_set_u(s):  # up's members update calls account with no argument
+        fn = next(l for l in (HERE.parent / "track.sh").read_text().splitlines() if l.startswith("account()"))
+        r = subprocess.run(["bash", "-c", f'set -euo pipefail\n{fn}\nslug=s; echo "$(account) $(account 1) $(account 5)"'], capture_output=True, text=True)
+        s.assertEqual(r.returncode, 0, r.stderr)
+        prefix, *names = r.stdout.split()
+        for n in names: s.assertEqual(n, prefix + n[len(prefix):]); s.assertEqual(len(n), len(prefix) + 1)
+
 
 class DesktopInstance(unittest.TestCase):
     def test_concurrent_ups_take_distinct_instances(s):  # two ups once took the same client and one acted on the other's server
