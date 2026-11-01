@@ -294,7 +294,7 @@ class DesktopInstance(unittest.TestCase):
 
     def test_the_desktop_takes_jav_config_from_openrune_endpoint_alone(s):  # the user's word: one variable points every Jagex endpoint at our server
         java = s.t / "desk/jdk/bin/java.exe"
-        java.write_text(java.read_text().replace("exec sleep 30", f'echo "$OPENRUNE_ENDPOINT $WSLENV" > {s.t}/env; exec sleep 30'))
+        java.write_text(java.read_text().replace("#!/bin/bash\n", f'#!/bin/bash\necho "$OPENRUNE_ENDPOINT $WSLENV" > {s.t}/env; ', 1))   # before its port: desktop_start returns once the port answers
         p = s.sh("a", "desktop_start"); p.communicate(timeout=60)
         s.assertEqual(p.returncode, 0)
         ep, wslenv = (s.t / "env").read_text().split()
