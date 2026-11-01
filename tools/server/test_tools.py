@@ -80,17 +80,30 @@ class AccountName(unittest.TestCase):
 
 
 class QuestMode(unittest.TestCase):
-    def test_up_runs_the_image_config_with_every_quest_requirement_checked(s):  # upstream's assume-completed let the range cook before Cook's Assistant
+    def test_up_runs_the_image_config_with_the_changes_quest_mode(s):  # upstream's assume-completed let the range cook before Cook's Assistant; a cannon needs it while main has no Dwarf Cannon quest
         src = (HERE.parent / "track.sh").read_text()
-        fn = next(l for l in src.splitlines() if l.startswith("quests()"))
+        fns = "\n".join(l for l in src.splitlines() if l.startswith(("quests()", "quest_mode()")) or l.startswith("  y=$(sed"))
         yml = 'game:\n  pvp:\n    mode: "off"\n  quest-requirements:\n    # Bypass quest gates by default.\n    mode: "assume-completed"\n    virtual-lines: []\n  other:\n    mode: "on"\n'   # upstream game.example.yml's shape
-        run = lambda text: subprocess.run(["bash", "-c", f"set -euo pipefail\n{fn}\nquests"], input=text, capture_output=True, text=True)
-        r = run(yml); s.assertEqual(r.returncode, 0, r.stderr)
-        s.assertEqual([l for l in r.stdout.splitlines() if l.strip().startswith("mode:")], ['    mode: "off"', '    mode: "respect-progress"', '    mode: "on"'])
-        s.assertEqual(len(r.stdout.splitlines()), len(yml.splitlines()))
-        s.assertNotEqual(run("game:\n  name: x\n").returncode, 0)
+        root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, root); (root / "harness/changes").mkdir(parents=True)
+        def run(text, front, env=""):
+            (root / "harness/changes/x.md").write_text(f"---\nslug: x\n{front}---\nquest-mode: assume-completed in the body is no setting\n")
+            return subprocess.run(["bash", "-c", f"set -euo pipefail\nroot={root}; slug=x\n{fns}\n{env} quests \"$({env} quest_mode)\""], input=text, capture_output=True, text=True,
+                                  env={k: v for k, v in os.environ.items() if k != "QUEST_MODE"})
+        for front, env, mode in [("", "", "respect-progress"), ("quest-mode: assume-completed\n", "", "assume-completed"), ("quest-mode: respect-progress\n", "", "respect-progress"),
+                                 ("quest-mode: assume-completed\n", "QUEST_MODE=respect-progress", "respect-progress"), ("", "QUEST_MODE=assume-completed", "assume-completed")]:
+            r = run(yml, front, env); s.assertEqual(r.returncode, 0, r.stderr)
+            s.assertEqual([l for l in r.stdout.splitlines() if l.strip().startswith("mode:")], ['    mode: "off"', f'    mode: "{mode}"', '    mode: "on"'])
+            s.assertEqual(len(r.stdout.splitlines()), len(yml.splitlines()))
+        s.assertIn("respect-progress or assume-completed", run(yml, "quest-mode: off\n").stderr)
+        s.assertNotEqual(run("game:\n  name: x\n", "").returncode, 0)
         up = src.split("\nup() {")[1].split("\n}")[0]
-        s.assertIn('| quests > "$state/game.yml"', up); s.assertIn('-v "$state/game.yml:/app/game.yml:ro"', up)
+        s.assertIn('| quests "$(quest_mode)" > "$state/game.yml"', up); s.assertIn('-v "$state/game.yml:/app/game.yml:ro"', up)
+
+    def test_restart_keeps_the_config_and_database_of_up(s):  # a hand-run container lost its game.yml mount at restart; a tmpfs database loses the accounts
+        src = (HERE.parent / "track.sh").read_text()
+        up = src.split("\nup() {")[1].split("\n}")[0]; restart = src.split("\nrestart() {")[1].split("\n}")[0]
+        s.assertIn('-v "$state/postgres:/app/.data/postgres"', up); s.assertNotIn("--tmpfs", up)
+        s.assertIn('docker restart "server-$slug"', restart); s.assertNotIn("docker run", restart); s.assertNotIn("> \"$state/game.yml\"", restart)
 
 
 class DesktopInstance(unittest.TestCase):

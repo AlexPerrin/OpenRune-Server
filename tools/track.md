@@ -53,9 +53,13 @@ repeat, source removed mid-action, counts read with `get_inventory` and `get_con
 Clone `~/src/work/<slug>` (a shared clone of `~/src/OpenRune-Server`, remote `fork` = the fork, `origin` = upstream).
 Never edit the shared clone. Commit; `tools/track.sh build <slug>` builds T in the build copy; `tools/track.sh
 up <slug> [N]` starts the server from that build with N logged-in desktops and prints their devtools ports;
-`tools/track.sh log <slug> <pattern>` reads the server log. The server `up` starts runs the image's game.yml with
-`quest-requirements` `mode: "respect-progress"` (upstream's default `assume-completed` skips every quest check), so
-every quest requirement is judged for real; PR notes name it as the verification setting. Test through `osrs-devtools-desktop` data tools; a
+`tools/track.sh log <slug> <pattern>` reads the server log; `tools/track.sh restart <slug>` restarts that server,
+its game.yml and database kept, and logs the desktops in again. The server `up` starts runs the image's game.yml with
+`quest-requirements` `mode` set by the change's front matter `quest-mode:`: `respect-progress` by default, so every
+quest requirement is judged for real, or `assume-completed` (upstream's default, which skips every quest check) for
+content gated by a quest main does not register; `QUEST_MODE=<mode>` on one `up` overrides it (a refusal row of
+the other mode). PR notes name it as the verification setting. Every server run goes
+through track.sh, never a container by hand. Test through `osrs-devtools-desktop` data tools; a
 screenshot only for how something is drawn. Write `pr-title.txt`, `pr-body.md`, `pr-comment.md` (names the head
 and covers every commit the push carries since the PR's live head). Push `dev/<slug>`, then `hd handover <slug>`:
 it runs every script row of the contract and refuses on any failure. `hd ask <slug> "..."` when a decision is not
