@@ -85,6 +85,10 @@ class Text(Repo):
         s.write("mod/src/test/kotlin/ATest.kt", "class ATest\n")
         head = s.commit("fix: test the flow")
         s.assertEqual(s.row("text.py", "dupes", HEAD=head)[0], 0)
+        s.write("gen/src/main/kotlin/G.kt", "fun g() { invDel(x) }\n")
+        s.write("gen/src/integration/kotlin/GTest.kt", "class GTest\n")
+        head = s.commit("fix: an integration dupe test")
+        s.assertEqual(s.row("text.py", "dupes", HEAD=head)[0], 0)
         shutil.rmtree(ev)
 
     def test_commits_after_an_existing_prs_head(s):

@@ -65,8 +65,8 @@ def dupes():
     for line in git("diff", "--unified=0", f"{BASE}...{HEAD}").splitlines():
         if line.startswith("+++ b/"):
             path = line[6:]
-            if "/src/test/" in path:
-                tested.add(path.split("/src/test/")[0])
+            if m := re.search("/src/(test|integration)/", path):
+                tested.add(path[:m.start()])
         elif line.startswith("+") and path and "/src/main/" in path and path.endswith(".kt"):
             for m in MOVES.finditer(line):
                 flows.setdefault(path, set()).add(m.group(1))
