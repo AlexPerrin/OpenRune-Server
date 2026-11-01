@@ -456,9 +456,11 @@ class RealmLikeLive(unittest.TestCase):  # Central seeds a dev realm: every logi
         for col in ("player_xp_rate_in_hundreds", "global_xp_rate_in_hundreds"):
             s.assertIn(f"{col} = 100", line); s.assertIn(f"{col} <> 100", line)   # set, and a 150x realm alone still restarts
 
-    def test_every_account_is_a_player_unless_staff_names_its_desktop(s):
-        line = next(l for l in s.up.splitlines() if "update accounts set rights" in l)
+    def test_every_account_is_a_player_unless_staff_names_its_desktop(s):  # STAFF=1's account once read rights '' and every cheat was refused
+        line = "\n".join(l for l in s.up.splitlines() if l.startswith("  rights=") or "update accounts set rights" in l)
         s.assertLess(s.up.index("  offline"), s.up.index(line))
+        login = s.up.rindex('desktop_login.py" "$(cut -d: -f2 <<< "${desktops[$i]}")"')
+        s.assertLess(s.up.index(line), login); s.assertLess(login, s.up.index("rights <> $rights"))   # read back once the logins ran
         q = lambda staff: subprocess.run(["bash", "-c", f'set -euo pipefail\nsql() {{ echo "$1"; }}\n{s.fn}\nslug=s\n{line.replace(">/dev/null", "")}'],
                                          capture_output=True, text=True, env={**os.environ, **({"STAFF": staff} if staff else {})}).stdout
         name = lambda i: subprocess.run(["bash", "-c", f'{s.fn}\nslug=s; account {i}'], capture_output=True, text=True).stdout.strip()

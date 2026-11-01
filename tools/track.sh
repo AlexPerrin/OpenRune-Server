@@ -177,9 +177,11 @@ up() {
   for c in "${desktops[@]}"; do python3 "$self/server/desktop_login.py" "$(cut -d: -f2 <<< "$c")" logout; done
   offline
   sql "update account_characters set members = true where id in ($mine)" >/dev/null
-  sql "update accounts set rights = case when lower(account_name) = '$(account "${STAFF:-0}")' then 'ADMINISTRATOR' else '' end where lower(account_name) like '$(account)%'" >/dev/null   # players as on live; STAFF=N: the Nth desktop's account an administrator
+  rights="case when lower(account_name) = '$(account "${STAFF:-0}")' then 'ADMINISTRATOR' else '' end"   # players as on live; STAFF=N: the Nth desktop's account an administrator
+  sql "update accounts set rights = $rights where lower(account_name) like '$(account)%'" >/dev/null
   for i in "${!desktops[@]}"; do python3 "$self/server/desktop_login.py" "$(cut -d: -f2 <<< "${desktops[$i]}")" "${accounts[$i]}" "${accounts[$i]}"; done
-  echo "up: game $game http $http desktops ${desktops[*]}"
+  [ "$(sql "select count(*) from accounts where lower(account_name) like '$(account)%' and rights <> $rights")" = 0 ] || { echo "up: the accounts' rights did not hold after the login"; return 1; }   # read back once the logins ran: up fails rather than leave a cheat silently refused
+  echo "up: game $game http $http desktops ${desktops[*]}${STAFF:+ administrator $(account "$STAFF")}"
 }
 restart() {  # the server container restarted with its game.yml and database; the desktops of up logged in again
   since=$(date -u +%FT%TZ); docker restart "server-$slug" >/dev/null; ready "server-$slug" "$since"
