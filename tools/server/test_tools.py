@@ -366,7 +366,7 @@ mkdir -p {copy}/mod/build/test-results/test; echo '<testsuite name="ATest" tests
         fn = lambda name: f"{name}() {{" + src.split(f"\n{name}() {{")[1].split("\n}")[0] + "\n}"
         line = lambda pre: next(l for l in src.splitlines() if l.startswith(pre))
         script = "\n".join(["set -euo pipefail", f"slug=s1; repo={s.repo}; copy={copy}; state={root}/st; root={root}; T=t1; tc={tc}",
-                            line("record()"), "build() { :; }", fn("tests"), "tests"])
+                            line("record()"), line("projects()"), line("projdir()"), "build() { :; }", fn("tests"), "tests"])
         r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={**os.environ, "EVIDENCE": "", "PATH": f"{root}/bin:{os.environ['PATH']}"})
         s.assertEqual(r.returncode, 0, r.stderr + r.stdout)
         s.assertEqual((root / "tasks").read_text().split(), [":mod:test", ":mod:spotlessCheck"])
@@ -377,6 +377,16 @@ mkdir -p {copy}/mod/build/test-results/test; echo '<testsuite name="ATest" tests
         r = subprocess.run(["bash", "-c", script + " :other"], capture_output=True, text=True, env={**os.environ, "EVIDENCE": "", "PATH": f"{root}/bin:{os.environ['PATH']}"})
         s.assertEqual(r.returncode, 0, r.stderr); s.assertEqual((root / "tasks").read_text().split(), [":other:test", ":other:spotlessCheck"])
         s.assertNotIn("Old", (root / "evidence/s1/test.log").read_text())   # a report this run did not write is never read
+
+    def test_a_pack_directory_is_the_project_settings_names(s):  # quest-ernestthechicken: no module named ran :content:areas:city:draynor:pack:test, a project settings names draynor-pack
+        fns = "\n".join(l for l in (HERE.parent / "track.sh").read_text().splitlines() if l.startswith(("projects()", "projdir()")))
+        copy = tempfile.mkdtemp(); s.addCleanup(shutil.rmtree, copy)
+        for d in ("content/quest", "content/areas/city/draynor", "content/areas/city/draynor/pack"):
+            Path(copy, d).mkdir(parents=True); Path(copy, d, "build.gradle.kts").write_text("")
+        files = "content/quest/src/main/kotlin/A.kt content/areas/city/draynor/src/test/kotlin/B.kt content/areas/city/draynor/pack/src/main/resources/c.toml README.md"
+        r = subprocess.run(["bash", "-c", f'set -euo pipefail; copy={copy}\n{fns}\nprojects {files}; for p in $(projects {files}); do projdir $p; done'], capture_output=True, text=True)
+        s.assertEqual(r.stdout.split(), [":content:areas:city:draynor", ":content:areas:city:draynor:draynor-pack", ":content:quest",
+                                         "content/areas/city/draynor", "content/areas/city/draynor/pack", "content/quest"], r.stderr)
 
 
 class Snapshot(Repo):
