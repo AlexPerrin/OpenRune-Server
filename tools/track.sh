@@ -23,7 +23,9 @@
 #   ship TCOMMIT      the integration tree: build, the deploy image with the live key, boot check, deploy, or roll back
 #   measure GOAL      the content inventory's share of rows whose unit is in PASSES
 #   log <slug> PATTERN  the lines of the change's server container matching PATTERN (slug `live`: the live server)
-#   recordings <slug> REGEX  the RSProx transcripts holding a packet type or text
+#   recordings <slug> REGEX  the RSProx transcripts holding a packet type or text (any case: CLANSETTINGS finds clansettings_delta)
+#   transcribe <slug> [ID...]  rewrites those recordings' transcripts (none: every one) with every RSProx filter on (its defaults
+#                     hide clan and friends-chat packets): RSPROX/../bin/<id>.bin (gzip) to RSPROX/<id>.txt, RSProx 1.0.5 in RSPROX_RUNTIME
 # Windows locations, run through WSL interop (override in the environment):
 #   WINDOWS_SYSTEM32  /mnt/c/Windows/System32   netstat.exe, taskkill.exe, robocopy.exe
 #   DESKTOP_DIR       /mnt/c/osrs-test          the desktops' template; each up's instances are DESKTOP_DIR/run/N (jdk/bin/java.exe, jps.exe)
@@ -315,7 +317,22 @@ log() {  # the container's whole log (up makes it fresh), never since an earlier
   c=server-$slug; [ "$slug" = live ] && c=osrs-openrune
   docker inspect "$c" > /dev/null 2>&1 || { echo "no container $c: up first" >&2; return 1; }   # no server is not a clean log
   docker logs "$c" 2>&1 | grep -E "${arg:-.}" || true; }
-recordings() { grep -lE "$arg" "${RSPROX:-$HOME/osrs-plugins-reverse/re/ref/rsprox/txt}"/*.txt 2>/dev/null | xargs -rn1 basename || echo "no transcript holds /$arg/"; }
+rsprox=${RSPROX:-$HOME/osrs-plugins-reverse/re/ref/rsprox/txt}
+recordings() { grep -liE "$arg" "$rsprox"/*.txt 2>/dev/null | xargs -rn1 basename || echo "no transcript holds /$arg/"; }
+transcribe() {  # a fresh RSProx home: one filter set, active, naming every PropertyFilter true; the index's settings and caches
+  local cp=${RSPROX_RUNTIME:-$HOME/osrs-plugins-reverse/re/rsprox/build/osrs-test-runtime} h b id fail=0; h=$(mktemp -d); mkdir -p "$h/.rsprox/binary" "$h/.rsprox/filters"
+  { printf 'version=0\ncreationtime=1\nname=All\nactive=true\n'
+    javap -cp "$cp/shared-1.0.5.jar" net.rsprox.shared.filters.PropertyFilter | sed -nE 's/.*public static final net\.rsprox\.shared\.filters\.PropertyFilter ([A-Z0-9_]+);/\1=true/p'; } > "$h/.rsprox/filters/filters-all.txt"
+  grep -q '=true' "$h/.rsprox/filters/filters-all.txt" || { echo "no PropertyFilter in $cp/shared-1.0.5.jar" >&2; rm -rf "$h"; return 1; }
+  for d in settings caches; do [ -e "$rsprox/../home/.rsprox/$d" ] && ln -s "$(realpath "$rsprox/../home/.rsprox/$d")" "$h/.rsprox/$d"; done
+  for b in $([ $# -gt 0 ] && printf "$rsprox/../bin/%s.bin " "$@" || echo "$rsprox"/../bin/*.bin); do id=$(basename "$b" .bin)
+    gunzip -c "$b" > "$h/.rsprox/binary/$id.bin" 2>/dev/null || cp "$b" "$h/.rsprox/binary/$id.bin"
+    java -Duser.home="$h" -cp "$cp/*" net.rsprox.proxy.cli.TranscribeCommandKt -name "$id" > "$h/$id.log" 2>&1 && [ -s "$h/.rsprox/binary/$id.txt" ] \
+      && mv "$h/.rsprox/binary/$id.txt" "$rsprox/$id.txt" && echo "$id.txt" || { echo "$id: failed, $h/$id.log" >&2; fail=1; }
+    rm -f "$h/.rsprox/binary/$id.bin"; done
+  [ $fail = 1 ] || rm -rf "$h"; return $fail
+}
 
 case $verb in build|up|restart|down|gate|gate-ci|ship|measure|log|recordings) "${verb//-/_}" ;; token) token "$arg" ;; test) arg= tests "${@:3}" ;;
-  *) echo "verbs: build up restart down test gate gate-ci ship measure log recordings token" >&2; exit 2 ;; esac
+  transcribe) transcribe "${@:3}" ;;
+  *) echo "verbs: build up restart down test gate gate-ci ship measure log recordings transcribe token" >&2; exit 2 ;; esac

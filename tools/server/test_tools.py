@@ -47,6 +47,26 @@ class Log(unittest.TestCase):
         r = s.run_log("exit 1\n", "ERROR")
         s.assertEqual(r.returncode, 1); s.assertIn("no container server-x", r.stderr)
 
+class Transcribe(unittest.TestCase):
+    def test_every_filter_is_on_and_recordings_finds_the_packet(s):  # RSProx's default filters hid clan packets: recordings CLANSETTINGS found nothing
+        import gzip
+        root = Path(tempfile.mkdtemp()); change(root, "x"); fake = root / "fake"; fake.mkdir()
+        for d in ("txt", "bin"): (root / "rsprox" / d).mkdir(parents=True)
+        (root / "rsprox/bin/7.bin").write_bytes(gzip.compress(b"rec"))
+        (fake / "javap").write_text("#!/bin/sh\nprintf '  public static final net.rsprox.shared.filters.PropertyFilter CLANSETTINGS_FULL;\\n  public static final net.rsprox.shared.filters.PropertyFilter IF_BUTTON;\\n'\n")
+        # the fake transcriber writes its input and the active filter set: the transcript holds a packet only when its filter is true
+        (fake / "java").write_text('#!/bin/sh\nh=${1#-Duser.home=}; b=$h/.rsprox/binary; { cat "$b/7.bin"; echo; cat "$h"/.rsprox/filters/*; grep -q "CLANSETTINGS_FULL=true" "$h"/.rsprox/filters/* && echo "clansettings_full"; } > "$b/7.txt"\n')
+        for f in ("javap", "java"): (fake / f).chmod(0o755)
+        env = {**os.environ, "HD_ROOT": str(root), "RSPROX": str(root / "rsprox/txt"), "PATH": f"{fake}:{os.environ['PATH']}"}
+        r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "transcribe", "x"], capture_output=True, text=True, env=env)
+        s.assertEqual(r.returncode, 0, r.stderr)
+        t = (root / "rsprox/txt/7.txt").read_text()
+        s.assertEqual(t, "rec\nversion=0\ncreationtime=1\nname=All\nactive=true\nCLANSETTINGS_FULL=true\nIF_BUTTON=true\nclansettings_full\n")
+        r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "recordings", "x", "CLANSETTINGS"], capture_output=True, text=True, env=env)
+        s.assertEqual(r.stdout, "7.txt\n")
+        shutil.rmtree(root)
+
+
 class NoPowerShell(unittest.TestCase):
     def test_windows_programs_run_from_bash_by_absolute_path(s):  # Windows refuses unsigned .ps1 from the UNC path; a lost PATH loses bare .exe names
         s.assertEqual(list(HERE.parent.rglob("*.ps1")), [])
