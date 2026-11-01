@@ -213,7 +213,7 @@ class DesktopInstance(unittest.TestCase):
 
     def test_up_records_each_desktop_before_its_login(s):  # a failed login aborts up under set -e; restart and the tools read up.json
         up = (HERE.parent / "track.sh").read_text().split("\nup() {")[1].split("\n}")[0]
-        s.assertLess(up.index('> "$state/up.json"'), up.index("desktop_login.py\" \"$dt\""))
+        s.assertLess(up.index('> "$state/up.json"'), up.index('login "$dt"'))
         s.assertLess(up.index("down >/dev/null"), up.index("desktop_start"))
 
 
@@ -255,9 +255,19 @@ class DesktopLogin(unittest.TestCase):
         up = (HERE.parent / "track.sh").read_text().split("\nup() {")[1].split("\n}")[0]
         s.assertLess(up.index('desktop_login.py" "$(cut -d: -f2 <<< "$c")" logout'), up.index("  offline\n"))
         s.assertLess(up.index("  offline\n"), up.index("set members = true"))
-        s.assertLess(up.index("set members = true"), up.rindex('desktop_login.py" "$(cut -d: -f2 <<< "${desktops[$i]}")"'))
+        s.assertLess(up.index("set members = true"), up.rindex('login "$(cut -d: -f2 <<< "${desktops[$i]}")"'))
         s.assertNotIn("::", (HERE / "desktop_login.py").read_text())
 
+    def test_a_login_that_made_another_account_logs_in_again(s):  # quest-restlessghost-9: a lost key made a stray first account, the rights update missed the real one and the relogin made it with rights ''
+        t = (HERE.parent / "track.sh").read_text(); fn = t[t.index("login() {"):t.index("offline() {")]
+        for site in ('login "$dt"', 'login "$(cut -d: -f2 <<< "${desktops[$i]}")"', 'login "$(cut -d: -f2 <<< "${ds[$i]}")"'):
+            s.assertIn(site, t)   # every login of up and restart
+        s.assertEqual(t.count("desktop_login.py\" \"$1\" \"$2\""), 1)   # no login but through it
+        made = lambda *rows: subprocess.run(["bash", "-c", f'set -euo pipefail\nf=$(mktemp); trap "rm -f $f" EXIT; printf "%s\\n" {" ".join(repr(r) for r in rows)} > $f\nsql() {{ case $1 in *max*) echo 0 ;; *) head -1 $f; sed -i 1d $f ;; esac; }}   # each read in its own subshell: the rows a file\npython3() {{ echo "py $3"; }}\nself=.\n{fn}\nlogin 7786 h1'],
+                                            capture_output=True, text=True).stdout
+        s.assertEqual(made("h1"), "py h1\n")
+        s.assertEqual(made("h1x h1", "h1"), "py h1\nlogin on 7786 made another account than h1: logging in again\npy logout\npy h1\n")
+        s.assertEqual(made("h", "h1"), "py h1\nlogin on 7786 made another account than h1: logging in again\npy logout\npy h1\n")   # no row of the account yet
 
 class Repo(unittest.TestCase):
     def setUp(s):
@@ -476,7 +486,7 @@ class RealmLikeLive(unittest.TestCase):  # Central seeds a dev realm: every logi
     def test_every_account_is_a_player_unless_staff_names_its_desktop(s):  # STAFF=1's account once read rights '' and every cheat was refused
         line = "\n".join(l for l in s.up.splitlines() if l.startswith("  rights=") or "update accounts set rights" in l)
         s.assertLess(s.up.index("  offline"), s.up.index(line))
-        login = s.up.rindex('desktop_login.py" "$(cut -d: -f2 <<< "${desktops[$i]}")"')
+        login = s.up.rindex('login "$(cut -d: -f2 <<< "${desktops[$i]}")"')
         s.assertLess(s.up.index(line), login); s.assertLess(login, s.up.index("rights <> $rights"))   # read back once the logins ran
         q = lambda staff: subprocess.run(["bash", "-c", f'set -euo pipefail\nsql() {{ echo "$1"; }}\n{s.fn}\nslug=s\n{line.replace(">/dev/null", "")}'],
                                          capture_output=True, text=True, env={**os.environ, **({"STAFF": staff} if staff else {})}).stdout

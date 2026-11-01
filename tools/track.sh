@@ -46,6 +46,11 @@ account() { echo "h$(printf %s "$slug" | sha1sum | cut -c1-9)${1:-}"; }   # the 
 mine="select c.id from account_characters c join accounts a on a.id = c.account_id where lower(a.account_name) like '$(account)%'"   # this slug's characters
 sql() { local pg; pg=$(docker logs "server-$slug" 2>&1 | grep -oE 'jdbc:postgresql://localhost:[0-9]+' | tail -1 | grep -oE '[0-9]+$')
   docker run --rm --network "container:server-$slug" postgres:16-alpine psql -h 127.0.0.1 -p "$pg" -U postgres -d postgres -tAq -c "$1"; }
+login() {  # login <devtools port> <account>: logs that desktop in as the account; a lost key types another name, whose first login makes a stray account (the rights update then missed the real row): until this login made no row but the account's, out and in again
+  local m; while :; do m=$(sql "select coalesce(max(id), 0) from accounts")
+    python3 "$self/server/desktop_login.py" "$1" "$2" "$2"
+    [ "$(sql "select string_agg(lower(account_name), ' ') from accounts where id > $m or lower(account_name) = '$2'")" = "$2" ] && return
+    echo "login on $1 made another account than $2: logging in again"; python3 "$self/server/desktop_login.py" "$1" logout; done; }
 offline() { until [ "$(sql "select count(*) from main.character_progress where online_central_world_id is not null and character_id in ($mine)")" = 0 ]; do sleep 1; done; }   # each character saved at its logout
 
 sys32=${WINDOWS_SYSTEM32:-/mnt/c/Windows/System32}; desk=${DESKTOP_DIR:-/mnt/c/osrs-test}
@@ -172,7 +177,7 @@ up() {
     desktop_start
     desktops+=("$inst:$dt"); accounts+=("$(account "$i")")
     printf '{"game": %s, "http": %s, "desktops": "%s", "accounts": "%s"}\n' "$game" "$http" "${desktops[*]}" "${accounts[*]}" > "$state/up.json"   # before the login: restart and the devtools tools find each desktop
-    python3 "$self/server/desktop_login.py" "$dt" "$(account "$i")" "$(account "$i")"      # creates the account on first login; prints LOGGED_IN or FAILED: reason
+    login "$dt" "$(account "$i")"      # creates the account on first login; prints LOGGED_IN or FAILED: reason
   done
   # members and rights are read at login and members written by the save at logout: log out, wait until no character of this up is online, update, log in
   for c in "${desktops[@]}"; do python3 "$self/server/desktop_login.py" "$(cut -d: -f2 <<< "$c")" logout; done
@@ -180,7 +185,7 @@ up() {
   sql "update account_characters set members = true where id in ($mine)" >/dev/null
   rights="case when lower(account_name) = '$(account "${STAFF:-0}")' then 'ADMINISTRATOR' else '' end"   # players as on live; STAFF=N: the Nth desktop's account an administrator
   sql "update accounts set rights = $rights where lower(account_name) like '$(account)%'" >/dev/null
-  for i in "${!desktops[@]}"; do python3 "$self/server/desktop_login.py" "$(cut -d: -f2 <<< "${desktops[$i]}")" "${accounts[$i]}" "${accounts[$i]}"; done
+  for i in "${!desktops[@]}"; do login "$(cut -d: -f2 <<< "${desktops[$i]}")" "${accounts[$i]}"; done
   [ "$(sql "select count(*) from accounts where lower(account_name) like '$(account)%' and rights <> $rights")" = 0 ] || { echo "up: the accounts' rights did not hold after the login"; return 1; }   # read back once the logins ran: up fails rather than leave a cheat silently refused
   echo "up: game $game http $http desktops ${desktops[*]}${STAFF:+ administrator $(account "$STAFF")}"
 }
@@ -188,7 +193,7 @@ restart() {  # the server container restarted with its game.yml and database; th
   since=$(date -u +%FT%TZ); docker restart "server-$slug" >/dev/null; ready "server-$slug" "$since"
   d=$(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d["desktops"], "|", d["accounts"])' "$state/up.json")
   read -ra ds <<< "${d%%|*}"; read -ra as <<< "${d#*|}"
-  for i in "${!ds[@]}"; do python3 "$self/server/desktop_login.py" "$(cut -d: -f2 <<< "${ds[$i]}")" "${as[$i]}" "${as[$i]}"; done
+  for i in "${!ds[@]}"; do login "$(cut -d: -f2 <<< "${ds[$i]}")" "${as[$i]}"; done
   echo "restarted: quest-requirements $(sed -n '/quest-requirements:/,/mode:/p' "$state/game.yml" | grep -o 'mode:.*')"
 }
 down() {
