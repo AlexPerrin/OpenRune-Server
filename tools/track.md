@@ -69,8 +69,10 @@ quest requirement is judged for real, or `assume-completed` (upstream's default,
 content gated by a quest main does not register; `QUEST_MODE=<mode>` on one `up` overrides it (a refusal row of
 the other mode). PR notes name it as the verification setting. Every server run goes
 through track.sh, never a container by hand. Helper scripts and evidence live in `evidence/<slug>/`, never a session scratchpad. Test through `osrs-devtools-desktop` data tools; a
-screenshot only for how something is drawn. Write `pr-title.txt`, `pr-body.md`, `pr-comment.md` (names the head
-and covers every commit the push carries since the PR's live head). Push `dev/<slug>`, then `hd handover <slug>`:
+screenshot only for how something is drawn. Write `pr-title.txt`, `pr-body.md` (on an open PR they replace the live ones
+that differ), `pr-comment.md` (the push summary: names the head and every commit the push carries since the PR's live
+head, no quote, no @) and, for each finding answered, `pr-reply-<finding id>.md` (the reply alone: the finding quoted
+with `> `, @ only its author). Push `dev/<slug>`, then `hd handover <slug>`:
 it runs every script row of the contract and refuses on any failure. `hd ask <slug> "..."` when a decision is not
 yours; `hd show <slug>` first, always.
 
