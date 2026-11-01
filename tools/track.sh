@@ -8,13 +8,14 @@
 #   gate-ci           fork CI and Formatting green on gate/<slug> at TCOMMIT (blocks until both conclude)
 #   ship TCOMMIT      the integration tree: build, the deploy image with the live key, boot check, deploy, or roll back
 #   measure GOAL      the content inventory's share of passing rows
-#   log PATTERN       the change's server log since the run's marker (slug `live`: the live server)
-#   recordings REGEX  the RSProx transcripts holding a packet type or text
+#   log <slug> PATTERN  the change's server log since the run's marker (slug `live`: the live server)
+#   recordings <slug> REGEX  the RSProx transcripts holding a packet type or text
 set -euo pipefail
 verb=$1; slug=${2:-${SLUG:-}}; arg=${3:-}   # a contract row passes no slug: hd exports SLUG
 self=$(cd "$(dirname "$0")" && pwd)
 repo=${CLONE:-$HOME/src/OpenRune-Server}
 root=${HD_ROOT:-$HOME/osrs-harness}
+[ -f "$root/harness/changes/$slug.md" ] || [ -f "$root/harness/goals/$slug.md" ] || case $slug in live|integration) ;; *) echo "no change or goal \"$slug\": tools/track.sh <verb> <slug> [arg]" >&2; exit 2 ;; esac
 state=$root/state/$slug; mkdir -p "$state"
 dev=$repo/.worktrees/$slug; copy=$repo/.worktrees/$slug-build
 live_image=osrs-openrune:241; compose_dir=$self/server

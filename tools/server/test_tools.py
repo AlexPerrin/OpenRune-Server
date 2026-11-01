@@ -10,6 +10,19 @@ def git(repo, *a, env=None):
     return subprocess.run(["git", "-C", repo, *a], capture_output=True, text=True, env={**os.environ, **(env or {})}).stdout.strip()
 
 
+def change(root, slug):
+    p = Path(root) / "harness/changes" / f"{slug}.md"; p.parent.mkdir(parents=True, exist_ok=True); p.write_text("")
+
+
+class Slug(unittest.TestCase):
+    def test_a_pattern_in_the_slug_place_is_refused_before_any_state(s):
+        root = Path(tempfile.mkdtemp())
+        r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "log", "Have a nice day"], capture_output=True, text=True, env={**os.environ, "HD_ROOT": str(root)})
+        s.assertEqual(r.returncode, 2); s.assertIn('no change or goal "Have a nice day"', r.stderr)
+        s.assertFalse((root / "state").exists())
+        shutil.rmtree(root)
+
+
 class Repo(unittest.TestCase):
     def setUp(s):
         s.repo = tempfile.mkdtemp()
@@ -110,7 +123,7 @@ class Snapshot(Repo):
         git(s.repo, "add", "-f", "generated/build.gradle.kts"); s.commit("feat: a tracked file under an ignored path")
         git(s.repo, "worktree", "add", "-q", ".worktrees/s1")
         (Path(s.repo) / ".worktrees/s1/new.kt").write_text("y\n")
-        root = tempfile.mkdtemp(); out = Path(root) / "ls"
+        root = tempfile.mkdtemp(); out = Path(root) / "ls"; change(root, "s1")
         (Path(root) / "hd.py").write_text(f"import subprocess,sys\nopen({str(out)!r},'w').write(subprocess.run(['git','-C',{s.repo!r},'ls-tree','-r','--name-only',sys.argv[3]],capture_output=True,text=True).stdout)\nsys.exit(1)\n")
         subprocess.run(["bash", str(HERE.parent / "track.sh"), "build", "s1"], capture_output=True, env={**os.environ, "CLONE": s.repo, "HD_ROOT": root, "T": ""})
         files = out.read_text().split()
@@ -122,7 +135,7 @@ class GateCi(Repo):
     def test_a_row_without_a_slug_pushes_gate_of_the_env_slug(s):
         fork = tempfile.mkdtemp(); git(fork, "init", "-q", "--bare"); git(s.repo, "remote", "add", "fork", fork)
         bin = Path(tempfile.mkdtemp()); (bin / "gh").write_text("#!/bin/sh\necho success/completed\n"); (bin / "gh").chmod(0o755)
-        root = tempfile.mkdtemp()
+        root = tempfile.mkdtemp(); change(root, "s1")
         r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "gate-ci"], capture_output=True, text=True,
                            env={**os.environ, **s.env, "HD_ROOT": root, "TCOMMIT": s.base, "PATH": f"{bin}:{os.environ['PATH']}"})
         s.assertEqual(r.returncode, 0, r.stderr)
@@ -134,7 +147,7 @@ class GateCi(Repo):
 class Measure(unittest.TestCase):
     def test_measure_writes_under_the_goal_not_the_target(s):
         root = Path(tempfile.mkdtemp()); (root / "harness/goals").mkdir(parents=True)
-        (root / "harness/goals/server-content.json").write_text("[]")
+        (root / "harness/goals/server-content.json").write_text("[]"); (root / "harness/goals/server-content.md").write_text("")
         r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "measure", "server-content", "abc123"], capture_output=True, text=True, env={**os.environ, "HD_ROOT": str(root), "TREE": "t1"})
         s.assertEqual(r.returncode, 0, r.stderr)
         s.assertEqual(json.loads((root / "state/server-content/measure.json").read_text())["value"], 0.0)
