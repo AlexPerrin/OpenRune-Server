@@ -471,6 +471,10 @@ class Text(Repo):
         (Path(ev) / "pr-body.md").write_text("## Summary\n## Checklist\n")
         rc, out = s.row("text.py", "texts", EVIDENCE=ev, HEAD=head)
         s.assertEqual((rc, out.strip()), (0, "texts: ok"))
+        (Path(ev) / "pr-body.md").write_text(""); (Path(ev) / "pr-comment.md").write_text("> why?\n\n@rev because.")   # a reply on an open PR
+        s.assertEqual(s.row("text.py", "texts", EVIDENCE=ev, HEAD=head, PR="7")[0], 0)
+        s.assertEqual(s.row("text.py", "evidence", EVIDENCE=ev, PR="7")[0], 0)
+        s.assertEqual(s.row("text.py", "evidence", EVIDENCE=ev)[0], 1)
         s.write("mod/src/test/kotlin/ATest.kt", "class ATest\n")
         head = s.commit("fix: test the flow")
         s.assertEqual(s.row("text.py", "dupes", HEAD=head)[0], 0)

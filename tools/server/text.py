@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """The server contract's script rows that read text. Exit 1 names every miss.
-  text.py evidence   accuracy.md, pr-title.txt, pr-body.md, pr-comment.md present and non-empty in $EVIDENCE
+  text.py evidence   accuracy.md, pr-comment.md and, for a new PR (no $PR), pr-title.txt and pr-body.md present and non-empty in $EVIDENCE
   text.py commits    every commit $BASE..$HEAD not on an existing PR's head fork/$PUBLIC_BRANCH: subject feat:/fix:, no Claude-Session trailer, only a Co-Authored-By trailer
-  text.py texts      pr-body.md has upstream's template sections (read live from origin/main), no fork PR link anywhere,
-                     pr-comment.md names $HEAD
+  text.py texts      a new PR's pr-body.md has upstream's template sections (read live from origin/main), no fork PR link anywhere,
+                     pr-comment.md names $HEAD unless it is a reply in a review thread (it quotes the finding: '> ')
   text.py dupes      a module whose main sources gain an item-moving call has a test source added or changed ($BASE...$HEAD,
                      on an existing PR fork/$PUBLIC_BRANCH...$HEAD)
 Env: EVIDENCE, CLONE, BASE, HEAD, PR, PUBLIC_BRANCH.
@@ -25,7 +25,8 @@ def text(name):
 
 
 def evidence():
-    return [f"{n} missing or empty in {E}" for n in ("accuracy.md", "pr-title.txt", "pr-body.md", "pr-comment.md") if not text(n).strip()]
+    need = ("accuracy.md", "pr-comment.md") + (() if os.environ.get("PR") else ("pr-title.txt", "pr-body.md"))  # an open PR keeps its title and body
+    return [f"{n} missing or empty in {E}" for n in need if not text(n).strip()]
 
 
 def live():
@@ -53,13 +54,13 @@ def texts():
     bad = []
     template = git("show", "origin/main:.github/pull_request_template.md")
     body = text("pr-body.md")
-    for h in re.findall(r"^##+ *(.+?)\s*$", template, re.M):
+    for h in re.findall(r"^##+ *(.+?)\s*$", template, re.M) if not os.environ.get("PR") else []:
         if h.lower() not in body.lower():
             bad.append(f"pr-body.md lacks the template section '{h}'")
     for n in ("pr-title.txt", "pr-body.md", "pr-comment.md"):
         if FORK_LINK.search(text(n)):
             bad.append(f"{n} links a fork PR (it renders as a red Closed on upstream)")
-    if HEAD[:9] not in text("pr-comment.md"):
+    if HEAD[:9] not in text("pr-comment.md") and not text("pr-comment.md").startswith("> "):
         bad.append(f"pr-comment.md does not name the head {HEAD[:9]}")
     return bad
 
