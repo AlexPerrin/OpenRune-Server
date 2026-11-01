@@ -1,10 +1,9 @@
 package org.rsmod.api.net.rsprot
 
+import net.rsprot.protocol.ServerProtCategory
 import net.rsprot.protocol.api.NetworkService
 import net.rsprot.protocol.api.Session
 import net.rsprot.protocol.game.outgoing.info.Infos
-import net.rsprot.protocol.game.outgoing.info.npcinfo.NpcInfo
-import net.rsprot.protocol.game.outgoing.info.playerinfo.PlayerInfo
 import net.rsprot.protocol.message.OutgoingGameMessage
 import org.rsmod.game.client.Client
 import org.rsmod.game.entity.Player
@@ -21,6 +20,10 @@ class RspClient(private val session: Session<Player>, private val infos: Infos) 
 
     override fun write(message: OutgoingGameMessage) {
         session.queue(message)
+    }
+
+    fun write(message: OutgoingGameMessage, category: ServerProtCategory) {
+        session.queue(message, category)
     }
 
     override fun read(player: Player) {

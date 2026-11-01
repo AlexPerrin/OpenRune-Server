@@ -9,10 +9,12 @@ import dev.openrune.rscm.RSCMType
 import dev.or2.central.account.Rights
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
+import net.rsprot.protocol.game.outgoing.GameServerProtCategory
 import net.rsprot.protocol.game.outgoing.friendchat.MessageFriendChannel
 import net.rsprot.protocol.game.outgoing.friendchat.UpdateFriendChatChannelFull.FriendChatEntry
 import net.rsprot.protocol.game.outgoing.friendchat.UpdateFriendChatChannelFullV2
 import net.rsprot.protocol.game.outgoing.friendchat.UpdateFriendChatChannelSingleUser
+import net.rsprot.protocol.game.outgoing.misc.player.MessageGame
 import org.rsmod.api.attr.AttributeKey
 import org.rsmod.api.db.gateway.GameDbManager
 import org.rsmod.api.db.gateway.model.GameDbResult
@@ -22,6 +24,7 @@ import org.rsmod.api.net.central.WorldLinkFrameSpecs
 import org.rsmod.api.net.central.formatWorldName
 import org.rsmod.api.net.central.nextPrivateMessageCounter
 import org.rsmod.api.net.central.writeCentralSocialSnapshot
+import org.rsmod.api.net.rsprot.RspClient
 import org.rsmod.api.parsers.json.Json
 import org.rsmod.api.player.output.ChatType
 import org.rsmod.api.player.output.mes
@@ -32,6 +35,7 @@ import org.rsmod.api.server.config.ServerConfig
 import org.rsmod.game.MapClock
 import org.rsmod.game.entity.Player
 import org.rsmod.game.entity.PlayerList
+import org.rsmod.game.queue.WorldQueueList
 import org.rsmod.game.vars.VarPlayerIntMap
 
 public val FRIEND_CHAT_NAME: AttributeKey<String> = AttributeKey(persistenceKey = "friend_chat_name")
@@ -84,6 +88,7 @@ constructor(
     private val central: OpenRuneCentralWorldLink,
     private val config: ServerConfig,
     private val mapClock: MapClock,
+    private val worldQueues: WorldQueueList,
     @Json private val objectMapper: ObjectMapper,
 ) {
     private val channels = HashMap<String, Channel>()
@@ -99,13 +104,25 @@ constructor(
             return
         }
         player.mes("Attempting to join chat-channel...", ChatType.FriendsChatNotification)
-        val active = channels[nameKey(ownerName)]
-        if (active != null) {
-            joining.remove(player)
-            tryJoin(player, active)
+        val key = nameKey(ownerName)
+        if (key !in channels) {
+            load(player, ownerName)
             return
         }
-        load(player, ownerName)
+        val uid = player.uid
+        worldQueues.add(1) {
+            val current = uid.resolve(playerList) ?: return@add
+            if (!joining.remove(current)) {
+                return@add
+            }
+            val active = channels[key]
+            if (active == null) {
+                joining.add(current)
+                load(current, ownerName)
+            } else {
+                tryJoin(current, active)
+            }
+        }
     }
 
     public fun updateBlocked(player: Player) {
@@ -196,7 +213,9 @@ constructor(
             channel.bans[nameKey(target.chatName)] = mapClock.cycle + KICK_BAN_CYCLES
         }
         target.attr.remove(FRIEND_CHAT_LAST)
-        target.mes("You have been kicked from the channel.", ChatType.FriendsChatNotification)
+        val notice = MessageGame(ChatType.FriendsChatNotification.id, "You have been kicked from the channel.")
+        (target.client as? RspClient)?.write(notice, GameServerProtCategory.LOW_PRIORITY_PROT)
+            ?: target.client.write(notice)
         leave(target, explicit = false)
     }
 
