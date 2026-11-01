@@ -118,6 +118,19 @@ class Snapshot(Repo):
         shutil.rmtree(root)
 
 
+class GateCi(Repo):
+    def test_a_row_without_a_slug_pushes_gate_of_the_env_slug(s):
+        fork = tempfile.mkdtemp(); git(fork, "init", "-q", "--bare"); git(s.repo, "remote", "add", "fork", fork)
+        bin = Path(tempfile.mkdtemp()); (bin / "gh").write_text("#!/bin/sh\necho success/completed\n"); (bin / "gh").chmod(0o755)
+        root = tempfile.mkdtemp()
+        r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "gate-ci"], capture_output=True, text=True,
+                           env={**os.environ, **s.env, "HD_ROOT": root, "TCOMMIT": s.base, "PATH": f"{bin}:{os.environ['PATH']}"})
+        s.assertEqual(r.returncode, 0, r.stderr)
+        s.assertEqual(git(fork, "rev-parse", "refs/heads/gate/s1"), s.base)
+        s.assertTrue((Path(root) / "state/s1").is_dir())
+        for d in (fork, bin, root): shutil.rmtree(d)
+
+
 class Measure(unittest.TestCase):
     def test_measure_writes_under_the_goal_not_the_target(s):
         root = Path(tempfile.mkdtemp()); (root / "harness/goals").mkdir(parents=True)

@@ -11,7 +11,7 @@
 #   log PATTERN       the change's server log since the run's marker (slug `live`: the live server)
 #   recordings REGEX  the RSProx transcripts holding a packet type or text
 set -euo pipefail
-verb=$1; slug=${2:-}; arg=${3:-}
+verb=$1; slug=${2:-${SLUG:-}}; arg=${3:-}   # a contract row passes no slug: hd exports SLUG
 self=$(cd "$(dirname "$0")" && pwd)
 repo=${CLONE:-$HOME/src/OpenRune-Server}
 root=${HD_ROOT:-$HOME/osrs-harness}
