@@ -141,6 +141,10 @@ build() {
   if docker image inspect "or:$T" >/dev/null 2>&1; then echo "cached or:$T"; record true build <<< "cached"; return; fi
   if [ -d "$copy" ]; then git -C "$copy" reset -q --hard "$tc" && git -C "$copy" clean -fdq; else git -C "$repo" worktree add -q --detach "$copy" "$tc"; fi
   [ -f "$copy/game.yml" ] || cp "$copy/game.example.yml" "$copy/game.yml"
+  if grep -q '\.m2-rsprot' "$copy/settings.gradle.kts"; then  # local/android pins an rsprot published only to the clone's .m2-rsprot
+    [ -d "$repo/.m2-rsprot" ] || { echo "no $repo/.m2-rsprot: the tree pins a locally published rsprot" | tee "$state/build-$T.log" | record false build; echo "build failed: $state/build-$T.log"; return 1; }
+    cp -a "$repo/.m2-rsprot" "$copy/"
+  fi
   ck=$(git -C "$copy" ls-tree -r "$tc" | grep -E 'or-cache/|/pack/|gamevals|raw-cache' | sha1sum | cut -c1-12)   # the cache's inputs
   log=$state/build-$T.log
   vols=(-v "gradle-$slug:/gradle" -v or-dl:/dl -v or-cache-store:/store); cdir=
