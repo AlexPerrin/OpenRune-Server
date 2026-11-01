@@ -63,9 +63,12 @@ yours; `hd show <slug>` first, always.
 
 The desktop clients are Windows programs run from bash through WSL interop by absolute path, located by
 `WINDOWS_SYSTEM32` (default `/mnt/c/Windows/System32`: netstat.exe, taskkill.exe) and `DESKTOP_DIR` (default
-`/mnt/c/osrs-test`, the Nth instance `DESKTOP_DIR<N>`); a missing program fails naming its variable. An up takes
-each instance under `state/desktop.lock` until its pid file claims it, and lists each client in `up.json` before its
-login, so `down` stops exactly the clients its up started.
+`/mnt/c/osrs-test`, the Nth instance `DESKTOP_DIR<N>`, devtools port 7779+N; jps.exe locates JVMs). Every JVM of
+instance N carries `-Dosrstest.marker=osrs-test-N`, and only such a JVM is ever stopped (never the user's own RuneLite).
+An up, under `state/desktop.lock`, first stops the clients of every instance no live run's `up.json` lists (a live run's
+server container runs), then claims the first instance that no run lists and no client answers on, and keeps the lock
+until it lists that client in `up.json` (`desktopN:port:pids`, the launcher's and the port's Windows PIDs) before its
+login; `down` stops exactly those PIDs.
 
 ## The reviewer
 Never writes the code it checks. Judges every contract row from the same build (`tools/track.sh up <slug>`),

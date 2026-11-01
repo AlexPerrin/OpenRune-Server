@@ -70,25 +70,73 @@ class QuestMode(unittest.TestCase):
 
 
 class DesktopInstance(unittest.TestCase):
-    def test_concurrent_ups_take_distinct_instances(s):  # two ups once took the same client and one acted on the other's server
-        src = (HERE.parent / "track.sh").read_text()
-        fns = src[src.index("sys32="):src.index("desktop_stop()")]
-        t = Path(tempfile.mkdtemp()); (t / "state").mkdir(); (t / "bin").mkdir(); (t / "sys32").mkdir()
+    """A fake Windows: each process is win/<pid>.jvm (its jps line) and win/<pid>.port (the port it listens on)."""
+    def setUp(s):
+        s.t = t = Path(tempfile.mkdtemp()); (t / "state").mkdir(); (t / "bin").mkdir(); (t / "sys32").mkdir(); (t / "win").mkdir()
         exe = lambda p, body: (p.write_text("#!/bin/bash\n" + body), p.chmod(0o755))
-        exe(t / "sys32/netstat.exe", f'for i in 1 2 3 4 5; do [ -e {t}/desk${{i#1}}/listening ] && echo "  TCP 0.0.0.0:$((7779 + i)) 0.0.0.0:0 LISTENING"; done; true\n')
-        exe(t / "bin/wslpath", 'sleep 0.5; echo "$2"\n')   # widens the window between picking an instance and claiming it
+        exe(t / "sys32/netstat.exe", f'for f in {t}/win/*.port; do [ -e "$f" ] && echo "  TCP 127.0.0.1:$(cat $f) 0.0.0.0:0 LISTENING $(basename $f .port)"; done; true\n')
+        exe(t / "sys32/taskkill.exe", f'echo "$4" >> {t}/killed; rm -f {t}/win/$4.*\n')
+        exe(t / "bin/wslpath", 'sleep 0.5; echo "$2"\n')   # widens the window between picking an instance and listing it
+        exe(t / "bin/docker", f'[ -e {t}/live-$4 ] && echo true || echo false\n')   # inspect -f <fmt> server-<slug>
         for i in range(1, 6):
             d = t / f"desk{'' if i == 1 else i}"; (d / "home/.rsprox").mkdir(parents=True); (d / "jdk/bin").mkdir(parents=True)
-            exe(d / "jdk/bin/java.exe", "touch listening; exec sleep 30\n")
-        env = {**os.environ, "PATH": f"{t / 'bin'}:{os.environ['PATH']}", "WINDOWS_SYSTEM32": str(t / "sys32"), "DESKTOP_DIR": str(t / "desk")}
-        run = lambda: subprocess.Popen(["bash", "-c", f"set -euo pipefail; root={t}; slug=s; http=1; game=2; modulus=3\n{fns}\ndesktop_start", ], stdout=subprocess.PIPE, text=True, env=env)
-        ps = [run() for _ in range(3)]
+            exe(d / "jdk/bin/java.exe", f'echo "$$ OsrsTestLauncher $*" > {t}/win/$$.jvm; echo $((7779 + ${{1##*-}})) > {t}/win/$$.port; exec sleep 30\n')
+            exe(d / "jdk/bin/jps.exe", f'cat {t}/win/*.jvm 2>/dev/null; true\n')
+        src = (HERE.parent / "track.sh").read_text()
+        s.fns = src[src.index("sys32="):src.index("\ntree() {")]
+        s.env = {**os.environ, "PATH": f"{t / 'bin'}:{os.environ['PATH']}", "WINDOWS_SYSTEM32": str(t / "sys32"), "DESKTOP_DIR": str(t / "desk")}
+
+    def tearDown(s):
+        for f in s.t.glob("win/*.jvm"): subprocess.run(["kill", f.stem], capture_output=True)
+        shutil.rmtree(s.t, ignore_errors=True)
+
+    def proc(s, pid, cls, marker=None, port=None):
+        (s.t / f"win/{pid}.jvm").write_text(f"{pid} {cls} -Duser.home=C:\\x" + (f" -Dosrstest.marker=osrs-test-{marker}" if marker else "") + "\n")
+        if port: (s.t / f"win/{pid}.port").write_text(f"{port}\n")
+
+    def up(s, slug, clients, live=True):
+        (s.t / "state" / slug).mkdir(); (s.t / "state" / slug / "up.json").write_text(json.dumps({"clients": clients}))
+        if live: (s.t / f"live-server-{slug}").touch()
+
+    def sh(s, slug, body):
+        return subprocess.Popen(["bash", "-c", f"set -euo pipefail; root={s.t}; slug={slug}; http=1; game=2; modulus=3\n{s.fns}\n{body}"], stdout=subprocess.PIPE, text=True, env=s.env)
+
+    def killed(s):
+        return sorted((s.t / "killed").read_text().split()) if (s.t / "killed").exists() else []
+
+    def test_concurrent_ups_take_distinct_instances(s):  # two ups once took the same client and one acted on the other's server
+        start = 'desktop_start; mkdir -p "$root/state/$slug"; echo "{\\"clients\\": \\"$inst:$dt:$pids\\"}" > "$root/state/$slug/up.json"; touch "$root/live-server-$slug"; echo $inst'
+        ps = [s.sh(f"s{k}", start) for k in range(3)]
         got = [p.communicate(timeout=60)[0].split()[0] for p in ps]
-        [subprocess.run(["kill", f.read_text().strip()]) for f in t.glob("desk*/rsprox.pid")]; shutil.rmtree(t, ignore_errors=True)
-        s.assertEqual(len(set(got)), 3, got)
+        s.assertEqual(len(set(got)), 3, got); s.assertEqual(s.killed(), [])
+
+    def test_a_client_no_live_run_lists_is_stopped_and_no_unmarked_jvm_is_touched(s):  # an orphan on desktop4 took a judge's login keys
+        s.proc(100, "OsrsTestLauncher", 1, 7780); s.up("a", "desktop1:7780:100")     # a live run's client
+        s.proc(200, "RuneLite", 2, 7781); s.up("gone", "desktop2:7781:200", live=False)   # its run's server is gone
+        s.proc(500, "RuneLite", None, 7782)                                          # the user's own RuneLite on a harness port
+        s.proc(400, "RuneLite", 4, 7783); s.proc(401, "Launcher", 4)                 # no up.json lists it
+        out = s.sh("b", "desktop_start; echo $inst $dt").communicate(timeout=60)[0].split()
+        s.assertEqual(s.killed(), ["200", "400", "401"])
+        s.assertEqual(out, ["desktop2", "7781"])
+        s.assertTrue((s.t / "win/500.jvm").exists()); s.assertTrue((s.t / "win/100.jvm").exists())
+
+    def test_an_instance_is_claimed_only_when_no_client_answers_on_it(s):  # whatever a pid file says
+        for i in range(1, 6): s.up(f"r{i}", f"desktop{i}:{7779 + i}:{i}") if i != 3 else None
+        s.proc(500, "RuneLite", None, 7782)                                          # not marked: never stopped, its port stays taken
+        p = s.sh("b", "desktop_start"); p.communicate(timeout=60)
+        s.assertNotEqual(p.returncode, 0); s.assertEqual(s.killed(), [])
+
+    def test_stop_takes_the_recorded_pids_that_carry_the_marker(s):  # a PID reused by another program is never stopped
+        s.proc(200, "OsrsTestLauncher", 2); s.proc(201, "RuneLite", 2, 7781); s.proc(999, "RuneLite", None, 7781)
+        s.sh("b", "desktop_stop desktop2 200,201,999").communicate(timeout=60)
+        s.assertEqual(s.killed(), ["200", "201"])
+        s.proc(300, "Launcher", 3); s.proc(301, "RuneLite", 3); (s.t / "killed").unlink()
+        s.sh("b", "desktop_stop desktop3").communicate(timeout=60)              # an up.json from before the PIDs were recorded
+        s.assertEqual(s.killed(), ["300", "301"]); s.assertTrue((s.t / "win/999.jvm").exists())
 
     def test_up_records_each_client_before_its_login(s):  # a failed login aborts up under set -e; down must still stop that client
         up = (HERE.parent / "track.sh").read_text().split("\nup() {")[1].split("\n}")[0]
+        s.assertLess(up.index('> "$state/up.json"'), up.index("flock -u 9"))
         s.assertLess(up.index('> "$state/up.json"'), up.index("desktop_login.py\" \"$dt\""))
         s.assertLess(up.index("down >/dev/null"), up.index("desktop_start"))
 
