@@ -90,7 +90,7 @@ class Central(unittest.TestCase):
         s.assertIn('read -r cpath ccommit <<< "$CENTRAL"', c)
         s.assertIn('worktree add -q --detach "$cdir" "$ccommit"', c)
         s.assertIn('-v "$cdir:$cdir"', c)
-        for verb in ("build", "tests"):
+        for verb in ("build", "gradle_check"):
             b = src.split(f"\n{verb}() {{")[1].split("\n}")[0]
             for want in ("central;", '"${cvols[@]}"', 'CDIR="$cdir"', "${CDIR:+ --init-script /central.init.gradle}"):
                 s.assertIn(want, b, verb)
@@ -528,7 +528,7 @@ mkdir -p {copy}/mod/build/test-results/test; echo '<testsuite name="ATest" tests
         fn = lambda name: f"{name}() {{" + src.split(f"\n{name}() {{")[1].split("\n}")[0] + "\n}"
         line = lambda pre: next(l for l in src.splitlines() if l.startswith(pre))
         script = "\n".join(["set -euo pipefail", f"slug=s1; repo={s.repo}; copy={copy}; state={root}/st; root={root}; T=t1; tc={tc}",
-                            line("atomic()"), line("record()"), line("projects()"), line("projdir()"), "build() { :; }", fn("central"), fn("tests"), "tests"])
+                            line("atomic()"), line("record()"), line("projects()"), line("projdir()"), "build() { :; }", fn("central"), fn("gradle_check"), line("tests()"), "tests"])
         r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={**os.environ, "EVIDENCE": "", "PATH": f"{root}/bin:{os.environ['PATH']}"})
         s.assertEqual(r.returncode, 0, r.stderr + r.stdout)
         s.assertEqual((root / "tasks").read_text().split(), [":mod:test", ":mod:spotlessCheck"])
@@ -539,6 +539,37 @@ mkdir -p {copy}/mod/build/test-results/test; echo '<testsuite name="ATest" tests
         r = subprocess.run(["bash", "-c", script + " :other"], capture_output=True, text=True, env={**os.environ, "EVIDENCE": "", "PATH": f"{root}/bin:{os.environ['PATH']}"})
         s.assertEqual(r.returncode, 0, r.stderr); s.assertEqual((root / "tasks").read_text().split(), [":other:test", ":other:spotlessCheck"])
         s.assertNotIn("Old", (root / "evidence/s1/test.log").read_text())   # a report this run did not write is never read
+
+    def test_the_spotless_row_fails_on_old_lint_in_a_touched_file(s):  # server-npc-examine-without-overlay failed CI Formatting three times: the ratchet saw a touched file's old lint
+        s.write("mod/build.gradle.kts", ""); s.write("mod/src/main/kotlin/B.kt", "fun  b()  {}\n")   # old lint, on main before the change
+        s.write("other/build.gradle.kts", "")
+        s.commit("feat: modules"); git(s.repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+        s.write("mod/src/main/kotlin/B.kt", "fun  b()  {}\nfun c() {}\n")
+        tc = s.commit("feat: touch B")
+        copy = Path(s.repo) / ".worktrees/s1-build"
+        root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, root); (root / "bin").mkdir(); (root / "st").mkdir()
+        # a fake gradle in docker: spotlessCheck of a module whose file holds the double space fails, as the ratchet does on a touched file
+        (root / "bin/docker").write_text(f"""#!/bin/bash
+while [ "$1" != _ ]; do shift; done; shift; echo "$@" > {root}/tasks
+for t; do m=${{t#:}}; m=${{m%:spotlessCheck}}; ! grep -rq 'fun  ' {copy}/$m/src 2>/dev/null || {{ echo "> Task :$m:spotlessCheck FAILED: format violations"; exit 1; }}; done
+""")
+        (root / "bin/docker").chmod(0o755)
+        src = (HERE.parent / "track.sh").read_text()
+        fn = lambda name: f"{name}() {{" + src.split(f"\n{name}() {{")[1].split("\n}")[0] + "\n}"
+        line = lambda pre: next(l for l in src.splitlines() if l.startswith(pre))
+        script = "\n".join(["set -euo pipefail", f"slug=s1; repo={s.repo}; copy={copy}; state={root}/st; root={root}; T=t1",
+                            line("atomic()"), line("record()"), line("projects()"), line("projdir()"), "build() { echo build >&2; exit 9; }",
+                            f"tree() {{ tc={tc}; }}", fn("central"), fn("gradle_check"), fn("spotless"), "spotless"])
+        run = lambda: subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={**os.environ, "EVIDENCE": "", "PATH": f"{root}/bin:{os.environ['PATH']}"})
+        r = run()
+        s.assertEqual(r.returncode, 1, r.stderr + r.stdout)
+        s.assertEqual((root / "tasks").read_text().split(), [":mod:spotlessCheck"])   # no test task, only the touched module
+        s.assertIn("violations", (root / "evidence/s1/spotless.log").read_text())
+        s.assertFalse(json.loads((root / "st/spotless.json").read_text())["ok"])
+        s.write("mod/src/main/kotlin/B.kt", "fun b() {}\nfun c() {}\n"); tc2 = s.commit("fix: the lint"); script = script.replace(tc, tc2)
+        r = run()
+        s.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        s.assertTrue(json.loads((root / "st/spotless.json").read_text())["ok"])
 
     def test_a_pack_directory_is_the_project_settings_names(s):  # quest-ernestthechicken: no module named ran :content:areas:city:draynor:pack:test, a project settings names draynor-pack
         fns = "\n".join(l for l in (HERE.parent / "track.sh").read_text().splitlines() if l.startswith(("projects()", "projdir()")))

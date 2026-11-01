@@ -54,7 +54,7 @@ Clone `~/src/work/<slug>` (a shared clone of `~/src/OpenRune-Server`, remote `fo
 Never edit the shared clone. Commit; `tools/track.sh build <slug>` builds T in the build copy; `tools/track.sh
 up <slug> [N]` starts the server from that build with N logged-in desktops and prints their devtools ports;
 `tools/track.sh test <slug> [module...]` builds, then runs each module's tests and spotlessCheck on the build copy
-(no module: every module the change touches) and writes `evidence/<slug>/test.log`; never gradle by hand.
+(no module: every module the change touches) and writes `evidence/<slug>/test.log` (the `spotless` row runs spotlessCheck alone on those modules at T, so lint in a touched file fails the hand-over, not CI); never gradle by hand.
 `tools/track.sh log <slug> <pattern>` reads the server log; `tools/track.sh restart <slug>` restarts that server,
 its game.yml and database kept, and logs the desktops in again. Each up starts a fresh database; `RESUME=1
 tools/track.sh up <slug>` starts from the accounts as the change's last `down` saved them (down waits until the server
@@ -124,4 +124,5 @@ Rows the contract starts from (`check:` rows run with SLUG, HEAD, T, BASE, CLONE
 - texts | template sections present; no fork PR link; pr-comment.md names HEAD | check: tools/server/text.py texts
 - gamevals | custom gameval ids unique across upstream main, the pins and open dev heads | check: tools/server/gamevals.py check
 - dupe-tests | every module whose main sources gain an item-moving call has a test source added or changed | check: tools/server/text.py dupes
+- spotless | spotlessCheck passes on every module the head changes from main | check: tools/track.sh spotless
 - ci | fork CI and Formatting green on gate/<slug> at T | gate: tools/track.sh gate-ci
