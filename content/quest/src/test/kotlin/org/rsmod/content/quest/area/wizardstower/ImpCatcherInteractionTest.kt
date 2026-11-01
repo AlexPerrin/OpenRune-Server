@@ -75,21 +75,22 @@ class ImpCatcherInteractionTest {
         assertEquals(0, f.player.statMap.getXP("stat.magic"))
     }
 
-    @Test fun `the journal lists every carried bead without replacing other lines`() {
+    @Test fun `the journal strikes each carried bead until all four are held`() {
         for (mask in 0 until (1 shl Beads.size)) {
             val f = Fixture(1)
             Beads.forEachIndexed { index, bead ->
                 if (mask and (1 shl index) != 0) f.player.inv[index] = InvObj(bead, 1)
             }
             val journal = f.script.questLog(f.access())
-            assertTrue(journal.contains("I need to bring him"), "Missing objective for mask $mask")
+            assertTrue(journal.contains("<str>I have spoken to Wizard Mizgog.</str>"))
+            val all = mask == (1 shl Beads.size) - 1
+            assertEquals(all, journal.contains("I have collected all the missing beads"), "Mask $mask")
             Beads.forEachIndexed { index, bead ->
-                val colour = bead.removePrefix("obj.").removeSuffix("_bead")
-                val line = "I have found the <red>$colour bead</red>."
-                assertEquals(mask and (1 shl index) != 0, journal.contains(line), "Mask $mask: $colour")
+                val name = bead.removePrefix("obj.").removeSuffix("_bead").replaceFirstChar { it.uppercase() }
+                val held = mask and (1 shl index) != 0
+                assertEquals(!all && held, journal.contains("<str>1 $name Bead.</str>"), "Mask $mask: $name")
+                assertEquals(!all && !held, journal.contains("<red>1 $name Bead.</red>"), "Mask $mask: $name")
             }
-            f.player.inv.fillNulls()
-            assertFalse(f.script.questLog(f.access()).contains("I have found the"))
         }
     }
 

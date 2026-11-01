@@ -44,41 +44,40 @@ class ImpCatcher @Inject constructor(private val worldRepo: WorldRepository) :
     }
 
     override fun subTitle(): String =
-        "talking to <col=800000>Wizard Mizgog</col> on the top floor of the " +
-            "<col=800000>Wizards' Tower</col>."
+        "talking to <col=800000>Wizard Mizgog</col> in the <col=800000>Wizards' Tower</col>."
 
     override fun questLog(player: ProtectedAccess) =
         questJournal(player) {
-            description(
-                "<red>Wizard Mizgog</red> has asked me to recover the four magical beads that " +
-                    "<red>Wizard Grayzag's</red> imps stole from him."
+            strike("I have spoken to Wizard Mizgog.")
+            line("")
+            if (hasAllBeads(player.player)) {
+                line(
+                    "I have collected all the missing beads and need to return them to " +
+                        "<red>Wizard Mizgog</red>."
+                )
+                return@questJournal
+            }
+            line(
+                "I need to collect some items by killing <red>Imps</red>, I can find Imps all " +
+                    "over the kingdom."
             )
-
-            objective(
-                "I need to bring him a <red>black bead</red>, a <red>red bead</red>, a " +
-                    "<red>white bead</red> and a <red>yellow bead</red>. The imps have spread out " +
-                    "all over the kingdom."
-            ) {
-                hasItem("black_bead", "I have found the <red>black bead</red>.")
-                    .preserveObjective(strikeObjective = false)
-                hasItem("red_bead", "I have found the <red>red bead</red>.")
-                    .preserveObjective(strikeObjective = false)
-                hasItem("white_bead", "I have found the <red>white bead</red>.")
-                    .preserveObjective(strikeObjective = false)
-                hasItem("yellow_bead", "I have found the <red>yellow bead</red>.")
-                    .preserveObjective(strikeObjective = false)
+            for ((bead, name) in Beads.zip(BeadNames)) {
+                if (player.inv.count(bead) > 0) {
+                    strike("1 $name Bead.")
+                } else {
+                    line("<red>1 $name Bead.</red>")
+                }
             }
         }
 
     override fun completedLog(player: ProtectedAccess): String =
         completionJournal(player) {
+            line("I have spoken to Wizard Mizgog.")
+            line("")
+            line("I have collected all the beads.")
+            line("")
             line(
-                "Wizard Grayzag summoned an army of imps to torment Wizard Mizgog, and they made " +
-                    "off with his four magical beads."
-            )
-            line(
-                "I tracked down a black, a red, a white and a yellow bead and returned them, and " +
-                    "Mizgog enchanted them into an amulet of accuracy for me."
+                "Wizard Mizgog thanked me for finding his beads and gave me an Amulet of Accuracy."
             )
         }
 
@@ -210,7 +209,7 @@ class ImpCatcher @Inject constructor(private val worldRepo: WorldRepository) :
         when (choice) {
             2 -> {
                 chatPlayer(angry, "Give me a quest or else!")
-                chatNpc(happy, "Or else what? You'll attack me? ")
+                chatNpc(happy, "Or else what? You'll attack me?")
                 chatNpc(laugh, "Hahaha!")
                 return false
             }
@@ -457,6 +456,7 @@ class ImpCatcher @Inject constructor(private val worldRepo: WorldRepository) :
     private companion object {
         private val Beads =
             listOf("obj.black_bead", "obj.red_bead", "obj.white_bead", "obj.yellow_bead")
+        private val BeadNames = listOf("Black", "Red", "White", "Yellow")
 
         private const val AmuletOfAccuracy = "obj.amulet_of_accuracy"
         private const val EnchantSeq = "seq.qip_imp_catcher_wizard"
@@ -470,7 +470,7 @@ class ImpCatcher @Inject constructor(private val worldRepo: WorldRepository) :
         private val CamLookAt = CoordGrid(3103, 3162, 2)
         private val CamMoveTo = CoordGrid(3103, 3161, 2)
 
-        private const val CutsceneJingle = "jingle.waterlogged"
+        private const val CutsceneJingle = "jingle.mizgog_cutscene"
 
         private const val FadeOutDuration = 15
         private const val FadeInDuration = 50
