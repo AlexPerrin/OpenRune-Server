@@ -6,6 +6,8 @@ import org.rsmod.api.db.gateway.GameDbManager
 import org.rsmod.api.db.gateway.model.fold
 import org.rsmod.api.net.central.CentralSocialResult
 import org.rsmod.api.net.central.CentralSocialService
+import org.rsmod.api.net.central.OpenRuneCentralWorldLink
+import org.rsmod.api.net.central.writeCentralAddedFriend
 import org.rsmod.api.net.friendchat.FriendChats
 import org.rsmod.api.social.writeSocialMessage
 import org.rsmod.game.entity.Player
@@ -42,7 +44,10 @@ constructor(
                 result.fold(
                     onOk = { socialResult ->
                         when (socialResult) {
-                            CentralSocialResult.Ok -> friendChats.socialChanged(current)
+                            CentralSocialResult.Ok -> {
+                                refreshAddedFriend(current, requestedName)
+                                friendChats.socialChanged(current)
+                            }
 
                             CentralSocialResult.Ignored -> Unit
 
@@ -54,6 +59,25 @@ constructor(
                     onErr = {
                         current.writeSocialMessage("Unable to add player right now.")
                     },
+                )
+            },
+        )
+    }
+
+    private fun refreshAddedFriend(player: Player, name: String) {
+        val uid = player.uid
+        val characterId = player.characterId
+        db.request(
+            request = { social.socialSnapshot(characterId = characterId) },
+            response = { result ->
+                val current = uid.resolve(playerList) ?: return@request
+                result.fold(
+                    onOk = { sync ->
+                        if (sync is OpenRuneCentralWorldLink.CentralSocialSnapshotResult.Ok) {
+                            current.writeCentralAddedFriend(sync.snapshot, name)
+                        }
+                    },
+                    onErr = {},
                 )
             },
         )
