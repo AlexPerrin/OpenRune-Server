@@ -11,6 +11,8 @@
 #                     (dev_mode off, xp at 1x), every account a member at rank 0, or with STAFF=N the Nth desktop's an administrator
 #   restart           restarts server-<slug>, its game.yml and database kept, and logs up's desktops in again
 #   down              stops the desktops, waits until the server has saved and dropped their characters, removes the containers
+#   test [MODULE...]  build, then each module's tests and spotlessCheck on the build copy (no module: those holding a file
+#                     the change's tree changes from origin/main); log evidence/<slug>/test.log, result state/<slug>/test.json
 #   gate TCOMMIT      every check: and gate: row of the contract from the build copy (`hd rows`)
 #   gate-ci           fork CI and Formatting green on gate/<slug> at TCOMMIT (blocks until both conclude)
 #   ship TCOMMIT      the integration tree: build, the deploy image with the live key, boot check, deploy, or roll back
@@ -183,6 +185,31 @@ down() {
   if [ "$(docker inspect -f '{{.State.Running}}' "server-$slug" 2>/dev/null)" = true ] && docker logs "server-$slug" 2>&1 | grep -q "Server ready in"; then offline; fi   # the server drops each disconnected character and saves it: RESUME starts there
   docker rm -f "server-$slug" "http-$slug" >/dev/null 2>&1 || true; rm -f "$state/up.json"; echo "down"
 }
+tests() {  # spotless's JGit cannot open a linked worktree: the container sees the copy's .git as a plain repo of T, its objects borrowed
+  build; git -C "$copy" reset -q --hard "$tc" && git -C "$copy" clean -fdq
+  local mods=("$@") f d g=$state/test.git out=${EVIDENCE:-$root/evidence/$slug}
+  if [ ${#mods[@]} = 0 ]; then
+    for f in $(git -C "$repo" diff --name-only "$(git -C "$repo" merge-base origin/main "$tc")" "$tc"); do
+      d=$(dirname "$f"); while [ "$d" != . ] && [ ! -f "$copy/$d/build.gradle.kts" ]; do d=$(dirname "$d"); done
+      [ "$d" = . ] || mods+=(":${d//\//:}")
+    done
+    mapfile -t mods < <(printf '%s\n' "${mods[@]}" | sort -u | grep .)
+  fi
+  [ ${#mods[@]} -gt 0 ] || { echo "no module touched: tools/track.sh test <slug> MODULE..."; return 2; }
+  rm -rf "$g"; git init -q --bare "$g"; git --git-dir="$g" config core.bare false; git --git-dir="$g" config core.worktree "$copy"
+  echo "$repo/.git/objects" > "$g/objects/info/alternates"
+  git --git-dir="$g" update-ref refs/remotes/origin/main "$(git -C "$repo" rev-parse origin/main)"; git --git-dir="$g" update-ref --no-deref HEAD "$tc"
+  git -C "$copy" update-index -q --refresh || true; cp "$(git -C "$copy" rev-parse --absolute-git-dir)/index" "$g/index"
+  echo "gitdir: $g" > "$state/test.gitfile"; mkdir -p "$out"
+  for d in "${mods[@]}"; do d=${d#:}; rm -rf "$copy/${d//://}/build/test-results/test"; done   # the report is this run's
+  docker run --rm --name "test-$slug" --cpus=4 --memory=5g -u 1000:1000 -e HOME=/gradle/home -e GRADLE_USER_HOME=/gradle \
+    -v "gradle-$slug:/gradle" -v or-dl:/dl -v "$repo/.git:$repo/.git:ro" -v "$g:$g:ro" -v "$copy:$copy" -v "$state/test.gitfile:$copy/.git:ro" -w "$copy" \
+    eclipse-temurin:21 bash -c 'mkdir -p ~/.openrune/caches && cp -an /dl/. ~/.openrune/caches/ 2>/dev/null || true
+      ./gradlew --console=plain --build-cache --no-configuration-cache --max-workers=4 -Dorg.gradle.jvmargs=-Xmx1536m --continue "$@"' _ \
+    $(printf '%s:test ' "${mods[@]}") $(printf '%s:spotlessCheck ' "${mods[@]}") > "$out/test.log" 2>&1 && ok=true || ok=false
+  for d in "${mods[@]}"; do d=${d#:}; cat "$copy/${d//://}"/build/test-results/test/*.xml 2>/dev/null | grep -o '<testsuite name="[^"]*" tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' || true; done >> "$out/test.log"
+  record "$ok" test < "$out/test.log"; grep -E '^<testsuite|went wrong|violations|FAILED|BUILD' "$out/test.log" || true; [ "$ok" = true ]
+}
 gate() {
   tc=$arg; build; git -C "$copy" reset -q --hard "$tc" && git -C "$copy" clean -fdq
   if out=$(HD_ROOT=$root python3 "$root/hd.py" rows "$slug" "$tc" "$copy" 2>&1); then record true gate <<< "$out"; else record false gate <<< "$out"; fi
@@ -235,4 +262,5 @@ EOF
 log() { c=server-$slug; [ "$slug" = live ] && c=osrs-openrune; m=$state/log-mark; docker logs ${m:+--since "$(cat "$m" 2>/dev/null || echo 1h)"} "$c" 2>&1 | grep -E "${arg:-.}" || true; date -u +%FT%TZ > "$m"; }
 recordings() { grep -lE "$arg" "${RSPROX:-$HOME/osrs-plugins-reverse/re/ref/rsprox/txt}"/*.txt 2>/dev/null | xargs -rn1 basename || echo "no transcript holds /$arg/"; }
 
-case $verb in build|up|restart|down|gate|gate-ci|ship|measure|log|recordings) "${verb//-/_}" ;; *) echo "verbs: build up restart down gate gate-ci ship measure log recordings" >&2; exit 2 ;; esac
+case $verb in build|up|restart|down|gate|gate-ci|ship|measure|log|recordings) "${verb//-/_}" ;; test) arg= tests "${@:3}" ;;
+  *) echo "verbs: build up restart down test gate gate-ci ship measure log recordings" >&2; exit 2 ;; esac

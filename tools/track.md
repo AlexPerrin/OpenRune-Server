@@ -53,6 +53,8 @@ repeat, source removed mid-action, counts read with `get_inventory` and `get_con
 Clone `~/src/work/<slug>` (a shared clone of `~/src/OpenRune-Server`, remote `fork` = the fork, `origin` = upstream).
 Never edit the shared clone. Commit; `tools/track.sh build <slug>` builds T in the build copy; `tools/track.sh
 up <slug> [N]` starts the server from that build with N logged-in desktops and prints their devtools ports;
+`tools/track.sh test <slug> [module...]` builds, then runs each module's tests and spotlessCheck on the build copy
+(no module: every module the change touches) and writes `evidence/<slug>/test.log`; never gradle by hand.
 `tools/track.sh log <slug> <pattern>` reads the server log; `tools/track.sh restart <slug>` restarts that server,
 its game.yml and database kept, and logs the desktops in again. Each up starts a fresh database; `RESUME=1
 tools/track.sh up <slug>` starts from the accounts as the change's last `down` saved them (down waits until the server
@@ -63,7 +65,7 @@ administrator, for a row that needs staff. The server `up` starts runs the image
 quest requirement is judged for real, or `assume-completed` (upstream's default, which skips every quest check) for
 content gated by a quest main does not register; `QUEST_MODE=<mode>` on one `up` overrides it (a refusal row of
 the other mode). PR notes name it as the verification setting. Every server run goes
-through track.sh, never a container by hand. Test through `osrs-devtools-desktop` data tools; a
+through track.sh, never a container by hand. Helper scripts and evidence live in `evidence/<slug>/`, never a session scratchpad. Test through `osrs-devtools-desktop` data tools; a
 screenshot only for how something is drawn. Write `pr-title.txt`, `pr-body.md`, `pr-comment.md` (names the head
 and covers every commit the push carries since the PR's live head). Push `dev/<slug>`, then `hd handover <slug>`:
 it runs every script row of the contract and refuses on any failure. `hd ask <slug> "..."` when a decision is not

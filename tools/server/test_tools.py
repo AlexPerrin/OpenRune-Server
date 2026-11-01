@@ -330,6 +330,40 @@ class Text(Repo):
         s.assertEqual(rc, 0, out)
 
 
+class TestVerb(Repo):
+    def test_runs_the_touched_modules_tests_and_spotless_with_the_copys_git_readable(s):  # a dev ran gradle by hand; spotless's JGit could not open the worktree
+        s.write("mod/build.gradle.kts", "")
+        s.write("other/build.gradle.kts", "")
+        s.commit("feat: modules"); git(s.repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+        s.write("mod/src/main/kotlin/A.kt", "fun a() { 1 }\n")
+        tc = s.commit("feat: touch mod")
+        copy = Path(s.repo) / ".worktrees/s1-build"; git(s.repo, "worktree", "add", "-q", "--detach", str(copy), tc)
+        root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, root); (root / "bin").mkdir(); (root / "st").mkdir()
+        # a fake docker: the container's view of the copy's git (as spotless reads it), the gradle tasks, a test report
+        (root / "bin/docker").write_text(f"""#!/bin/bash
+for a in "$@"; do case $a in *:{copy}/.git:ro) gd=$(sed 's/^gitdir: //' "${{a%%:*}}") ;; esac; done
+git --git-dir="$gd" rev-parse HEAD origin/main > {root}/git; git --git-dir="$gd" status --porcelain >> {root}/git
+while [ "$1" != _ ]; do shift; done; shift; echo "$@" > {root}/tasks
+mkdir -p {copy}/mod/build/test-results/test; echo '<testsuite name="ATest" tests="3" skipped="0" failures="0" errors="0" x>' > {copy}/mod/build/test-results/test/a.xml
+""")
+        (root / "bin/docker").chmod(0o755)
+        src = (HERE.parent / "track.sh").read_text()
+        fn = lambda name: f"{name}() {{" + src.split(f"\n{name}() {{")[1].split("\n}")[0] + "\n}"
+        line = lambda pre: next(l for l in src.splitlines() if l.startswith(pre))
+        script = "\n".join(["set -euo pipefail", f"slug=s1; repo={s.repo}; copy={copy}; state={root}/st; root={root}; T=t1; tc={tc}",
+                            line("record()"), "build() { :; }", fn("tests"), "tests"])
+        r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={**os.environ, "PATH": f"{root}/bin:{os.environ['PATH']}"})
+        s.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        s.assertEqual((root / "tasks").read_text().split(), [":mod:test", ":mod:spotlessCheck"])
+        s.assertEqual((root / "git").read_text().split(), [tc, git(s.repo, "rev-parse", "origin/main")])
+        s.assertIn('<testsuite name="ATest" tests="3"', (root / "evidence/s1/test.log").read_text())
+        s.assertTrue(json.loads((root / "st/test.json").read_text())["ok"])
+        (copy / "other/build/test-results/test").mkdir(parents=True); (copy / "other/build/test-results/test/old.xml").write_text('<testsuite name="Old" tests="1" skipped="0" failures="1" errors="0">')
+        r = subprocess.run(["bash", "-c", script + " :other"], capture_output=True, text=True, env={**os.environ, "PATH": f"{root}/bin:{os.environ['PATH']}"})
+        s.assertEqual(r.returncode, 0, r.stderr); s.assertEqual((root / "tasks").read_text().split(), [":other:test", ":other:spotlessCheck"])
+        s.assertNotIn("Old", (root / "evidence/s1/test.log").read_text())   # a report this run did not write is never read
+
+
 class Snapshot(Repo):
     def test_build_snapshot_keeps_tracked_files_under_ignored_paths(s):
         s.write(".gitignore", "generated/\n")
