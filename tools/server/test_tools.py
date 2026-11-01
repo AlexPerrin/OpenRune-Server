@@ -538,3 +538,43 @@ class KeyOnCachedBuild(unittest.TestCase):  # a cached or:<T> left state/<slug>/
         s.assertEqual(client, f"Exponent: 10001\nModulus: {mod}")
         s.assertEqual(len(mod), 256)
         r = run(); s.assertEqual(r.returncode, 0, r.stderr); s.assertEqual((st / "key/game.key").read_text(), game)   # an existing key is kept
+
+
+class TokenLogin(unittest.TestCase):  # a test desktop's token login (auth type 7): server-token-auth verifies the compact token's signature, expiry and account
+    def test_mint_signs_a_compact_token_with_the_secret_game_yml_holds(s):
+        import base64, hashlib, hmac, time, issuer as t
+        d = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, d)
+        block = t.key(d / "a"); t.key(d / "b")
+        secret = base64.b64decode(block.split('secret: "')[1].split('"')[0]); s.assertEqual(len(secret), 32)
+        def verifies(tok):
+            acc, exp, mac = tok.split(".")
+            return hmac.compare_digest(mac, t.b64(hmac.new(secret, f"{acc}.{exp}".encode(), hashlib.sha256).digest()))
+        tok = t.mint(d / "a", "hab12", exp=-5)
+        acc, exp, _ = tok.split("."); s.assertEqual(acc, "hab12"); s.assertLess(int(exp), time.time())
+        s.assertTrue(verifies(tok)); s.assertLessEqual(len(t.mint(d / "a", "h" * 12)), 90)   # the client's RSA login block holds about 90 bytes
+        s.assertFalse(verifies(t.mint(d / "b", "hab12")))   # another secret: a forged token
+        s.assertEqual(t.key(d / "a"), block)   # the secret is made once
+
+    def test_tokens_answers_the_token_written_last(s):
+        import http.server, threading, urllib.request, issuer as t
+        d = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, d); t.GameSession.dir = d
+        srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), t.GameSession); threading.Thread(target=srv.serve_forever, daemon=True).start(); s.addCleanup(srv.shutdown)
+        get = lambda: json.load(urllib.request.urlopen(f"http://127.0.0.1:{srv.server_port}/game-session/v1/tokens", data=b""))
+        (d / "token").write_text("a.b.c\n"); s.assertEqual(get(), {"token": "a.b.c"})
+        (d / "token").write_text("x.y.z\n"); s.assertEqual(get(), {"token": "x.y.z"})
+
+    def test_up_token_points_the_desktop_at_the_issuer_and_down_removes_it(s):
+        sh = (HERE.parent / "track.sh").read_text()
+        up = sh.split("\nup() {")[1].split("\n}")[0]; down = sh.split("\ndown() {")[1].split("\n}")[0]
+        s.assertIn('issuer.py" key "$state/token" >> "$state/game.yml"', up)
+        s.assertIn("param=\\1=https://127.0.0.1:", up)   # the client casts params 11 and 22 connections to https
+        s.assertIn('-v "$tpl:/app/protocol/jav_config.ws.template:ro"', up)
+        s.assertIn('"token-$slug"', down)
+        s.assertIn('"-Dosrstest.token=${tok:-false}"', sh); s.assertIn("JX_SESSION_ID:JX_CHARACTER_ID:JX_DISPLAY_NAME", sh)
+
+    def test_the_launcher_refuses_a_jagex_access_or_refresh_token_in_every_mode(s):
+        src = (HERE / "OsrsTestLauncher.java").read_text()
+        s.assertIn('"JX_ACCESS_TOKEN", "JX_REFRESH_TOKEN"', src)
+        s.assertIn('boolean session = v.equals("JX_SESSION_ID") || v.equals("JX_CHARACTER_ID") || v.equals("JX_DISPLAY_NAME");', src)
+        s.assertIn("token && session ? System.getenv(v) == null : System.getenv(v) != null", src)
+        s.assertIn('-cp "$t\\\\rsprox\\\\$l;', (HERE.parent / "track.sh").read_text())   # up runs this tree's launcher, compiled from this source

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""desktop_login.py <devtools port> <user> <password> | <devtools port> logout: logs a desktop client in (prints LOGGED_IN
-or FAILED: <reason>) or out through the logout tab's button (prints LOGIN_SCREEN) through its devtools endpoint. Keys only:
+"""desktop_login.py <devtools port> <user> <password> | <devtools port> token | <devtools port> logout: logs a desktop
+client in, by its login form or (token) by the token login its Jagex session variables start (prints LOGGED_IN or
+FAILED: <reason>), or out through the logout tab's button (prints LOGIN_SCREEN) through its devtools endpoint. Keys only:
 the login screen's place on the canvas changes with the window, so no point on it is clicked.
 """
 import json, sys, time, urllib.error, urllib.request
@@ -73,6 +74,16 @@ def login(port, user, password):
     return "LOGGED_IN" if s["gameState"] == "LOGGED_IN" else "FAILED: back at the login screen: the server refused the login"
 
 
+def token(port):
+    s = wait(port, ("LOGIN_SCREEN", "LOGGED_IN"))
+    if s["gameState"] == "LOGGED_IN":
+        return "LOGGED_IN"
+    call(port, "press_key", key="ENTER")  # the session's login page: Enter plays; the client fetches its token from param 11
+    wait(port, ("LOGIN_SCREEN",), poll=0.1, leave=True)
+    s = wait(port, ("LOGGED_IN", "LOGIN_SCREEN"))
+    return "LOGGED_IN" if s["gameState"] == "LOGGED_IN" else "FAILED: back at the login screen: the server refused the token"
+
+
 def logout(port):
     call(port, "invoke_menu_action", param0=-1, param1=LOGOUT_BUTTON, type="CC_OP", identifier=1, option="Logout")
     return wait(port, ("LOGIN_SCREEN",))["gameState"]
@@ -81,7 +92,7 @@ def logout(port):
 if __name__ == "__main__":
     port = sys.argv[1]
     try:
-        r = logout(port) if sys.argv[2] == "logout" else login(port, sys.argv[2], sys.argv[3])
+        r = logout(port) if sys.argv[2] == "logout" else token(port) if sys.argv[2] == "token" else login(port, sys.argv[2], sys.argv[3])
     except (OSError, Refused) as e:
         r = f"FAILED: devtools endpoint on {port}: {e}"
     print(r)
