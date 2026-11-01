@@ -2,7 +2,7 @@
 # tools/track.sh <verb> <slug> [arg]: the server track (docs/ARCHITECTURE.md of osrs-harness). Env from hd: SLUG HEAD T
 # TCOMMIT BASE CLONE EVIDENCE PINS HD_ROOT (HEADS NAMES for ship). Verbs:
 #   build [TCOMMIT]   the image or:<T> of the tree T (a dev: the working copy snapshotted, T from `hd tree`); cached by T
-#   up [N]            server-<slug> and http-<slug> from or:<T> on the change's ports, N desktop clients logged in
+#   up [N]            server-<slug> and http-<slug> from or:<T> on the change's ports (quest mode respect-progress), N desktop clients logged in
 #   down              stops the clients, removes the containers
 #   gate TCOMMIT      every check: and gate: row of the contract from the build copy (`hd rows`)
 #   gate-ci           fork CI and Formatting green on gate/<slug> at TCOMMIT (blocks until both conclude)
@@ -30,6 +30,7 @@ ready() {  # ready <container> [since]: blocks until "Server ready in" or the co
   done
 }
 port() { echo $(( 20000 + 16#$(printf %s "$slug" | sha1sum | cut -c1-3) * 2 + $1 )); }   # game +0, http +1; shortcut: two slugs may hash alike, pick from up.json when it happens
+quests() { y=$(sed -E '/^[[:space:]]*quest-requirements:/,/^[[:space:]]*mode:/ s/(mode:[[:space:]]*).*/\1"respect-progress"/'); grep -q 'mode: "respect-progress"' <<< "$y" || { echo "game.yml has no quest-requirements mode" >&2; return 1; }; printf '%s\n' "$y"; }   # stdin game.yml with every quest gate checked
 account() { echo "h$(printf %s "$slug" | sha1sum | cut -c1-9)${1:-}"; }   # the Nth client's login name and password (no N: the prefix of this slug's names): 11 characters (a login name takes 12 at most), listed in the slug's up.json
 
 sys32=${WINDOWS_SYSTEM32:-/mnt/c/Windows/System32}; desk=${DESKTOP_DIR:-/mnt/c/osrs-test}
@@ -102,8 +103,9 @@ up() {
   docker image inspect "or:$T" >/dev/null 2>&1 || { echo "no image or:$T: build first"; return 1; }
   game=$(port 0); http=$(port 1)
   down >/dev/null   # a previous up's clients and containers
+  docker run --rm --entrypoint cat "or:$T" /app/game.yml | quests > "$state/game.yml"   # upstream's default assume-completed skips every quest check
   docker run -d --name "server-$slug" --cpus=4 --memory=4g -p "$game:43594" --tmpfs /app/.data/postgres:uid=1000,gid=1000,mode=0700 \
-    -v "$state/key/game.key:/app/.data/game.key:ro" -v "$state/key/client.key:/app/.data/client.key:ro" "or:$T" >/dev/null
+    -v "$state/key/game.key:/app/.data/game.key:ro" -v "$state/key/client.key:/app/.data/client.key:ro" -v "$state/game.yml:/app/game.yml:ro" "or:$T" >/dev/null
   docker run -d --name "http-$slug" -p "$http:8080" -v "$sidecar_data:/data:ro" -v "$self/server/jav_config.ws.template:/app/protocol/jav_config.ws.template:ro" \
     -e WORLD_HOST=127.0.0.1 -e HTTP_PUBLIC_PORT="$http" -e WORLD_ID=255 -e SAVE_DIR=/tmp/saves -e JAV_CONFIG_TEMPLATE=/app/protocol/jav_config.ws.template \
     -e LOCAL_AUTH=false -e PROOF_OF_WORK=false -e VALIDATE_CRCS=false osrs-rsps-test:241 >/dev/null

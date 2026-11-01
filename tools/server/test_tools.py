@@ -55,6 +55,20 @@ class AccountName(unittest.TestCase):
         for n in names: s.assertEqual(n, prefix + n[len(prefix):]); s.assertEqual(len(n), len(prefix) + 1)
 
 
+class QuestMode(unittest.TestCase):
+    def test_up_runs_the_image_config_with_every_quest_requirement_checked(s):  # upstream's assume-completed let the range cook before Cook's Assistant
+        src = (HERE.parent / "track.sh").read_text()
+        fn = next(l for l in src.splitlines() if l.startswith("quests()"))
+        yml = 'game:\n  pvp:\n    mode: "off"\n  quest-requirements:\n    # Bypass quest gates by default.\n    mode: "assume-completed"\n    virtual-lines: []\n  other:\n    mode: "on"\n'   # upstream game.example.yml's shape
+        run = lambda text: subprocess.run(["bash", "-c", f"set -euo pipefail\n{fn}\nquests"], input=text, capture_output=True, text=True)
+        r = run(yml); s.assertEqual(r.returncode, 0, r.stderr)
+        s.assertEqual([l for l in r.stdout.splitlines() if l.strip().startswith("mode:")], ['    mode: "off"', '    mode: "respect-progress"', '    mode: "on"'])
+        s.assertEqual(len(r.stdout.splitlines()), len(yml.splitlines()))
+        s.assertNotEqual(run("game:\n  name: x\n").returncode, 0)
+        up = src.split("\nup() {")[1].split("\n}")[0]
+        s.assertIn('| quests > "$state/game.yml"', up); s.assertIn('-v "$state/game.yml:/app/game.yml:ro"', up)
+
+
 class DesktopInstance(unittest.TestCase):
     def test_concurrent_ups_take_distinct_instances(s):  # two ups once took the same client and one acted on the other's server
         src = (HERE.parent / "track.sh").read_text()
