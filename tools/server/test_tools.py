@@ -4,6 +4,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+SRC = (HERE.parent / "track.sh").read_text() + "\n" + (HERE.parent / "gate/gate.sh").read_text()   # the track script and the code a build or gate runs
 
 
 def git(repo, *a, env=None):
@@ -70,7 +71,7 @@ class Transcribe(unittest.TestCase):
 class NoPowerShell(unittest.TestCase):
     def test_windows_programs_run_from_bash_by_absolute_path(s):  # Windows refuses unsigned .ps1 from the UNC path; a lost PATH loses bare .exe names
         s.assertEqual(list(HERE.parent.rglob("*.ps1")), [])
-        src = "\n".join(l for l in (HERE.parent / "track.sh").read_text().splitlines() if not l.lstrip().startswith("#"))
+        src = "\n".join(l for l in SRC.splitlines() if not l.lstrip().startswith("#"))
         s.assertNotIn("powershell", src.lower())
         import re
         s.assertEqual(re.findall(r'(?:^|[\s(|;&])[\w.-]+\.exe\b', src), [])
@@ -78,14 +79,14 @@ class NoPowerShell(unittest.TestCase):
 
 class CacheStore(unittest.TestCase):
     def test_a_store_hit_restores_every_output_of_the_cache_step(s):  # a hit without api/generated fails :api:music:compileKotlin
-        line = next(l for l in (HERE.parent / "track.sh").read_text().splitlines() if "cp -a --parents" in l)
+        line = next(l for l in SRC.splitlines() if "cp -a --parents" in l)
         for out in (".data/cache ", ".data/gamevals ", ".data/gamevals-binary ", "api/generated "):
             s.assertIn(out, line)
 
 
 class Central(unittest.TestCase):
     def test_build_and_test_include_that_central_at_its_commit(s):  # a server change needing a Central change built, then tested, against the published dev.or2
-        src = (HERE.parent / "track.sh").read_text()
+        src = SRC
         c = src.split("\ncentral() {")[1].split("\n}")[0]
         s.assertIn('read -r cpath ccommit <<< "$CENTRAL"', c)
         s.assertIn('worktree add -q --detach "$cdir" "$ccommit"', c)
@@ -94,15 +95,15 @@ class Central(unittest.TestCase):
             b = src.split(f"\n{verb}() {{")[1].split("\n}")[0]
             for want in ("central;", '"${cvols[@]}"', 'CDIR="$cdir"', "${CDIR:+ --init-script /central.init.gradle}"):
                 s.assertIn(want, b, verb)
-        init = (HERE / "central.init.gradle").read_text()  # openrune-central is named unlike its project: substituted explicitly
+        init = (HERE.parent / "gate/central.init.gradle").read_text()  # openrune-central is named unlike its project: substituted explicitly
         for m, p in (("openrune-central", "central-app"), ("central-common", "central-common"), ("central-worldlink", "central-worldlink")):
             s.assertIn(f"substitute module('dev.or2:{m}') using project(':{p}')", init)
-        s.assertIn("CENTRAL=${CENTRAL:-$cen}", (HERE.parent / "track.sh").read_text())
+        s.assertIn("CENTRAL=${CENTRAL:-$cen}", SRC)
 
 
 class SidecarData(unittest.TestCase):
     def test_compose_gets_the_sidecar_dir_the_script_resolves(s):  # ship's compose mounted ":/data:ro": SIDECAR_DATA was a shell variable only
-        line = next(l for l in (HERE.parent / "track.sh").read_text().splitlines() if "SIDECAR_DATA:-" in l)
+        line = next(l for l in SRC.splitlines() if "SIDECAR_DATA:-" in l)
         env = {k: v for k, v in os.environ.items() if k != "SIDECAR_DATA"}
         for extra, want in (({"HOME": "/h"}, "/h/src/openrune-work/server-tools/sidecar/data"), ({"SIDECAR_DATA": "/d"}, "/d")):
             r = subprocess.run(["bash", "-c", line + '\nbash -c \'echo "$SIDECAR_DATA $0"\' "$sidecar_data"'], capture_output=True, text=True, env={**env, **extra})
@@ -111,14 +112,14 @@ class SidecarData(unittest.TestCase):
 
 class BuildLock(unittest.TestCase):
     def test_a_second_build_of_a_slug_waits_then_reuses_the_image(s):  # a dev's build was refused: the pass's build-<slug> container was running
-        b = (HERE.parent / "track.sh").read_text().split("\nbuild() {")[1].split("\n}")[0]
+        b = SRC.split("\nbuild() {")[1].split("\n}")[0]
         s.assertIn('exec 9> "$state/build.lock"; flock 9', b)
         s.assertLess(b.index("flock 9"), b.index('docker image inspect "or:$T"'))
 
 
 class DesktopDevtools(unittest.TestCase):
     def test_each_desktop_loads_the_live_clients_devtools_jar(s):  # the client track's build, not a jar staged by hand
-        t = (HERE.parent / "track.sh").read_text()
+        t = SRC
         f = t.split("\ndevtools_jar() {")[1].split("\n}")[0]
         s.assertIn('"$c" build live "$tc"', f); s.assertIn("-u T -u EVIDENCE", f)
         s.assertIn('jar=$root/evidence/live/$(git -C "$(dirname "$c")" rev-parse "$tc^{tree}").devtools-desktop.jar', f)
@@ -129,14 +130,14 @@ class DesktopDevtools(unittest.TestCase):
 
 class AccountName(unittest.TestCase):
     def test_each_login_name_fits_the_client_and_is_unique_per_slug_and_client(s):  # the client refuses a login name over 12 characters
-        fn = next(l for l in (HERE.parent / "track.sh").read_text().splitlines() if l.startswith("account()"))
+        fn = next(l for l in SRC.splitlines() if l.startswith("account()"))
         name = lambda slug, i: subprocess.run(["bash", "-c", f'{fn}\nslug=$1; account $2', "-", slug, str(i)], capture_output=True, text=True).stdout.strip()
         names = {name(slug, i) for slug in ("harness-no-powershell", "harness-server-account-name-length") for i in (1, 5)}
         s.assertEqual(len(names), 4)
         for n in names: s.assertRegex(n, r"^[a-z][a-z0-9]{1,11}$")
 
     def test_without_an_index_it_is_the_prefix_of_every_name_under_set_u(s):  # up's members update calls account with no argument
-        fn = next(l for l in (HERE.parent / "track.sh").read_text().splitlines() if l.startswith("account()"))
+        fn = next(l for l in SRC.splitlines() if l.startswith("account()"))
         r = subprocess.run(["bash", "-c", f'set -euo pipefail\n{fn}\nslug=s; echo "$(account) $(account 1) $(account 5)"'], capture_output=True, text=True)
         s.assertEqual(r.returncode, 0, r.stderr)
         prefix, *names = r.stdout.split()
@@ -145,7 +146,7 @@ class AccountName(unittest.TestCase):
 
 class QuestMode(unittest.TestCase):
     def test_up_runs_the_image_config_with_the_changes_quest_mode(s):  # upstream's assume-completed let the range cook before Cook's Assistant; a cannon needs it while main has no Dwarf Cannon quest
-        src = (HERE.parent / "track.sh").read_text()
+        src = SRC
         fns = "\n".join(l for l in src.splitlines() if l.startswith(("quests()", "quest_mode()")) or l.startswith("  y=$(sed"))
         yml = 'game:\n  pvp:\n    mode: "off"\n  quest-requirements:\n    # Bypass quest gates by default.\n    mode: "assume-completed"\n    virtual-lines: []\n  other:\n    mode: "on"\n'   # upstream game.example.yml's shape
         root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, root); (root / "harness/changes").mkdir(parents=True)
@@ -164,7 +165,7 @@ class QuestMode(unittest.TestCase):
         s.assertIn('| quests "$(quest_mode)" > "$state/game.yml"', up); s.assertIn('-v "$state/game.yml:/app/game.yml:ro"', up)
 
     def test_restart_keeps_the_config_and_database_of_up(s):  # a hand-run container lost its game.yml mount at restart; a tmpfs database loses the accounts
-        src = (HERE.parent / "track.sh").read_text()
+        src = SRC
         up = src.split("\nup() {")[1].split("\n}")[0]; restart = src.split("\nrestart() {")[1].split("\n}")[0]
         s.assertIn('-v "$state/postgres:/app/.data/postgres"', up); s.assertNotIn("--tmpfs", up)
         s.assertIn('docker restart "server-$slug"', restart); s.assertNotIn("docker run", restart); s.assertNotIn("> \"$state/game.yml\"", restart)
@@ -172,7 +173,7 @@ class QuestMode(unittest.TestCase):
 
 class Resume(unittest.TestCase):
     def test_down_saves_the_characters_and_resume_up_keeps_them(s):  # each up wiped the account: a long quest review replayed the quest every run
-        src = (HERE.parent / "track.sh").read_text()
+        src = SRC
         fn = lambda name: f"{name}() {{" + src.split(f"\n{name}() {{")[1].split("\n}")[0] + "\n}"
         line = lambda pre: next(l for l in src.splitlines() if l.startswith(pre))
         root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, root); (root / "bin").mkdir(); (root / "st").mkdir()
@@ -213,8 +214,8 @@ class DesktopInstance(unittest.TestCase):
         exe(d / "jdk/bin/javac.exe", f'echo "$*" >> {t}/javac; touch "${{5//\\\\//}}/OsrsTestLauncher.class"\n')
         exe(d / "jdk/bin/jps.exe", f'for f in {t}/win/*.jvm; do [ -e "$f" ] || continue; if [ -e "${{f%.jvm}}.flaky" ]; then rm "${{f%.jvm}}.flaky"; echo "${{f##*/}} -- process information unavailable"; else cat "$f"; fi; done\n')
         (t / "devtools.jar").write_text("jar")
-        src = (HERE.parent / "track.sh").read_text()
-        s.fns = src[src.index("sys32="):src.index("\ntree() {")]
+        src = SRC
+        s.fns = src[src.index("sys32="):src.index("\nkeys() {")]
         s.env = {**os.environ, "PATH": f"{t / 'bin'}:{os.environ['PATH']}", "WINDOWS_SYSTEM32": str(t / "sys32"), "DESKTOP_DIR": str(d)}
 
     def tearDown(s):
@@ -247,7 +248,7 @@ class DesktopInstance(unittest.TestCase):
         p = s.sh("a", "desktop_start; echo $inst $dt"); out = p.communicate(timeout=60)[0].split()
         s.assertEqual((p.returncode, out), (0, ["desktop1", "7780"])); s.assertFalse((s.t / "interop-fails").exists())
         s.assertTrue((s.t / "state/a/desktop1.log").exists())   # the launcher's output, read when a desktop never opens its port
-        s.assertIn('timeout 20 "$sys32/netstat.exe"', (HERE.parent / "track.sh").read_text())   # a hung listing ends and is asked again
+        s.assertIn('timeout 20 "$sys32/netstat.exe"', SRC)   # a hung listing ends and is asked again
 
     def test_a_port_another_program_holds_is_skipped_and_never_stopped(s):  # the user's own RuneLite on a harness port
         s.proc(500, "RuneLite", None, 7780)
@@ -304,7 +305,7 @@ class DesktopInstance(unittest.TestCase):
         s.assertIn('System.getenv("OPENRUNE_ENDPOINT")', src); s.assertIn('getJavConfigUrl().equals(endpoint + "/jav_config.ws")', src)
 
     def test_up_records_each_desktop_before_its_login(s):  # a failed login aborts up under set -e; restart and the tools read up.json
-        up = (HERE.parent / "track.sh").read_text().split("\nup() {")[1].split("\n}")[0]
+        up = SRC.split("\nup() {")[1].split("\n}")[0]
         s.assertLess(up.index('| atomic "$state/up.json"'), up.index('login "$dt"'))
         s.assertLess(up.index("down >/dev/null"), up.index("desktop_start"))
 
@@ -382,14 +383,14 @@ class DesktopLogin(unittest.TestCase):
         s.assertIn(("invoke_menu_action", {"param0": -1, "param1": d.LOGOUT_BUTTON, "type": "CC_OP", "identifier": 1, "option": "Logout"}), sent)
 
     def test_up_sets_members_while_its_characters_are_offline(s):  # the logout save wrote members back to false over an update made in game
-        up = (HERE.parent / "track.sh").read_text().split("\nup() {")[1].split("\n}")[0]
+        up = SRC.split("\nup() {")[1].split("\n}")[0]
         s.assertLess(up.index('desktop_login.py" "$(cut -d: -f2 <<< "$c")" logout'), up.index("  offline\n"))
         s.assertLess(up.index("  offline\n"), up.index("set members = true"))
         s.assertLess(up.index("set members = true"), up.rindex('login "$(cut -d: -f2 <<< "${desktops[$i]}")"'))
         s.assertNotIn("::", (HERE / "desktop_login.py").read_text())
 
     def test_a_login_that_made_another_account_logs_in_again(s):  # quest-restlessghost-9: a lost key made a stray first account, the rights update missed the real one and the relogin made it with rights ''
-        t = (HERE.parent / "track.sh").read_text(); fn = t[t.index("login() {"):t.index("offline() {")]
+        t = SRC; fn = t[t.index("login() {"):t.index("offline() {")]
         for site in ('login "$dt"', 'login "$(cut -d: -f2 <<< "${desktops[$i]}")"', 'login "$(cut -d: -f2 <<< "${ds[$i]}")"'):
             s.assertIn(site, t)   # every login of up and restart
         s.assertEqual(t.count("desktop_login.py\" \"$1\" \"$2\""), 1)   # no login but through it
@@ -524,7 +525,7 @@ while [ "$1" != _ ]; do shift; done; shift; echo "$@" > {root}/tasks
 mkdir -p {copy}/mod/build/test-results/test; echo '<testsuite name="ATest" tests="3" skipped="0" failures="0" errors="0" x>' > {copy}/mod/build/test-results/test/a.xml
 """)
         (root / "bin/docker").chmod(0o755)
-        src = (HERE.parent / "track.sh").read_text()
+        src = SRC
         fn = lambda name: f"{name}() {{" + src.split(f"\n{name}() {{")[1].split("\n}")[0] + "\n}"
         line = lambda pre: next(l for l in src.splitlines() if l.startswith(pre))
         script = "\n".join(["set -euo pipefail", f"slug=s1; repo={s.repo}; copy={copy}; state={root}/st; root={root}; T=t1; tc={tc}",
@@ -554,7 +555,7 @@ while [ "$1" != _ ]; do shift; done; shift; echo "$@" > {root}/tasks
 for t; do m=${{t#:}}; m=${{m%:spotlessCheck}}; ! grep -rq 'fun  ' {copy}/$m/src 2>/dev/null || {{ echo "> Task :$m:spotlessCheck FAILED: format violations"; exit 1; }}; done
 """)
         (root / "bin/docker").chmod(0o755)
-        src = (HERE.parent / "track.sh").read_text()
+        src = SRC
         fn = lambda name: f"{name}() {{" + src.split(f"\n{name}() {{")[1].split("\n}")[0] + "\n}"
         line = lambda pre: next(l for l in src.splitlines() if l.startswith(pre))
         script = "\n".join(["set -euo pipefail", f"slug=s1; repo={s.repo}; copy={copy}; state={root}/st; root={root}; T=t1",
@@ -572,7 +573,7 @@ for t; do m=${{t#:}}; m=${{m%:spotlessCheck}}; ! grep -rq 'fun  ' {copy}/$m/src 
         s.assertTrue(json.loads((root / "st/spotless.json").read_text())["ok"])
 
     def test_a_pack_directory_is_the_project_settings_names(s):  # quest-ernestthechicken: no module named ran :content:areas:city:draynor:pack:test, a project settings names draynor-pack
-        fns = "\n".join(l for l in (HERE.parent / "track.sh").read_text().splitlines() if l.startswith(("projects()", "projdir()")))
+        fns = "\n".join(l for l in SRC.splitlines() if l.startswith(("projects()", "projdir()")))
         copy = tempfile.mkdtemp(); s.addCleanup(shutil.rmtree, copy)
         for d in ("content/quest", "content/areas/city/draynor", "content/areas/city/draynor/pack"):
             Path(copy, d).mkdir(parents=True); Path(copy, d, "build.gradle.kts").write_text("")
@@ -631,7 +632,7 @@ class GateCi(Repo):
         g = git(fork, "rev-parse", "refs/heads/gate/s1")
         s.assertNotEqual(g, t); s.assertEqual(git(fork, "rev-parse", f"{g}^"), t)  # the change's head and T unchanged
         s.assertEqual(git(fork, "rev-parse", f"{g}:.central"), git(central, "rev-parse", f"{c}^{{tree}}"))
-        s.assertEqual(git(fork, "show", f"{g}:.central.init.gradle"), (HERE / "central.init.gradle").read_text().strip())
+        s.assertEqual(git(fork, "show", f"{g}:.central.init.gradle"), (HERE.parent / "gate/central.init.gradle").read_text().strip())
         for f in ("ci", "format"):
             y = git(fork, "show", f"{g}:.github/workflows/{f}.yml")
             s.assertLess(y.index("setup-gradle@v6"), y.index('mv .central "$RUNNER_TEMP/central"'), f); s.assertLess(y.index("init.d/central.gradle"), y.index("./gradlew test"), f)
@@ -687,7 +688,7 @@ if __name__ == "__main__":
 
 
 class RealmLikeLive(unittest.TestCase):  # Central seeds a dev realm: every login an administrator, unlike live
-    t = (HERE.parent / "track.sh").read_text()
+    t = SRC
     up = t.split("\nup() {")[1].split("\n}")[0]
     fn = next(l for l in t.splitlines() if l.startswith("account()"))
 
@@ -717,7 +718,7 @@ class RealmLikeLive(unittest.TestCase):  # Central seeds a dev realm: every logi
 
 
 class KeyOnCachedBuild(unittest.TestCase):  # a cached or:<T> left state/<slug>/key empty: docker made the mount sources directories and the server exited at boot
-    t = (HERE.parent / "track.sh").read_text()
+    t = SRC
     fn = "keys() {" + t.split("\nkeys() {")[1].split("\n}")[0] + "\n}"
 
     def test_up_makes_a_key_pair_before_the_server_runs_and_keeps_an_existing_one(s):
@@ -785,7 +786,7 @@ class TokenLogin(unittest.TestCase):  # a test desktop's token login (auth type 
         s.assertEqual(call("game-session/v1/tokens", b"", form=True)["token"].split(".")[0], "hab12")   # no DIR/token: a fresh one for DIR/account
 
     def test_up_token_points_the_desktop_at_the_issuer_and_down_removes_it(s):
-        sh = (HERE.parent / "track.sh").read_text()
+        sh = SRC
         up = sh.split("\nup() {")[1].split("\n}")[0]; down = sh.split("\ndown() {")[1].split("\n}")[0]
         s.assertIn('issuer.py" key "$state/token" >> "$state/game.yml"', up)
         s.assertIn("param=\\1=https://127.0.0.1:", up)   # the client casts params 11 and 22 connections to https
@@ -798,4 +799,4 @@ class TokenLogin(unittest.TestCase):  # a test desktop's token login (auth type 
         s.assertIn('"JX_ACCESS_TOKEN", "JX_REFRESH_TOKEN"', src)
         s.assertIn('boolean session = v.equals("JX_SESSION_ID") || v.equals("JX_CHARACTER_ID") || v.equals("JX_DISPLAY_NAME");', src)
         s.assertIn("token && session ? System.getenv(v) == null : System.getenv(v) != null", src)
-        s.assertIn('-cp "$t\\\\rsprox\\\\$l;', (HERE.parent / "track.sh").read_text())   # up runs this tree's launcher, compiled from this source
+        s.assertIn('-cp "$t\\\\rsprox\\\\$l;', SRC)   # up runs this tree's launcher, compiled from this source

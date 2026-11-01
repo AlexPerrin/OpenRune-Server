@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 # tools/track.sh <verb> <slug> [arg]: the server track (docs/ARCHITECTURE.md of osrs-harness). Env from hd: SLUG HEAD T
-# TCOMMIT BASE CLONE EVIDENCE PINS HD_ROOT CENTRAL (HEADS NAMES for ship). Verbs:
-#   build [TCOMMIT]   the image or:<T> of the tree T (a dev: the working copy snapshotted, T from `hd tree`); cached by T;
-#                     CENTRAL=<Central clone>:<commit> builds and tests with that Central in place of the published dev.or2 modules
-#                     (server/central.init.gradle substitutes each, :central-app included)
+# TCOMMIT BASE CLONE EVIDENCE PINS HD_ROOT CENTRAL (HEADS NAMES for ship). build, test, spotless, gate, gate-ci and tree are
+# tools/gate/gate.sh's (the code a build or gate runs, its own files). Verbs:
 #   up [N]            server-<slug> and http-<slug> from or:<T> on the change's ports (quest mode: QUEST_MODE, else the change's front
 #                     matter quest-mode, else respect-progress; or assume-completed), N desktops logged in,
 #                     each loading the live client's devtools jar (CLIENT_TRACK: the client track's script, its build of slug live);
@@ -16,14 +14,6 @@
 #                     ones (--exp -5), another account's, and forged ones (another key DIR)
 #   restart           restarts server-<slug>, its game.yml and database kept, and logs up's desktops in again
 #   down              stops the desktops, waits until the server has saved and dropped their characters, removes the containers (token-<slug> too)
-#   test [MODULE...]  build, then each module's tests and spotlessCheck on the build copy (no module: those holding a file
-#                     the change's tree changes from origin/main); log evidence/<slug>/test.log, result state/<slug>/test.json
-#   spotless          spotlessCheck alone on those modules at TCOMMIT (a contract row; no TCOMMIT: the working copy's T), no build;
-#                     log evidence/<slug>/spotless.log, result state/<slug>/spotless.json
-#   gate TCOMMIT      every check: and gate: row of the contract from the build copy (`hd rows`)
-#   gate-ci           fork CI and Formatting green on gate/<slug> (blocks until both conclude) at a child of TCOMMIT whose
-#                     workflows first move the runner's ephemeral ports above the game port 43594 (an outgoing socket on it
-#                     fails the boot's bind), and with CENTRAL build that Central in, as build does (the change's head unchanged)
 #   ship TCOMMIT      the integration tree: build, the deploy image with the live key, boot check, deploy, or roll back
 #   measure GOAL      the content inventory's share of rows whose unit is in PASSES
 #   log <slug> PATTERN  the lines of the change's server container matching PATTERN (slug `live`: the live server)
@@ -33,6 +23,7 @@
 # Windows locations, run through WSL interop (override in the environment):
 #   WINDOWS_SYSTEM32  /mnt/c/Windows/System32   netstat.exe, taskkill.exe, robocopy.exe
 #   DESKTOP_DIR       /mnt/c/osrs-test          the desktops' template; each up's instances are DESKTOP_DIR/run/N (jdk/bin/java.exe, jps.exe)
+case ${1:-} in build|test|spotless|gate|gate-ci|tree) exec "$(dirname "$0")/gate/gate.sh" "$@" ;; esac
 set -euo pipefail
 verb=$1; slug=${2:-${SLUG:-}}; arg=${3:-}   # a contract row passes no slug: hd exports SLUG
 self=$(cd "$(dirname "$0")" && pwd)
@@ -40,11 +31,9 @@ repo=${CLONE:-$HOME/src/OpenRune-Server}
 root=${HD_ROOT:-$HOME/osrs-harness}
 [ -f "$root/harness/changes/$slug.md" ] || [ -f "$root/harness/goals/$slug.md" ] || case $slug in live|integration) ;; *) echo "no change or goal \"$slug\": tools/track.sh <verb> <slug> [arg]" >&2; exit 2 ;; esac
 state=$root/state/$slug; mkdir -p "$state"
-dev=$repo/.worktrees/$slug; copy=$repo/.worktrees/$slug-build
 live_image=osrs-openrune:241; compose_dir=$self/server
 export SIDECAR_DATA=${SIDECAR_DATA:-$HOME/src/openrune-work/server-tools/sidecar/data}; sidecar_data=$SIDECAR_DATA  # compose mounts ${SIDECAR_DATA}
 atomic() { cat > "$1.$$.tmp"; if [ -s "$1.$$.tmp" ]; then mv -f "$1.$$.tmp" "$1"; else rm -f "$1.$$.tmp"; return 1; fi; }   # a state record whole or not at all: hd reads it at any moment
-record() { python3 -c 'import json,sys;print(json.dumps({"T":sys.argv[1],"ok":sys.argv[2]=="true","detail":sys.stdin.read()[-2000:]}))' "$T" "$1" | atomic "$state/$2.json"; }
 ready() {  # ready <container> [since]: blocks until "Server ready in" or the container stops
   while ! docker logs ${2:+--since "$2"} "$1" 2>&1 | grep -q "Server ready in"; do
     [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = true ] || { echo "$1 is not running"; return 1; }; sleep 5
@@ -135,51 +124,6 @@ devtools_jar() {  # sets jar: the devtools classes jar of the client track's bui
   [ -f "$jar" ] || { echo "no desktop devtools jar $jar" >&2; return 1; }
 }
 
-tree() {  # TCOMMIT and T: the pass gives them; a dev's build snapshots the working copy and asks hd
-  if [ -n "$arg" ]; then tc=$arg; T=${T:-$(git -C "$repo" rev-parse "$tc^{tree}")}; return; fi
-  [ -d "$dev" ] || git -C "$repo" worktree add -q "$dev" -B "dev/$slug" "$(git -C "$repo" rev-parse -q --verify "fork/dev/$slug" || echo origin/main)"
-  idx=$(git -C "$dev" rev-parse --git-path snapshot-index); rm -f "$idx"   # from HEAD: add -A alone drops tracked files under ignored paths
-  GIT_INDEX_FILE=$idx git -C "$dev" read-tree HEAD && GIT_INDEX_FILE=$idx git -C "$dev" add -A . && snap=$(git -C "$dev" commit-tree "$(GIT_INDEX_FILE=$idx git -C "$dev" write-tree)" -p HEAD -m snapshot)
-  read -r tc T cen < <(HD_ROOT=$root python3 "$root/hd.py" tree "$slug" "$snap"); CENTRAL=${CENTRAL:-$cen}
-}
-central() {  # the change's Central dependencies, merged by hd, built in (server/central.init.gradle): cdir and cvols for build and tests
-  cdir= cvols=(); [ -n "${CENTRAL:-}" ] || return 0
-  IFS=: read -r cpath ccommit <<< "$CENTRAL"; cdir=$cpath/.worktrees/$slug-central
-  if [ -d "$cdir" ]; then git -C "$cdir" reset -q --hard "$ccommit" && git -C "$cdir" clean -fdq; else git -C "$cpath" worktree add -q --detach "$cdir" "$ccommit"; fi
-  cvols=(-v "$cpath/.git:$cpath/.git:ro" -v "$cdir:$cdir" -v "$self/server/central.init.gradle:/central.init.gradle:ro")
-}
-build() {
-  tree
-  exec 9> "$state/build.lock"; flock 9   # one build of a slug at a time (the pass's and its dev's): the second waits, then reuses a cached or:<T>
-  if docker image inspect "or:$T" >/dev/null 2>&1; then echo "cached or:$T"; record true build <<< "cached"; return; fi
-  if [ -d "$copy" ]; then git -C "$copy" reset -q --hard "$tc" && git -C "$copy" clean -fdq; else git -C "$repo" worktree add -q --detach "$copy" "$tc"; fi
-  [ -f "$copy/game.yml" ] || cp "$copy/game.example.yml" "$copy/game.yml"
-  if grep -q '\.m2-rsprot' "$copy/settings.gradle.kts"; then  # local/android pins an rsprot published only to the clone's .m2-rsprot
-    [ -d "$repo/.m2-rsprot" ] || { echo "no $repo/.m2-rsprot: the tree pins a locally published rsprot" | tee "$state/build-$T.log" | record false build; echo "build failed: $state/build-$T.log"; return 1; }
-    cp -a "$repo/.m2-rsprot" "$copy/"
-  fi
-  ck=$(git -C "$copy" ls-tree -r "$tc" | grep -E 'or-cache/|/pack/|gamevals|raw-cache' | sha1sum | cut -c1-12)   # the cache's inputs
-  log=$state/build-$T.log
-  central; vols=(-v "gradle-$slug:/gradle" -v or-dl:/dl -v or-cache-store:/store "${cvols[@]}")
-  docker run --rm "${vols[@]}" eclipse-temurin:21 chown 1000:1000 /gradle /dl /store   # docker makes a new volume root's; the build runs as 1000
-  docker run --rm --name "build-$slug" --cpus=4 --memory=5g -u 1000:1000 -e HOME=/gradle/home -e GRADLE_USER_HOME=/gradle -e CK="$ck" -e CDIR="$cdir" \
-    "${vols[@]}" -v "$repo/.git:$repo/.git:ro" -v "$copy:$copy" -w "$copy" \
-    eclipse-temurin:21 bash -c '
-      set -e; mkdir -p "$HOME"; g="./gradlew --console=plain --build-cache --no-configuration-cache --max-workers=4 -Dorg.gradle.jvmargs=-Xmx1536m${CDIR:+ --init-script /central.init.gradle}"
-      mkdir -p ~/.openrune/caches && cp -an /dl/. ~/.openrune/caches/ 2>/dev/null || true
-      s=/store/s-$CK   # every output of the cache step: api/generated is compiled, the gamevals are read at boot
-      if [ -d $s ]; then cp -a $s/. .; else
-        $g :or-cache:freshCache :or-cache:mergePluginGamevals :or-cache:buildCache
-        rm -rf $s.tmp && mkdir -p $s.tmp && cp -a --parents .data/cache .data/gamevals .data/gamevals-binary api/generated $s.tmp/ && mv $s.tmp $s
-        for z in ~/.openrune/caches/*/*/*-disk.zip; do [ -e "$z" ] || continue; d=/dl/$(basename $(dirname $(dirname $z)))/$(basename $(dirname $z)); mkdir -p $d; cp -n $z $d/; done
-      fi
-      $g generateRsa :server:app:installDist -x test' > "$log" 2>&1 || { record false build < "$log"; echo "build failed: $log"; return 1; }
-  st=$copy/.image; rm -rf "$st"; mkdir -p "$st/data"
-  cp -a "$copy/server/app/build/install/app" "$st/server"; cp "$copy/game.yml" "$st/"
-  cp -a "$copy/.data/." "$st/data/"; rm -rf "$st/data/client.key" "$st/data/game.key" "$st/data/postgres"
-  docker build -q -f "$self/server/Dockerfile" -t "or:$T" "$st" >> "$log" 2>&1
-  record true build < "$log"; echo "built or:$T"
-}
 keys() {  # the change's key pair in $state/key, made by up alone: whichever change built or:<T>, no key is copied from a build
   k=$state/key; [ -f "$k/game.key" ] && [ -f "$k/client.key" ] && return
   rm -rf "$k" 2>/dev/null || docker run --rm -v "$state:/s" postgres:16-alpine rm -rf /s/key; mkdir "$k"   # the root-owned directories docker made for missing mount sources go too
@@ -240,75 +184,9 @@ down() {
   if [ "$(docker inspect -f '{{.State.Running}}' "server-$slug" 2>/dev/null)" = true ] && docker logs "server-$slug" 2>&1 | grep -q "Server ready in"; then offline; fi   # the server drops each disconnected character and saves it: RESUME starts there
   docker rm -f "server-$slug" "http-$slug" "token-$slug" >/dev/null 2>&1 || true; rm -f "$state/up.json"; echo "down"
 }
-projects() { local f d; for f; do d=$(dirname "$f"); while [ "$d" != . ] && [ ! -f "$copy/$d/build.gradle.kts" ]; do d=$(dirname "$d"); done; [ "$d" = . ] || { [ "${d##*/}" = pack ] && d=${d%/pack}/$(basename "${d%/pack}")-pack; echo ":${d//\//:}"; }; done | sort -u; }   # the Gradle projects holding these files: settings.gradle.kts names a pack directory <parent>-pack
-projdir() { local d=${1#:}; d=${d//://}; [ "${d##*/}" = "$(basename "$(dirname "$d")")-pack" ] && d=$(dirname "$d")/pack; echo "$d"; }   # a project's directory
-tests() { build; gradle_check test "$@"; }
-spotless() {  # the check row: spotlessCheck on every module T changes from origin/main, so a lint the ratchet sees in a touched file fails the hand-over, not CI; no build (the gate's holds the build lock)
-  tree; [ -d "$copy" ] || git -C "$repo" worktree add -q --detach "$copy" "$tc"; gradle_check spotless
-}
-gradle_check() {  # gradle_check test|spotless [MODULE...]: spotless's JGit cannot open a linked worktree: the container sees the copy's .git as a plain repo of T, its objects borrowed
-  local kind=$1; shift; git -C "$copy" reset -q --hard "$tc" && git -C "$copy" clean -fdq
-  local mods=("$@") f d g=$state/$kind.git out=${EVIDENCE:-$root/evidence/$slug}
-  if [ ${#mods[@]} = 0 ]; then
-    mapfile -t mods < <(projects $(git -C "$repo" diff --name-only "$(git -C "$repo" merge-base origin/main "$tc")" "$tc"))
-  fi
-  if [ ${#mods[@]} = 0 ]; then [ "$kind" = spotless ] && { echo "no module touched"; record true spotless <<< "no module touched"; return 0; }
-    echo "no module touched: tools/track.sh test <slug> MODULE..."; return 2; fi
-  echo "modules: ${mods[*]}"
-  rm -rf "$g"; git init -q --bare "$g"; git --git-dir="$g" config core.bare false; git --git-dir="$g" config core.worktree "$copy"
-  echo "$repo/.git/objects" > "$g/objects/info/alternates"
-  git --git-dir="$g" update-ref refs/remotes/origin/main "$(git -C "$repo" rev-parse origin/main)"; git --git-dir="$g" update-ref --no-deref HEAD "$tc"
-  git -C "$copy" update-index -q --refresh || true; cp "$(git -C "$copy" rev-parse --absolute-git-dir)/index" "$g/index"
-  echo "gitdir: $g" > "$state/$kind.gitfile"; mkdir -p "$out"
-  for d in "${mods[@]}"; do rm -rf "$copy/$(projdir "$d")/build/test-results/test"; done   # the report is this run's
-  central; docker run --rm --name "$kind-$slug" --cpus=4 --memory=5g -u 1000:1000 -e HOME=/gradle/home -e GRADLE_USER_HOME=/gradle -e CDIR="$cdir" \
-    -v "gradle-$slug:/gradle" -v or-dl:/dl "${cvols[@]}" -v "$repo/.git:$repo/.git:ro" -v "$g:$g:ro" -v "$copy:$copy" -v "$state/$kind.gitfile:$copy/.git:ro" -w "$copy" \
-    eclipse-temurin:21 bash -c 'mkdir -p ~/.openrune/caches && cp -an /dl/. ~/.openrune/caches/ 2>/dev/null || true
-      ./gradlew --console=plain --build-cache --no-configuration-cache --max-workers=4 -Dorg.gradle.jvmargs=-Xmx1536m${CDIR:+ --init-script /central.init.gradle} --continue "$@"' _ \
-    $([ "$kind" = test ] && printf '%s:test ' "${mods[@]}") $(printf '%s:spotlessCheck ' "${mods[@]}") > "$out/$kind.log" 2>&1 && ok=true || ok=false
-  for d in "${mods[@]}"; do cat "$copy/$(projdir "$d")"/build/test-results/test/*.xml 2>/dev/null | grep -o '<testsuite name="[^"]*" tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' || true; done >> "$out/$kind.log"
-  record "$ok" "$kind" < "$out/$kind.log"; grep -E -A1 '^<testsuite|went wrong|violations|FAILED|BUILD' "$out/$kind.log" | grep -v '^--$' || true; [ "$ok" = true ]
-}
-gate() {
-  tc=$arg; build; git -C "$copy" reset -q --hard "$tc" && git -C "$copy" clean -fdq
-  if out=$(HD_ROOT=$root python3 "$root/hd.py" rows "$slug" "$tc" "$copy" 2>&1); then record true gate <<< "$out"; else record false gate <<< "$out"; fi
-}
-gate_sha() {  # a child of TCOMMIT whose workflows move the ephemeral ports off the game port, and with CENTRAL hold that Central tree at .central/ built in
-  set -e   # a command substitution does not inherit it
-  d=$(mktemp -d); trap 'rm -rf "$d"' EXIT; idx=$d/index   # one index per run: gates of other changes run at once
-  GIT_INDEX_FILE=$idx git -C "$repo" read-tree "$TCOMMIT"
-  step='      - name: Ephemeral ports above the game port (tools/track.sh gate-ci)
-        run: sysctl net.ipv4.ip_local_port_range; sudo sysctl -w net.ipv4.ip_local_port_range="49152 65535"'
-  if [ -n "${CENTRAL:-}" ]; then
-    IFS=: read -r cpath ccommit <<< "$CENTRAL"; git -C "$repo" fetch -q "$cpath" "$ccommit"
-    GIT_INDEX_FILE=$idx git -C "$repo" read-tree --prefix=.central/ "$ccommit"
-    GIT_INDEX_FILE=$idx git -C "$repo" update-index --add --cacheinfo "100644,$(git -C "$repo" hash-object -w "$self/server/central.init.gradle"),.central.init.gradle"
-    step="$step"'
-      - name: Central of the gate tree (tools/track.sh gate-ci)
-        run: |
-          mv .central "$RUNNER_TEMP/central"; echo "CDIR=$RUNNER_TEMP/central" >> "$GITHUB_ENV"
-          mkdir -p "${GRADLE_USER_HOME:-$HOME/.gradle}/init.d"; mv .central.init.gradle "${GRADLE_USER_HOME:-$HOME/.gradle}/init.d/central.gradle"'
-  fi
-  for f in ci format; do f=.github/workflows/$f.yml
-    y=$(git -C "$repo" show "$TCOMMIT:$f" | awk -v step="$step" '{print} /uses: gradle\/actions\/setup-gradle@/{print step; n++} END{exit n!=1}') || { echo "$f: no single setup-gradle step to follow" >&2; return 1; }
-    GIT_INDEX_FILE=$idx git -C "$repo" update-index --cacheinfo "100644,$(printf '%s\n' "$y" | git -C "$repo" hash-object -w --stdin),$f"
-  done
-  git -C "$repo" commit-tree "$(GIT_INDEX_FILE=$idx git -C "$repo" write-tree)" -p "$TCOMMIT" -m "gate: $TCOMMIT${CENTRAL:+ with Central ${ccommit:-}}"
-}
-gate_ci() {  # pushes T (gate_sha) to gate/<slug>; a run of each workflow at that sha concludes green, or the row fails
-  sha=$(gate_sha); git -C "$repo" push -q --force fork "$sha:refs/heads/gate/$slug"
-  for wf in CI Formatting; do
-    while :; do
-      st=$(gh run list -R "$(git -C "$repo" remote get-url fork | sed -E 's#.*github.com[:/]##; s#\.git$##')" --branch "gate/$slug" --limit 20 \
-             --json headSha,conclusion,status,workflowName -q ".[] | select(.headSha==\"$sha\" and .workflowName==\"$wf\") | (.conclusion // \"\") + \"/\" + .status" | head -1)
-      case $st in success/*) break ;; "") gh workflow run "$wf" -R "$(git -C "$repo" remote get-url fork | sed -E 's#.*github.com[:/]##; s#\.git$##')" --ref "gate/$slug"; sleep 30 ;;
-        */completed) echo "$wf $st on gate/$slug at $sha (T $TCOMMIT)"; return 1 ;; *) sleep 30 ;; esac
-    done
-  done; echo "CI and Formatting green at $sha (T $TCOMMIT)"
-}
 ship() {  # the integration tree → the live test server
-  slug=integration; state=$root/state/live; mkdir -p "$state"; copy=$repo/.worktrees/integration-build; arg=${arg:-$TCOMMIT}
-  build
+  arg=${arg:-$TCOMMIT}; "$self/gate/gate.sh" build integration "$arg"; T=${T:-$(git -C "$repo" rev-parse "$arg^{tree}")}
+  slug=integration; state=$root/state/live; mkdir -p "$state"
   cat > "$state/Dockerfile" <<EOF
 FROM or:$T
 COPY --from=$live_image --chown=1000:1000 /app/.data/game.key /app/.data/client.key /app/.data/
@@ -364,7 +242,6 @@ transcribe() {  # a fresh RSProx home: one filter set, active, naming every Prop
   [ $fail = 1 ] || rm -rf "$h"; return $fail
 }
 
-case $verb in build|up|restart|down|gate|gate-ci|ship|measure|log|recordings) "${verb//-/_}" ;; token) token "$arg" ;; test) arg= tests "${@:3}" ;;
-  spotless) arg=${TCOMMIT:-} spotless ;;
+case $verb in up|restart|down|ship|measure|log|recordings) "$verb" ;; token) token "$arg" ;;
   transcribe) transcribe "${@:3}" ;;
-  *) echo "verbs: build up restart down test spotless gate gate-ci ship measure log recordings transcribe token" >&2; exit 2 ;; esac
+  *) echo "verbs: build up restart down test spotless gate gate-ci tree ship measure log recordings transcribe token" >&2; exit 2 ;; esac
