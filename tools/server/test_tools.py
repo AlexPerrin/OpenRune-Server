@@ -94,8 +94,8 @@ class DesktopInstance(unittest.TestCase):
         (s.t / f"win/{pid}.jvm").write_text(f"{pid} {cls} -Duser.home=C:\\x" + (f" -Dosrstest.marker=osrs-test-{marker}" if marker else "") + "\n")
         if port: (s.t / f"win/{pid}.port").write_text(f"{port}\n")
 
-    def up(s, slug, clients, live=True):
-        (s.t / "state" / slug).mkdir(); (s.t / "state" / slug / "up.json").write_text(json.dumps({"clients": clients}))
+    def up(s, slug, desktops, live=True):
+        (s.t / "state" / slug).mkdir(); (s.t / "state" / slug / "up.json").write_text(json.dumps({"desktops": desktops}))
         if live: (s.t / f"live-server-{slug}").touch()
 
     def sh(s, slug, body):
@@ -104,14 +104,14 @@ class DesktopInstance(unittest.TestCase):
     def killed(s):
         return sorted((s.t / "killed").read_text().split()) if (s.t / "killed").exists() else []
 
-    def test_concurrent_ups_take_distinct_instances(s):  # two ups once took the same client and one acted on the other's server
-        start = 'desktop_start; mkdir -p "$root/state/$slug"; echo "{\\"clients\\": \\"$inst:$dt:$pids\\"}" > "$root/state/$slug/up.json"; touch "$root/live-server-$slug"; echo $inst'
+    def test_concurrent_ups_take_distinct_instances(s):  # two ups once took the same desktop and one acted on the other's server
+        start = 'desktop_start; mkdir -p "$root/state/$slug"; echo "{\\"desktops\\": \\"$inst:$dt:$pids\\"}" > "$root/state/$slug/up.json"; touch "$root/live-server-$slug"; echo $inst'
         ps = [s.sh(f"s{k}", start) for k in range(3)]
         got = [p.communicate(timeout=60)[0].split()[0] for p in ps]
         s.assertEqual(len(set(got)), 3, got); s.assertEqual(s.killed(), [])
 
-    def test_a_client_no_live_run_lists_is_stopped_and_no_unmarked_jvm_is_touched(s):  # an orphan on desktop4 took a judge's login keys
-        s.proc(100, "OsrsTestLauncher", 1, 7780); s.up("a", "desktop1:7780:100")     # a live run's client
+    def test_a_desktop_no_live_run_lists_is_stopped_and_no_unmarked_jvm_is_touched(s):  # an orphan on desktop4 took a judge's login keys
+        s.proc(100, "OsrsTestLauncher", 1, 7780); s.up("a", "desktop1:7780:100")     # a live run's desktop
         s.proc(200, "RuneLite", 2, 7781); s.up("gone", "desktop2:7781:200", live=False)   # its run's server is gone
         s.proc(500, "RuneLite", None, 7782)                                          # the user's own RuneLite on a harness port
         s.proc(400, "RuneLite", 4, 7783); s.proc(401, "Launcher", 4)                 # no up.json lists it
@@ -120,7 +120,12 @@ class DesktopInstance(unittest.TestCase):
         s.assertEqual(out, ["desktop2", "7781"])
         s.assertTrue((s.t / "win/500.jvm").exists()); s.assertTrue((s.t / "win/100.jvm").exists())
 
-    def test_an_instance_is_claimed_only_when_no_client_answers_on_it(s):  # whatever a pid file says
+    def test_a_live_up_json_from_before_the_rename_still_owns_its_desktop(s):  # field "clients", written before "desktops"
+        (s.t / "state/old").mkdir(); (s.t / "state/old/up.json").write_text(json.dumps({"clients": "desktop1:7780:100"})); (s.t / "live-server-old").touch()
+        s.up("new", "desktop2:7781:200")
+        s.assertEqual(sorted(s.sh("b", "owned").communicate(timeout=60)[0].split()), ["desktop1:7780:100", "desktop2:7781:200"])
+
+    def test_an_instance_is_claimed_only_when_no_desktop_answers_on_it(s):  # whatever a pid file says
         for i in range(1, 6): s.up(f"r{i}", f"desktop{i}:{7779 + i}:{i}") if i != 3 else None
         s.proc(500, "RuneLite", None, 7782)                                          # not marked: never stopped, its port stays taken
         p = s.sh("b", "desktop_start"); p.communicate(timeout=60)
@@ -134,7 +139,7 @@ class DesktopInstance(unittest.TestCase):
         s.sh("b", "desktop_stop desktop3").communicate(timeout=60)              # an up.json from before the PIDs were recorded
         s.assertEqual(s.killed(), ["300", "301"]); s.assertTrue((s.t / "win/999.jvm").exists())
 
-    def test_up_records_each_client_before_its_login(s):  # a failed login aborts up under set -e; down must still stop that client
+    def test_up_records_each_desktop_before_its_login(s):  # a failed login aborts up under set -e; down must still stop that desktop
         up = (HERE.parent / "track.sh").read_text().split("\nup() {")[1].split("\n}")[0]
         s.assertLess(up.index('> "$state/up.json"'), up.index("flock -u 9"))
         s.assertLess(up.index('> "$state/up.json"'), up.index("desktop_login.py\" \"$dt\""))

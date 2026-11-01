@@ -52,7 +52,7 @@ repeat, source removed mid-action, counts read with `get_inventory` and `get_con
 ## The dev
 Clone `~/src/work/<slug>` (a shared clone of `~/src/OpenRune-Server`, remote `fork` = the fork, `origin` = upstream).
 Never edit the shared clone. Commit; `tools/track.sh build <slug>` builds T in the build copy; `tools/track.sh
-up <slug> [N]` starts the server from that build with N logged-in desktop clients and prints their devtools ports;
+up <slug> [N]` starts the server from that build with N logged-in desktops and prints their devtools ports;
 `tools/track.sh log <slug> <pattern>` reads the server log. The server `up` starts runs the image's game.yml with
 `quest-requirements` `mode: "respect-progress"` (upstream's default `assume-completed` skips every quest check), so
 every quest requirement is judged for real; PR notes name it as the verification setting. Test through `osrs-devtools-desktop` data tools; a
@@ -61,13 +61,13 @@ and covers every commit the push carries since the PR's live head). Push `dev/<s
 it runs every script row of the contract and refuses on any failure. `hd ask <slug> "..."` when a decision is not
 yours; `hd show <slug>` first, always.
 
-The desktop clients are Windows programs run from bash through WSL interop by absolute path, located by
+The desktops are Windows programs run from bash through WSL interop by absolute path, located by
 `WINDOWS_SYSTEM32` (default `/mnt/c/Windows/System32`: netstat.exe, taskkill.exe) and `DESKTOP_DIR` (default
 `/mnt/c/osrs-test`, the Nth instance `DESKTOP_DIR<N>`, devtools port 7779+N; jps.exe locates JVMs). Every JVM of
 instance N carries `-Dosrstest.marker=osrs-test-N`, and only such a JVM is ever stopped (never the user's own RuneLite).
-An up, under `state/desktop.lock`, first stops the clients of every instance no live run's `up.json` lists (a live run's
-server container runs), then claims the first instance that no run lists and no client answers on, and keeps the lock
-until it lists that client in `up.json` (`desktopN:port:pids`, the launcher's and the port's Windows PIDs) before its
+An up, under `state/desktop.lock`, first stops the desktops of every instance no live run's `up.json` lists (a live run's
+server container runs), then claims the first instance that no run lists and no desktop answers on, and keeps the lock
+until it lists that desktop in `up.json` (field `desktops`: `desktopN:port:pids`, the launcher's and the port's Windows PIDs) before its
 login; `down` stops exactly those PIDs.
 
 ## The reviewer
@@ -77,7 +77,7 @@ fail and a note per failure. A text-only failure (PR title, body, comment): fix 
 mark the row pass. A difference from the official game is a failed row, never a caveat.
 
 ## Never
-Touch the Android device or the tester account's items (keep its GE lobster offer, drop only what you spawned);
+Touch a mobile or the tester account's items (keep its GE lobster offer, drop only what you spawned);
 restart the live server (`osrs-openrune*`); push any ref but yours; open or edit PRs; connect to Jagex; read
 `C:\Users\Alex\.runelite`; stop a process you did not start; use the DB tool for writes.
 

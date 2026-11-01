@@ -2,8 +2,8 @@
 # tools/track.sh <verb> <slug> [arg]: the server track (docs/ARCHITECTURE.md of osrs-harness). Env from hd: SLUG HEAD T
 # TCOMMIT BASE CLONE EVIDENCE PINS HD_ROOT (HEADS NAMES for ship). Verbs:
 #   build [TCOMMIT]   the image or:<T> of the tree T (a dev: the working copy snapshotted, T from `hd tree`); cached by T
-#   up [N]            server-<slug> and http-<slug> from or:<T> on the change's ports (quest mode respect-progress), N desktop clients logged in
-#   down              stops the clients, removes the containers
+#   up [N]            server-<slug> and http-<slug> from or:<T> on the change's ports (quest mode respect-progress), N desktops logged in
+#   down              stops the desktops, removes the containers
 #   gate TCOMMIT      every check: and gate: row of the contract from the build copy (`hd rows`)
 #   gate-ci           fork CI and Formatting green on gate/<slug> at TCOMMIT (blocks until both conclude)
 #   ship TCOMMIT      the integration tree: build, the deploy image with the live key, boot check, deploy, or roll back
@@ -12,7 +12,7 @@
 #   recordings <slug> REGEX  the RSProx transcripts holding a packet type or text
 # Windows locations, run through WSL interop (override in the environment):
 #   WINDOWS_SYSTEM32  /mnt/c/Windows/System32   netstat.exe, taskkill.exe
-#   DESKTOP_DIR       /mnt/c/osrs-test          the first desktop client; the Nth is DESKTOP_DIR<N> (jdk/bin/java.exe, jps.exe)
+#   DESKTOP_DIR       /mnt/c/osrs-test          the first desktop; the Nth is DESKTOP_DIR<N> (jdk/bin/java.exe, jps.exe)
 set -euo pipefail
 verb=$1; slug=${2:-${SLUG:-}}; arg=${3:-}   # a contract row passes no slug: hd exports SLUG
 self=$(cd "$(dirname "$0")" && pwd)
@@ -31,28 +31,28 @@ ready() {  # ready <container> [since]: blocks until "Server ready in" or the co
 }
 port() { echo $(( 20000 + 16#$(printf %s "$slug" | sha1sum | cut -c1-3) * 2 + $1 )); }   # game +0, http +1; shortcut: two slugs may hash alike, pick from up.json when it happens
 quests() { y=$(sed -E '/^[[:space:]]*quest-requirements:/,/^[[:space:]]*mode:/ s/(mode:[[:space:]]*).*/\1"respect-progress"/'); grep -q 'mode: "respect-progress"' <<< "$y" || { echo "game.yml has no quest-requirements mode" >&2; return 1; }; printf '%s\n' "$y"; }   # stdin game.yml with every quest gate checked
-account() { echo "h$(printf %s "$slug" | sha1sum | cut -c1-9)${1:-}"; }   # the Nth client's login name and password (no N: the prefix of this slug's names): 11 characters (a login name takes 12 at most), listed in the slug's up.json
+account() { echo "h$(printf %s "$slug" | sha1sum | cut -c1-9)${1:-}"; }   # the Nth desktop's login name and password (no N: the prefix of this slug's names): 11 characters (a login name takes 12 at most), listed in the slug's up.json
 
 sys32=${WINDOWS_SYSTEM32:-/mnt/c/Windows/System32}; desk=${DESKTOP_DIR:-/mnt/c/osrs-test}
 need() { [ -x "$1" ] || { echo "$1 not found: set $2" >&2; exit 2; }; }   # need <program> <the variable that locates it>
 tcp() { "$sys32/netstat.exe" -ano -p TCP | tr -d '\r' | awk '$4=="LISTENING"{n=split($2,a,":");print a[n], $5}'; }   # "<port> <Windows PID>" of each Windows listening socket
 marked() { "$desk/jdk/bin/jps.exe" -v | tr -d '\r' | awk -v m="-Dosrstest.marker=osrs-test-$1" '{for (f = 3; f <= NF; f++) if ($f == m) {print $1, $2; next}}'; }   # "<Windows PID> <main class>" of instance N's JVMs: only desktop_start sets the marker
-owned() {  # the clients a live run's up.json lists (its server container runs), one "desktopN:port[:pids]" per line
+owned() {  # the desktops a live run's up.json lists (its server container runs), one "desktopN:port[:pids]" per line
   for f in "$root"/state/*/up.json; do
     [ -e "$f" ] && [ "$(docker inspect -f '{{.State.Running}}' "server-$(basename "$(dirname "$f")")" 2>/dev/null)" = true ] || continue
-    python3 -c 'import json,sys;print("\n".join(json.load(open(sys.argv[1]))["clients"].split()))' "$f"
+    python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print("\n".join(d.get("desktops", d.get("clients", "")).split()))' "$f"   # shortcut: reads an up.json written before the rename to desktops; drop "clients" once no live run's up.json carries it
   done
 }
-# The desktop test clients: the staged dirs DESKTOP_DIR, DESKTOP_DIR2 .. DESKTOP_DIR5 (JDK, RSProx launcher, RuneLite with
+# The desktops: the staged dirs DESKTOP_DIR, DESKTOP_DIR2 .. DESKTOP_DIR5 (JDK, RSProx launcher, RuneLite with
 # the devtools plugin), devtools port 7779+N for the Nth, run through WSL interop by absolute path. Every JVM of instance N
 # carries -Dosrstest.marker=osrs-test-N; nothing without it is ever stopped (the user's own RuneLite).
-desktop_start() {  # under state/desktop.lock: stops the clients no live run owns, starts the first instance no client answers on;
-  # sets inst dt pids (desktopN, its devtools port, the launcher's and the port's Windows PIDs) and keeps the lock until the caller lists the client in up.json
+desktop_start() {  # under state/desktop.lock: stops the desktops no live run owns, starts the first instance no desktop answers on;
+  # sets inst dt pids (desktopN, its devtools port, the launcher's and the port's Windows PIDs) and keeps the lock until the caller lists the desktop in up.json
   local i d dp w own busy
   need "$sys32/netstat.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/java.exe" DESKTOP_DIR; need "$desk/jdk/bin/jps.exe" DESKTOP_DIR
   exec 9> "$root/state/desktop.lock"; flock 9
   own=$(owned | cut -d: -f1)
-  for i in 1 2 3 4 5; do grep -qx "desktop$i" <<< "$own" || desktop_stop "desktop$i"; done   # the sweep: a client no live run lists is an orphan
+  for i in 1 2 3 4 5; do grep -qx "desktop$i" <<< "$own" || desktop_stop "desktop$i"; done   # the sweep: a desktop no live run lists is an orphan
   busy=$(tcp | cut -d' ' -f1)
   for i in 1 2 3 4 5; do d=$desk${i#1}; dp=$((7779 + i)); grep -qx "desktop$i" <<< "$own" || grep -qx "$dp" <<< "$busy" || [ -n "$(marked "$i")" ] || break; d=; done
   [ -n "$d" ] || { echo "no free desktop instance" >&2; return 1; }
@@ -63,8 +63,8 @@ desktop_start() {  # under state/desktop.lock: stops the clients no live run own
     exec setsid "$d/jdk/bin/java.exe" "-Dosrstest.marker=osrs-test-$i" "-Dosrstest.portskip=$((20 * (i - 1)))" "-Dosrstest.target=OpenRune Test - $slug" \
     -cp "$w\\rsprox\\launcher;$w\\rsprox\\lib\\*" OsrsTestLauncher) < /dev/null > /dev/null 2>&1 9>&- &   # nothing may hold the caller's pipe or the lock
   w=$!
-  until tcp | grep -q "^$dp "; do   # the devtools endpoint answers, or the client died
-    kill -0 "$w" 2>/dev/null || { echo "client $i exited" >&2; return 1; }; sleep 2
+  until tcp | grep -q "^$dp "; do   # the devtools endpoint answers, or the desktop died
+    kill -0 "$w" 2>/dev/null || { echo "desktop $i exited" >&2; return 1; }; sleep 2
   done
   inst=desktop$i; dt=$dp
   pids=$( { marked "$i" | awk '$2=="OsrsTestLauncher"{print $1}'; tcp | awk -v p="$dp" '$1==p{print $2}'; } | paste -sd, -)
@@ -114,7 +114,7 @@ up() {
   n=${arg:-1}; T=${T:-$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["T"])' "$state/build.json")}
   docker image inspect "or:$T" >/dev/null 2>&1 || { echo "no image or:$T: build first"; return 1; }
   game=$(port 0); http=$(port 1)
-  down >/dev/null   # a previous up's clients and containers
+  down >/dev/null   # a previous up's desktops and containers
   docker run --rm --entrypoint cat "or:$T" /app/game.yml | quests > "$state/game.yml"   # upstream's default assume-completed skips every quest check
   docker run -d --name "server-$slug" --cpus=4 --memory=4g -p "$game:43594" --tmpfs /app/.data/postgres:uid=1000,gid=1000,mode=0700 \
     -v "$state/key/game.key:/app/.data/game.key:ro" -v "$state/key/client.key:/app/.data/client.key:ro" -v "$state/game.yml:/app/game.yml:ro" "or:$T" >/dev/null
@@ -122,24 +122,24 @@ up() {
     -e WORLD_HOST=127.0.0.1 -e HTTP_PUBLIC_PORT="$http" -e WORLD_ID=255 -e SAVE_DIR=/tmp/saves -e JAV_CONFIG_TEMPLATE=/app/protocol/jav_config.ws.template \
     -e LOCAL_AUTH=false -e PROOF_OF_WORK=false -e VALIDATE_CRCS=false osrs-rsps-test:241 >/dev/null
   ready "server-$slug"
-  python3 "$self/server/javcheck.py" "http://127.0.0.1:$http/jav_config.ws" || { down; return 1; }   # no client is pointed at a foreign host
+  python3 "$self/server/javcheck.py" "http://127.0.0.1:$http/jav_config.ws" || { down; return 1; }   # no desktop is pointed at a foreign host
   modulus=$(openssl rsa -in "$state/key/game.key" -noout -modulus | cut -d= -f2 | tr A-F a-f)
-  clients=(); accounts=()
+  desktops=(); accounts=()
   for i in $(seq 1 "$n"); do
     desktop_start
-    clients+=("$inst:$dt:$pids"); accounts+=("$(account "$i")")
-    printf '{"game": %s, "http": %s, "clients": "%s", "accounts": "%s"}\n' "$game" "$http" "${clients[*]}" "${accounts[*]}" > "$state/up.json"   # before the login: down stops exactly the clients this up started
-    flock -u 9   # listed: a later sweep sees this client owned
+    desktops+=("$inst:$dt:$pids"); accounts+=("$(account "$i")")
+    printf '{"game": %s, "http": %s, "desktops": "%s", "accounts": "%s"}\n' "$game" "$http" "${desktops[*]}" "${accounts[*]}" > "$state/up.json"   # before the login: down stops exactly the desktops this up started
+    flock -u 9   # listed: a later sweep sees this desktop owned
     python3 "$self/server/desktop_login.py" "$dt" "$(account "$i")" "$(account "$i")"      # creates the account on first login; prints LOGGED_IN or FAILED: reason
   done
   pg=$(docker logs "server-$slug" 2>&1 | grep -oE 'jdbc:postgresql://localhost:[0-9]+' | tail -1 | grep -oE '[0-9]+$')
   docker run --rm --network "container:server-$slug" postgres:16-alpine psql -h 127.0.0.1 -p "$pg" -U postgres -d postgres -q -c \
     "update account_characters set members = true where account_id in (select id from accounts where lower(account_name) like '$(account)%')" >/dev/null
-  for c in "${clients[@]}"; do python3 "$self/server/desktop_login.py" "$(cut -d: -f2 <<< "$c")" relog; done   # members applies at login
-  echo "up: game $game http $http clients ${clients[*]}"
+  for c in "${desktops[@]}"; do python3 "$self/server/desktop_login.py" "$(cut -d: -f2 <<< "$c")" relog; done   # members applies at login
+  echo "up: game $game http $http desktops ${desktops[*]}"
 }
 down() {
-  for c in $(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["clients"])' "$state/up.json" 2>/dev/null); do
+  for c in $(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d.get("desktops", d.get("clients", "")))' "$state/up.json" 2>/dev/null); do
     (desktop_stop "$(cut -d: -f1 <<< "$c")" "$(cut -d: -f3 <<< "$c")") || true   # a missing program still lets the containers go
   done
   docker rm -f "server-$slug" "http-$slug" >/dev/null 2>&1 || true; rm -f "$state/up.json"; echo "down"
