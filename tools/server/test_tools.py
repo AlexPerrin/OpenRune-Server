@@ -23,6 +23,15 @@ class Slug(unittest.TestCase):
         shutil.rmtree(root)
 
 
+class NoPowerShell(unittest.TestCase):
+    def test_windows_programs_run_from_bash_by_absolute_path(s):  # Windows refuses unsigned .ps1 from the UNC path; a lost PATH loses bare .exe names
+        s.assertEqual(list(HERE.parent.rglob("*.ps1")), [])
+        src = "\n".join(l for l in (HERE.parent / "track.sh").read_text().splitlines() if not l.lstrip().startswith("#"))
+        s.assertNotIn("powershell", src.lower())
+        import re
+        s.assertEqual(re.findall(r'(?:^|[\s(|;&])[\w.-]+\.exe\b', src), [])
+
+
 class Repo(unittest.TestCase):
     def setUp(s):
         s.repo = tempfile.mkdtemp()

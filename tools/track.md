@@ -59,6 +59,10 @@ and covers every commit the push carries since the PR's live head). Push `dev/<s
 it runs every script row of the contract and refuses on any failure. `hd ask <slug> "..."` when a decision is not
 yours; `hd show <slug>` first, always.
 
+The desktop clients are Windows programs run from bash through WSL interop by absolute path, located by
+`WINDOWS_SYSTEM32` (default `/mnt/c/Windows/System32`: netstat.exe, taskkill.exe) and `DESKTOP_DIR` (default
+`/mnt/c/osrs-test`, the Nth instance `DESKTOP_DIR<N>`); a missing program fails naming its variable.
+
 ## The reviewer
 Never writes the code it checks. Judges every contract row from the same build (`tools/track.sh up <slug>`),
 in game for every player-facing claim, and records `hd verdict <slug> <head> rows.json` with every row pass or

@@ -10,6 +10,9 @@
 #   measure GOAL      the content inventory's share of rows whose unit is in PASSES
 #   log <slug> PATTERN  the change's server log since the run's marker (slug `live`: the live server)
 #   recordings <slug> REGEX  the RSProx transcripts holding a packet type or text
+# Windows locations, run through WSL interop (override in the environment):
+#   WINDOWS_SYSTEM32  /mnt/c/Windows/System32   netstat.exe, taskkill.exe
+#   DESKTOP_DIR       /mnt/c/osrs-test          the first desktop client; the Nth is DESKTOP_DIR<N> (jdk/bin/java.exe, jps.exe)
 set -euo pipefail
 verb=$1; slug=${2:-${SLUG:-}}; arg=${3:-}   # a contract row passes no slug: hd exports SLUG
 self=$(cd "$(dirname "$0")" && pwd)
@@ -27,6 +30,35 @@ ready() {  # ready <container> [since]: blocks until "Server ready in" or the co
   done
 }
 port() { echo $(( 20000 + 16#$(printf %s "$slug" | sha1sum | cut -c1-3) * 2 + $1 )); }   # game +0, http +1; shortcut: two slugs may hash alike, pick from up.json when it happens
+
+sys32=${WINDOWS_SYSTEM32:-/mnt/c/Windows/System32}; desk=${DESKTOP_DIR:-/mnt/c/osrs-test}
+need() { [ -x "$1" ] || { echo "$1 not found: set $2" >&2; exit 2; }; }   # need <program> <the variable that locates it>
+listening() { "$sys32/netstat.exe" -anp TCP | tr -d '\r' | awk '$4=="LISTENING"{n=split($2,a,":");print a[n]}'; }   # the Windows listening ports
+# The desktop test clients: the staged dirs DESKTOP_DIR, DESKTOP_DIR2 .. DESKTOP_DIR5 (JDK, RSProx launcher, RuneLite with
+# the devtools plugin), devtools port 7779+N for the Nth, run through WSL interop by absolute path.
+desktop_start() {  # the first instance whose devtools port is free and that has no pid file, against this change; prints "desktopN <port>"
+  need "$sys32/netstat.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/java.exe" DESKTOP_DIR; busy=$(listening)
+  for i in 1 2 3 4 5; do d=$desk${i#1}; dp=$((7779 + i)); grep -qx "$dp" <<< "$busy" || [ -e "$d/rsprox.pid" ] || break; d=; done
+  [ -n "$d" ] || { echo "no free desktop instance" >&2; return 1; }
+  w=$(wslpath -w "$d")
+  printf '%s\n' "- name: OpenRune Test - $slug" "  jav_config_url: http://127.0.0.1:$http/jav_config.ws" "  modulus: $modulus" "  revision: 241.1" \
+    "  game_server_port: $game" "  runelite_bootstrap_commithash: e617bef1a7f5c39fbe8768994d27d638941efd5d" "  binary_folder: openrune-qa" > "$d/home/.rsprox/proxy-targets.yaml"
+  (cd "$d" && JAVA_TOOL_OPTIONS="-Duser.home=$w\\home -Dosrstest.marker=osrs-test-$i" WSLENV=${WSLENV:+$WSLENV:}JAVA_TOOL_OPTIONS \
+    exec setsid "$d/jdk/bin/java.exe" "-Dosrstest.marker=osrs-test-$i" "-Dosrstest.portskip=$((20 * (i - 1)))" "-Dosrstest.target=OpenRune Test - $slug" \
+    -cp "$w\\rsprox\\launcher;$w\\rsprox\\lib\\*" OsrsTestLauncher) < /dev/null > /dev/null 2>&1 &   # nothing may hold the caller's $( ) pipe
+  echo $! > "$d/rsprox.pid"
+  until listening | grep -qx "$dp"; do   # the devtools endpoint answers, or the client died
+    kill -0 "$(cat "$d/rsprox.pid")" 2>/dev/null || { echo "client $i exited" >&2; rm -f "$d/rsprox.pid"; return 1; }; sleep 2
+  done
+  echo "desktop$i $dp"
+}
+desktop_stop() {  # desktopN: the process tree of the instance's launcher JVM (it carries the marker), then its pid file
+  i=${1#desktop}; d=$desk${i#1}; need "$sys32/taskkill.exe" WINDOWS_SYSTEM32; need "$d/jdk/bin/jps.exe" DESKTOP_DIR
+  for p in $("$d/jdk/bin/jps.exe" -v | tr -d '\r' | awk -v m="-Dosrstest.marker=osrs-test-$i" '{for (f = 2; f <= NF; f++) if ($f == m) print $1}'); do
+    "$sys32/taskkill.exe" /F /T /PID "$p" > /dev/null 2>&1 || true
+  done
+  rm -f "$d/rsprox.pid"
+}
 
 tree() {  # TCOMMIT and T: the pass gives them; a dev's build snapshots the working copy and asks hd
   if [ -n "$arg" ]; then tc=$arg; T=${T:-$(git -C "$repo" rev-parse "$tc^{tree}")}; return; fi
@@ -77,7 +109,7 @@ up() {
   modulus=$(openssl rsa -in "$state/key/game.key" -noout -modulus | cut -d= -f2 | tr A-F a-f)
   clients=()
   for i in $(seq 1 "$n"); do
-    inst=$(powershell.exe -NoProfile -File "$(wslpath -w "$self/server/desktop.ps1")" start -Title "$slug" -JavConfig "http://127.0.0.1:$http/jav_config.ws" -Modulus "$modulus" -GamePort "$game" | tr -d '\r')
+    inst=$(desktop_start)
     dt=${inst##* }; inst=${inst%% *}
     python3 "$self/server/desktop_login.py" "$dt" "$slug$i" "$slug$i"      # creates the account on first login; prints LOGGED_IN or FAILED: reason
     clients+=("$inst:$dt")
@@ -91,7 +123,7 @@ up() {
 }
 down() {
   for c in $(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["clients"])' "$state/up.json" 2>/dev/null); do
-    powershell.exe -NoProfile -File "$(wslpath -w "$self/server/desktop.ps1")" stop -Instance "${c%%:*}" >/dev/null || true
+    (desktop_stop "${c%%:*}") || true   # a missing program still lets the containers go
   done
   docker rm -f "server-$slug" "http-$slug" >/dev/null 2>&1 || true; rm -f "$state/up.json"; echo "down"
 }
