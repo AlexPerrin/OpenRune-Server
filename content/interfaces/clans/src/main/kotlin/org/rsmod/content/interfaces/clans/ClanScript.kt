@@ -24,6 +24,7 @@ import org.rsmod.api.script.onIfModalButton
 import org.rsmod.api.script.onIfModalDrag
 import org.rsmod.api.script.onIfOpen
 import org.rsmod.api.script.onIfOverlayButton
+import org.rsmod.api.script.onPlayerSoftTimer
 import org.rsmod.events.EventBus
 import org.rsmod.game.entity.Player
 import org.rsmod.game.entity.player.SessionStateEvent
@@ -36,10 +37,6 @@ private const val ASSIGN_RANKS = 2948
 private const val EDIT_RANK_TITLES = 2949
 private const val EXPEL_MEMBERS = 2950
 private const val ICONS = 2952
-private const val PERMISSION_NAME_PARAM = 1251
-private const val PERMISSION_MIN_RANK_PARAM = 1253
-private const val PERMISSION_ALLOW_NOBODY_PARAM = 1292
-private const val PERMISSION_CATEGORIES_ENUM = 3825
 private const val NOBODY = 128
 private const val HOME_WORLD_SETTING = 6
 private const val INTERESTS_SETTING = 10
@@ -55,6 +52,8 @@ private const val OUTFIT_POPUP = "clientscript.[clientscript,clan_outfit]"
 private const val COMLEVELS = "clientscript.[clientscript,script4257]"
 private const val SKILLTOTALS = "clientscript.[clientscript,script4258]"
 private const val TIMEOUT_CYCLES = 5
+private const val JOIN_DELAY = 2
+private const val INFO_REFRESH_CYCLES = 6
 
 class ClanScript @Inject constructor(private val clans: Clans, private val eventBus: EventBus) :
     PluginScript() {
@@ -62,6 +61,8 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
         onEvent<SessionStateEvent.Login> { clans.login(player) }
         onEvent<SessionStateEvent.Logout> { clans.logout(player) }
         onEvent<SessionStateEvent.Delete> { clans.logout(player) }
+        onPlayerSoftTimer("timer.clan_channel_hint") { clans.channelHint(player) }
+        onPlayerSoftTimer("timer.clan_info_refresh") { player.refreshInfo() }
 
         onIfOpen("interface.clans_sidepanel") {
             for (button in listOf("chat", "info", "refresh")) {
@@ -129,9 +130,16 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
     private fun ProtectedAccess.clan(): Clan? = clans.clanOf(player)
 
     private suspend fun ProtectedAccess.toggleChannel() {
+        val clan = clan() ?: return
         player.setVar("varbit.clan_transmit_affined_timeout", 1)
-        clans.toggleChannel(player)
-        delay(TIMEOUT_CYCLES)
+        if (player in clan.channel) {
+            clans.toggleChannel(player)
+            delay(TIMEOUT_CYCLES)
+        } else {
+            delay(JOIN_DELAY)
+            clans.toggleChannel(player)
+            delay(TIMEOUT_CYCLES - JOIN_DELAY)
+        }
         player.setVar("varbit.clan_transmit_affined_timeout", 0)
     }
 
@@ -139,6 +147,16 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
         val clan = clan() ?: return
         ifOpenMainModal("interface.clans_info", -1, -2)
         player.drawInfo(clan)
+        softTimer("timer.clan_info_refresh", INFO_REFRESH_CYCLES)
+    }
+
+    private fun Player.refreshInfo() {
+        val clan = clans.clanOf(this)
+        if (clan == null || !ui.containsModal("interface.clans_info")) {
+            clearSoftTimer("timer.clan_info_refresh")
+            return
+        }
+        drawInfo(clan)
     }
 
     private fun Player.drawInfo(clan: Clan) {
@@ -304,7 +322,7 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
             return PERMISSION_ACCESS
         }
         var index = 1
-        for (category in cacheEnum(PERMISSION_CATEGORIES_ENUM).values) {
+        for (category in cacheEnum("enum.clan_permission_categories").values) {
             val structs = cacheEnum(category as Int)
             val last = structs.size - 1
             for ((key, struct) in structs) {
@@ -333,9 +351,10 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
             return
         }
         val struct = ServerCacheManager.getStruct(permission)
-        val name = struct?.params?.get(PERMISSION_NAME_PARAM) as? String ?: ""
-        val min = (struct?.params?.get(PERMISSION_MIN_RANK_PARAM) as? Int ?: ClanRank.GUEST)
-        val allowNobody = (struct?.params?.get(PERMISSION_ALLOW_NOBODY_PARAM) as? Int ?: 0) == 1
+        val params = struct?.params.orEmpty()
+        val name = params["param.clan_permission_name".asRSCM(RSCMType.PARAM)] as? String ?: ""
+        val min = params["param.clan_permission_minrank".asRSCM(RSCMType.PARAM)] as? Int ?: ClanRank.GUEST
+        val allowNobody = params["param.clan_permission_allownobody".asRSCM(RSCMType.PARAM)] == 1
         val current = clan.permissionRank(permission)
         val onInfo = player.ui.containsModal("interface.clans_info")
         val target = if (onInfo) "component.clans_info:popup" else "component.clans_permissions:popup"
@@ -592,7 +611,7 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
         const val MAX_WORLD = 2047
 
         val PERMISSION_SETTINGS: Map<Int, Int> by lazy {
-            cacheEnum("enum.clan_permission_settings".asRSCM(RSCMType.ENUM)).mapValues { it.value as Int }
+            cacheEnum("enum.clan_permission_settings").mapValues { it.value as Int }
         }
 
         fun editingVarbit(rank: Int): String = "varbit.clan_editing_ranktitle_%03d".format(rank)

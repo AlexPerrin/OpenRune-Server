@@ -1,0 +1,13 @@
+[[area]]
+name = "Clan Hub"
+area_id = "area.clan_hub"
+levels = [0]
+
+[[area.polygons]]
+vertices = [
+    [3176, 3462],
+    [3191, 3462],
+    [3191, 3478],
+    [3176, 3478],
+    [3176, 3462],
+]

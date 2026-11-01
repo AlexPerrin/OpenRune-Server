@@ -18,7 +18,8 @@ internal object ClanStore {
                 "name TEXT NOT NULL, " +
                 "rank INT NOT NULL, " +
                 "join_runeday INT NOT NULL, " +
-                "joined_at BIGINT NOT NULL)",
+                "joined_at BIGINT NOT NULL, " +
+                "last_seen INT NOT NULL DEFAULT 0)",
             "CREATE TABLE IF NOT EXISTS clan_settings (" +
                 "clan_id INT NOT NULL REFERENCES clans(id) ON DELETE CASCADE, " +
                 "setting INT NOT NULL, " +
@@ -60,7 +61,7 @@ internal object ClanStore {
                 }
         connection
             .prepareStatement(
-                "SELECT character_id, name, rank, join_runeday, joined_at FROM clan_members " +
+                "SELECT character_id, name, rank, join_runeday, joined_at, last_seen FROM clan_members " +
                     "WHERE clan_id = ? ORDER BY joined_at, character_id"
             )
             .use {
@@ -74,6 +75,7 @@ internal object ClanStore {
                                 rank = rs.getInt(3),
                                 joinRuneDay = rs.getInt(4),
                                 joinedAt = rs.getLong(5),
+                                lastSeenDay = rs.getInt(6),
                             )
                     }
                 }
@@ -115,10 +117,10 @@ internal object ClanStore {
 
     fun saveMember(connection: DatabaseConnection, clanId: Int, member: ClanMember) {
         val sql =
-            "INSERT INTO clan_members (character_id, clan_id, name, rank, join_runeday, joined_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (character_id) DO UPDATE SET " +
+            "INSERT INTO clan_members (character_id, clan_id, name, rank, join_runeday, joined_at, last_seen) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (character_id) DO UPDATE SET " +
                 "clan_id = EXCLUDED.clan_id, name = EXCLUDED.name, rank = EXCLUDED.rank, " +
-                "join_runeday = EXCLUDED.join_runeday, joined_at = EXCLUDED.joined_at"
+                "join_runeday = EXCLUDED.join_runeday, joined_at = EXCLUDED.joined_at, last_seen = EXCLUDED.last_seen"
         connection.prepareStatement(sql).use {
             it.setInt(1, member.characterId)
             it.setInt(2, clanId)
@@ -126,6 +128,7 @@ internal object ClanStore {
             it.setInt(4, member.rank)
             it.setInt(5, member.joinRuneDay)
             it.setLong(6, member.joinedAt)
+            it.setInt(7, member.lastSeenDay)
             it.executeUpdate()
         }
     }

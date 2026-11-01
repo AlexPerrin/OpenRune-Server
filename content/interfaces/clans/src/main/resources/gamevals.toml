@@ -1,5 +1,16 @@
 [gamevals.enum]
 clan_permission_settings = 65468
+clan_interest_names = 3792
+clan_ranks = 3795
+clan_ranks_locked = 3796
+clan_rank_titles = 3797
+clan_create_buttons = 3824
+clan_permission_categories = 3825
+
+[gamevals.param]
+clan_permission_name = 1251
+clan_permission_minrank = 1253
+clan_permission_allownobody = 1292
 
 [gamevals.varp]
 clan_state = 65454
@@ -7,3 +18,10 @@ clan_state = 65454
 [gamevals.varbit]
 clan_channel_left = 65396
 clan_founded_runeday = 65395
+
+[gamevals.timer]
+clan_channel_hint = 65524
+clan_info_refresh = 65523
+
+[gamevals.area]
+clan_hub = 32762

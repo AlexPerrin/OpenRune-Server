@@ -11,6 +11,7 @@ import net.rsprot.protocol.game.outgoing.clan.ClanSettingsDelta
 import net.rsprot.protocol.game.outgoing.clan.ClanSettingsFull
 import net.rsprot.protocol.game.outgoing.clan.MessageClanChannel
 import net.rsprot.protocol.game.outgoing.clan.MessageClanChannelSystem
+import net.rsprot.protocol.game.outgoing.clan.VarClanDisable
 import org.rsmod.api.db.gateway.GameDbManager
 import org.rsmod.api.db.gateway.model.GameDbResult
 import org.rsmod.api.db.gateway.model.isOk
@@ -34,6 +35,7 @@ private const val AFFINITY_VARBIT = "varbit.clan_affinitystatus"
 private const val GUEST_AFFINITY_VARBIT = "varbit.clan_guest_affinitystatus"
 private const val HOME_WORLD_VARBIT = "varbit.clan_transmit_homeworld"
 private const val CHANNEL_LEFT_VARBIT = "varbit.clan_channel_left"
+private const val DISABLE_LAST_SEEN_VARBIT = "varbit.clan_disable_lastseen"
 private const val NO_CLAN = 1
 private const val LOADED = 3
 private const val TALK_HINT = "To talk in your clan's channel, start each line of chat with // or /c."
@@ -87,6 +89,7 @@ constructor(
 
     public fun login(player: Player) {
         sessions += player
+        player.client.write(VarClanDisable)
         VarPlayerIntMapSetter.set(player, GUEST_AFFINITY_VARBIT, NO_CLAN)
         val characterId = player.characterId
         db.request(
@@ -117,27 +120,30 @@ constructor(
             VarPlayerIntMapSetter.set(player, HOME_WORLD_VARBIT, homeWorld)
         }
         val today = runeDay()
-        if (member.name != player.displayName) {
+        val seen = player.vars[DISABLE_LAST_SEEN_VARBIT] == 0
+        if (member.name != player.displayName || seen) {
             member.name = player.displayName
+            if (seen) member.lastSeenDay = today
             saveMember(clan, member)
         }
-        member.lastSeenDay = today
-        val slot = clan.members.indexOf(member)
-        val updates =
-            mutableListOf<ClanSettingsDelta.Update>(
-                ClanSettingsDelta.SetMemberExtraInfoUpdate(
-                    slot,
-                    today - LAST_SEEN_RUNEDAY_BASE,
-                    0,
-                    LAST_SEEN_END_BIT,
+        if (seen) {
+            val slot = clan.members.indexOf(member)
+            val updates =
+                mutableListOf<ClanSettingsDelta.Update>(
+                    ClanSettingsDelta.SetMemberExtraInfoUpdate(
+                        slot,
+                        today - LAST_SEEN_RUNEDAY_BASE,
+                        0,
+                        LAST_SEEN_END_BIT,
+                    )
                 )
-            )
-        if (member.rank == ClanRank.OWNER) {
-            clan.intSettings[OWNER_ACTIVE_DAY_SETTING] = today
-            saveSetting(clan, OWNER_ACTIVE_DAY_SETTING)
-            updates += ClanSettingsDelta.SetIntSettingUpdate(OWNER_ACTIVE_DAY_SETTING, today)
+            if (member.rank == ClanRank.OWNER) {
+                clan.intSettings[OWNER_ACTIVE_DAY_SETTING] = today
+                saveSetting(clan, OWNER_ACTIVE_DAY_SETTING)
+                updates += ClanSettingsDelta.SetIntSettingUpdate(OWNER_ACTIVE_DAY_SETTING, today)
+            }
+            settingsDelta(clan, updates)
         }
-        settingsDelta(clan, updates)
         applyResignation(clan)
         if (player.vars[CHANNEL_LEFT_VARBIT] == 0) {
             joinChannel(player, clan)
@@ -174,7 +180,14 @@ constructor(
         channelDelta(clan, listOf(add))
         clan.channel += player
         player.client.write(ClanChannelFull(CLAN_TYPE, channelJoinUpdate(clan)))
-        player.mes(TALK_HINT, ChatType.ClanMessage)
+        player.softTimer("timer.clan_channel_hint", 1)
+    }
+
+    public fun channelHint(player: Player) {
+        player.clearSoftTimer("timer.clan_channel_hint")
+        if (clanOf[player]?.channel?.contains(player) == true) {
+            player.mes(TALK_HINT, ChatType.ClanMessage)
+        }
     }
 
     private fun leaveChannel(player: Player, clan: Clan, explicit: Boolean) {
@@ -444,8 +457,7 @@ constructor(
         )
 
     private fun settingsDelta(clan: Clan, updates: List<ClanSettingsDelta.Update>) {
-        val owner = clan.owner?.let { clan.members.indexOf(it) } ?: 0
-        val delta = ClanSettingsDelta(CLAN_TYPE, owner.toLong(), clan.settingsUpdateNum++, updates)
+        val delta = ClanSettingsDelta(CLAN_TYPE, 0, clan.settingsUpdateNum++, updates)
         clan.online.forEach { it.client.write(delta) }
     }
 

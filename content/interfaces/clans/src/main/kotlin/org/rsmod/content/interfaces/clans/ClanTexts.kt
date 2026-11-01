@@ -1,6 +1,8 @@
 package org.rsmod.content.interfaces.clans
 
 import dev.openrune.ServerCacheManager
+import dev.openrune.rscm.RSCM.asRSCM
+import dev.openrune.rscm.RSCMType
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -8,10 +10,6 @@ import java.util.Locale
 import org.rsmod.api.net.clan.Clan
 import org.rsmod.api.net.clan.ClanRank
 
-private const val RANKS_ENUM = 3795
-private const val LOCKED_RANKS_ENUM = 3796
-private const val TITLES_ENUM = 3797
-private const val INTERESTS_ENUM = 3792
 private const val TITLE_BITS = 10
 private val CREATION_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("dd-MMM-yyyy", Locale.UK)
 
@@ -58,10 +56,12 @@ private val FIXED_TITLES =
 
 internal fun cacheEnum(id: Int): Map<Int, Any> = ServerCacheManager.getEnum(id)?.values?.toSortedMap() ?: emptyMap()
 
-internal fun clanRanks(): List<Int> = cacheEnum(RANKS_ENUM).values.map { it as Int }
+internal fun cacheEnum(name: String): Map<Int, Any> = cacheEnum(name.asRSCM(RSCMType.ENUM))
+
+internal fun clanRanks(): List<Int> = cacheEnum("enum.clan_ranks").values.map { it as Int }
 
 internal fun lockedRank(rank: Int): Boolean =
-    cacheEnum(LOCKED_RANKS_ENUM)[clanRanks().indexOf(rank)].let { it == true || it == 1 }
+    cacheEnum("enum.clan_ranks_locked")[clanRanks().indexOf(rank)].let { it == true || it == 1 }
 
 internal fun Clan.titleOf(rank: Int): Int {
     FIXED_TITLES[rank]?.let {
@@ -83,7 +83,7 @@ internal fun Clan.withTitle(titles: Map<Int, Int>): Map<Int, Int> {
 }
 
 internal fun Clan.rankName(rank: Int): String {
-    val title = cacheEnum(TITLES_ENUM)[titleOf(rank)] as? String
+    val title = cacheEnum("enum.clan_rank_titles")[titleOf(rank)] as? String
     if (!title.isNullOrEmpty()) {
         return title
     }
@@ -92,7 +92,7 @@ internal fun Clan.rankName(rank: Int): String {
 
 internal fun interestsText(bits: Int): String {
     val names =
-        cacheEnum(INTERESTS_ENUM).filterKeys { bits and (1 shl it) != 0 }
+        cacheEnum("enum.clan_interest_names").filterKeys { bits and (1 shl it) != 0 }
     if (names.isEmpty()) {
         return "${HIGHLIGHT}None$END"
     }

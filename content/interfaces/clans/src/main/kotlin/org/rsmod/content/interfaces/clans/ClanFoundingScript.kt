@@ -10,12 +10,16 @@ import org.rsmod.api.net.clan.runeDay
 import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.player.output.ChatType
 import org.rsmod.api.player.output.GameMessage
+import org.rsmod.api.player.output.MiscOutput
 import org.rsmod.api.player.output.mes
 import org.rsmod.api.player.output.runClientScript
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.player.ui.ifOpenOverlay
 import org.rsmod.api.player.ui.ifSetEvents
 import org.rsmod.api.player.vars.VarPlayerIntMapSetter
+import org.rsmod.api.script.advanced.onOpPlayer2
+import org.rsmod.api.script.onArea
+import org.rsmod.api.script.onAreaExit
 import org.rsmod.api.script.onEvent
 import org.rsmod.api.script.onIfOpen
 import org.rsmod.api.script.onIfOverlayButton
@@ -32,7 +36,7 @@ private const val FOUNDERS = 5
 private const val FOUNDER_SLOTS = 5
 private const val FOUNDER_PLAYTIME = 25 * 60 * 100
 private const val CLAN_TAB = 1
-private const val CREATE_BUTTONS_ENUM = 3824
+private const val RECRUIT_OP = 2
 private const val LIST_PLAYERS = "clientscript.[clientscript,clan_create_side_list_players]"
 private const val UPDATE_BUTTON_TEXT = "clientscript.[clientscript,script4447]"
 
@@ -60,6 +64,9 @@ class ClanFoundingScript @Inject constructor(private val clans: Clans, private v
         onIfOverlayButton("component.clans_creation_sidepanel:confirm") { confirm() }
         onIfOverlayButton("component.clans_creation_sidepanel:contents") { removeFounder(it.comsub) }
         onOpPlayerT("component.clans_creation_sidepanel:invite") { invite(it.target) }
+        onArea("area.clan_hub") { MiscOutput.setPlayerOp(player, RECRUIT_OP, "Recruit") }
+        onAreaExit("area.clan_hub") { MiscOutput.clearPlayerOp(player, RECRUIT_OP, "Recruit") }
+        onOpPlayer2 { if (player.isInRecruitArea()) invite(it.target) }
         onEvent<ClanFounderAccept> { accept(player, leader) }
         onEvent<SessionStateEvent.Logout> { leaveFounding(player) }
         onEvent<SessionStateEvent.Delete> { leaveFounding(player) }
@@ -170,6 +177,8 @@ class ClanFoundingScript @Inject constructor(private val clans: Clans, private v
         player.ifOpenOverlay("interface.clans_creation_sidepanel", "component.side_channels:contents", eventBus)
     }
 
+    private fun Player.isInRecruitArea(): Boolean = MiscOutput.findPlayerOption(this, "Recruit") == RECRUIT_OP
+
     private fun foundingOf(player: Player): Founding? =
         foundings[player] ?: foundings.values.firstOrNull { player in it.founders }
 
@@ -194,7 +203,7 @@ class ClanFoundingScript @Inject constructor(private val clans: Clans, private v
                     UPDATE_BUTTON_TEXT.asRSCM(RSCMType.CLIENTSCRIPT),
                     "component.clans_creation_sidepanel:universe".asRSCM(RSCMType.COMPONENT),
                     "component.clans_creation_sidepanel:name".asRSCM(RSCMType.COMPONENT),
-                    CREATE_BUTTONS_ENUM,
+                    "enum.clan_create_buttons".asRSCM(RSCMType.ENUM),
                     name,
                 )
             }
