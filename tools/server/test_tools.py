@@ -23,6 +23,30 @@ class Slug(unittest.TestCase):
         shutil.rmtree(root)
 
 
+
+class Log(unittest.TestCase):
+    def setUp(s):
+        s.root = Path(tempfile.mkdtemp()); change(s.root, "x"); (s.root / "bin").mkdir()
+
+    def tearDown(s):
+        shutil.rmtree(s.root)
+
+    def run_log(s, docker, pattern):  # track.sh log against a fake docker on PATH, one state dir across calls
+        (s.root / "bin/docker").write_text("#!/bin/sh\n" + docker); (s.root / "bin/docker").chmod(0o755)
+        return subprocess.run(["bash", str(HERE.parent / "track.sh"), "log", "x", pattern], capture_output=True, text=True,
+                              env={**os.environ, "HD_ROOT": str(s.root), "PATH": f"{s.root / 'bin'}:{os.environ['PATH']}"})
+
+    def test_every_search_reads_the_running_servers_lines(s):  # a '.' search after an ERROR search printed nothing: a marker advanced by each call
+        docker = 'case $1 in inspect) exit 0;; logs) [ "$2" = --since ] && exit 0; printf "12:00 [INFO] - Server ready in 8s\\n12:01 [WARN] - slow tick\\n";; esac\n'
+        for pattern in ("ERROR|WARN", ".", "."):
+            r = s.run_log(docker, pattern); s.assertEqual(r.returncode, 0, r.stderr)
+            s.assertIn("slow tick", r.stdout)
+        s.assertIn("Server ready", s.run_log(docker, ".").stdout)
+
+    def test_no_container_is_an_error_not_a_clean_log(s):
+        r = s.run_log("exit 1\n", "ERROR")
+        s.assertEqual(r.returncode, 1); s.assertIn("no container server-x", r.stderr)
+
 class NoPowerShell(unittest.TestCase):
     def test_windows_programs_run_from_bash_by_absolute_path(s):  # Windows refuses unsigned .ps1 from the UNC path; a lost PATH loses bare .exe names
         s.assertEqual(list(HERE.parent.rglob("*.ps1")), [])

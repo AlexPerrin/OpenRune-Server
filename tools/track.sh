@@ -22,7 +22,7 @@
 #   gate-ci           fork CI and Formatting green on gate/<slug> at TCOMMIT (blocks until both conclude)
 #   ship TCOMMIT      the integration tree: build, the deploy image with the live key, boot check, deploy, or roll back
 #   measure GOAL      the content inventory's share of rows whose unit is in PASSES
-#   log <slug> PATTERN  the change's server log since the run's marker (slug `live`: the live server)
+#   log <slug> PATTERN  the lines of the change's server container matching PATTERN (slug `live`: the live server)
 #   recordings <slug> REGEX  the RSProx transcripts holding a packet type or text
 # Windows locations, run through WSL interop (override in the environment):
 #   WINDOWS_SYSTEM32  /mnt/c/Windows/System32   netstat.exe, taskkill.exe, robocopy.exe
@@ -309,7 +309,10 @@ EOF
 token() {  # [TOKEN]: the token the desktop's next login sends, or a valid one for the first desktop's account
   printf '%s\n' "${1:-$(python3 "$self/server/issuer.py" mint "$state/token" "$(account 1)")}" > "$state/token/token"; echo "token: $state/token/token"
 }
-log() { c=server-$slug; [ "$slug" = live ] && c=osrs-openrune; m=$state/log-mark; docker logs ${m:+--since "$(cat "$m" 2>/dev/null || echo 1h)"} "$c" 2>&1 | grep -E "${arg:-.}" || true; date -u +%FT%TZ > "$m"; }
+log() {  # the container's whole log (up makes it fresh), never since an earlier call: a second search read only lines after the first
+  c=server-$slug; [ "$slug" = live ] && c=osrs-openrune
+  docker inspect "$c" > /dev/null 2>&1 || { echo "no container $c: up first" >&2; return 1; }   # no server is not a clean log
+  docker logs "$c" 2>&1 | grep -E "${arg:-.}" || true; }
 recordings() { grep -lE "$arg" "${RSPROX:-$HOME/osrs-plugins-reverse/re/ref/rsprox/txt}"/*.txt 2>/dev/null | xargs -rn1 basename || echo "no transcript holds /$arg/"; }
 
 case $verb in build|up|restart|down|gate|gate-ci|ship|measure|log|recordings) "${verb//-/_}" ;; token) token "$arg" ;; test) arg= tests "${@:3}" ;;
