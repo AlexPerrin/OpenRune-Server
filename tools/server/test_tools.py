@@ -310,13 +310,22 @@ class DesktopInstance(unittest.TestCase):
 
 
 class DesktopLogin(unittest.TestCase):
-    def fake(s, states):  # a devtools endpoint whose game state walks through states, one per read, staying on the last
+    def fake(s, states, widgets=([{"childIndex": 0, "itemId": 6512, "itemQuantity": 1, "selfHidden": True}],), inv=None):  # a devtools endpoint whose game state walks through states, one per read, staying on the last; get_widget of the inventory walks through widgets likewise; inv: container 93's items (None: not loaded)
         import desktop_login as d
-        sent, states = [], list(states)
+        sent, states, widgets = [], list(states), list(widgets)
         def call(port, name, **a):
             sent.append((name, a))
             if name == "press_key" and len(a["key"]) > 1 and a["key"] not in ("ENTER", "ESCAPE", "SPACE", "TAB", "BACKSPACE"):
                 raise d.Refused("Unknown key: " + a["key"])  # the endpoint's named keys
+            if name == "get_widget":
+                w = widgets.pop(0) if len(widgets) > 1 else widgets[0]
+                if w is None:
+                    raise d.Refused("Widget not found: 149.0")
+                return json.dumps({"dynamicChildren": w})
+            if name == "get_inventory":
+                if inv is None:
+                    raise d.Refused("Item container 93 is not loaded")
+                return json.dumps({"items": inv})
             return json.dumps({"gameState": states.pop(0) if len(states) > 1 else states[0]}) if name == "get_client_state" else "{}"
         s.addCleanup(setattr, d, "call", d.call); s.addCleanup(setattr, d.time, "sleep", d.time.sleep)
         d.call, d.time.sleep = call, lambda _: None
@@ -327,6 +336,19 @@ class DesktopLogin(unittest.TestCase):
         s.assertEqual(d.login(1, "u", "p"), "LOGGED_IN")
         d, _ = s.fake(["LOGIN_SCREEN"] * 4 + ["LOGGING_IN", "LOGIN_SCREEN"])
         s.assertTrue(d.login(1, "u", "p").startswith("FAILED"))
+
+    def test_logged_in_only_once_the_inventory_widget_shows_container_93(s):  # cannon-354-return-after-destroy-3: after up the widget stayed empty over a full container 93
+        coins = [{"childIndex": 0, "itemId": 995, "itemQuantity": 5, "selfHidden": False}, {"childIndex": 1, "itemId": 6512, "itemQuantity": 1, "selfHidden": True}]
+        held = [{"slot": 0, "itemId": 995, "quantity": 5}]
+        d, sent = s.fake(["LOGGED_IN"], widgets=[None, [], coins], inv=held)   # the widget is built after LOGGED_IN
+        s.assertEqual(d.login(1, "u", "p"), "LOGGED_IN")
+        s.assertEqual(sum(n == "get_widget" for n, _ in sent), 3)
+        d, _ = s.fake(["LOGGED_IN"])   # a fresh account: no container, every slot empty
+        s.assertEqual(d.token(1), "LOGGED_IN")
+        d, _ = s.fake(["LOGGED_IN"], inv=held)
+        s.assertEqual(d.login(1, "u", "p"), "FAILED: the inventory widget shows {} but container 93 holds {0: (995, 5)}")
+        d, _ = s.fake(["LOGGED_IN"], widgets=[[dict(coins[0], selfHidden=False, hidden=True)]], inv=held)   # another side tab open hides the slots through their parent alone
+        s.assertEqual(d.login(1, "u", "p"), "LOGGED_IN")
 
     def test_a_refused_call_raises(s):  # press_key BACK_SPACE was refused as an unknown key and the login went on
         import desktop_login as d, io

@@ -55,7 +55,7 @@ account() { echo "h$(printf %s "$slug" | sha1sum | cut -c1-9)${1:-}"; }   # the 
 mine="select c.id from account_characters c join accounts a on a.id = c.account_id where lower(a.account_name) like '$(account)%'"   # this slug's characters
 sql() { local pg; pg=$(docker logs "server-$slug" 2>&1 | grep -oE 'jdbc:postgresql://localhost:[0-9]+' | tail -1 | grep -oE '[0-9]+$')
   docker run --rm --network "container:server-$slug" postgres:16-alpine psql -h 127.0.0.1 -p "$pg" -U postgres -d postgres -tAq -c "$1"; }
-login() {  # login <devtools port> <account>: logs that desktop in as the account; a lost key types another name, whose first login makes a stray account (the rights update then missed the real row): until this login made no row but the account's, out and in again
+login() {  # login <devtools port> <account>: logs that desktop in as the account (a FAILED login fails up and restart: one whose inventory widget does not show container 93 too); a lost key types another name, whose first login makes a stray account (the rights update then missed the real row): until this login made no row but the account's, out and in again
   local m; while :; do m=$(sql "select coalesce(max(id), 0) from accounts")
     if [ -n "${tok:-}" ]; then python3 "$self/server/desktop_login.py" "$1" token; else python3 "$self/server/desktop_login.py" "$1" "$2" "$2"; fi   # prints LOGGED_IN or FAILED: reason
     [ "$(sql "select string_agg(lower(account_name), ' ') from accounts where id > $m or lower(account_name) = '$2'")" = "$2" ] && return

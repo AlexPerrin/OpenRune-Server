@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """desktop_login.py <devtools port> <user> <password> | <devtools port> token | <devtools port> logout: logs a desktop
 client in, by its login form or (token) by the token login its Jagex session variables start (prints LOGGED_IN or
-FAILED: <reason>), or out through the logout tab's button (prints LOGIN_SCREEN) through its devtools endpoint. Keys only:
+FAILED: <reason>; LOGGED_IN only once the inventory widget shows container 93), or out through the logout tab's button (prints LOGIN_SCREEN) through its devtools endpoint. Keys only:
 the login screen's place on the canvas changes with the window, so no point on it is clicked.
 """
 import json, sys, time, urllib.error, urllib.request
 
 LOGOUT_BUTTON = 11927560  # component.logout:logout
+INVENTORY_ITEMS = 9764864  # component.inventory:items, one dynamic child per slot of container 93
 
 
 class Refused(Exception):
@@ -58,7 +59,7 @@ def clear(port):  # press_key takes one key per call
 def login(port, user, password):
     s = wait(port, ("LOGIN_SCREEN", "LOGGED_IN"))
     if s["gameState"] == "LOGGED_IN":
-        return "LOGGED_IN"
+        return inventory(port)
     call(port, "press_key", key="ESCAPE")  # any login screen page back to the welcome page
     state(port), state(port)  # each read runs on a client frame: the page has changed before the next key (one frame took both)
     call(port, "press_key", key="ENTER")   # Existing User: the form, its login field focused
@@ -71,17 +72,36 @@ def login(port, user, password):
     # shortcut: a refusal faster than the 0.1 s poll is never seen and the wait blocks; a devtools login tool removes it (harness-desktop-login-devtools)
     wait(port, ("LOGIN_SCREEN",), poll=0.1, leave=True)
     s = wait(port, ("LOGGED_IN", "LOGIN_SCREEN"))
-    return "LOGGED_IN" if s["gameState"] == "LOGGED_IN" else "FAILED: back at the login screen: the server refused the login"
+    return inventory(port) if s["gameState"] == "LOGGED_IN" else "FAILED: back at the login screen: the server refused the login"
 
 
 def token(port):
     s = wait(port, ("LOGIN_SCREEN", "LOGGED_IN"))
     if s["gameState"] == "LOGGED_IN":
-        return "LOGGED_IN"
+        return inventory(port)
     call(port, "press_key", key="ENTER")  # the session's login page: Enter plays; the client fetches its token from param 11
     wait(port, ("LOGIN_SCREEN",), poll=0.1, leave=True)
     s = wait(port, ("LOGGED_IN", "LOGIN_SCREEN"))
-    return "LOGGED_IN" if s["gameState"] == "LOGGED_IN" else "FAILED: back at the login screen: the server refused the token"
+    return inventory(port) if s["gameState"] == "LOGGED_IN" else "FAILED: back at the login screen: the server refused the token"
+
+
+def inventory(port):
+    """LOGGED_IN when the inventory widget's slots show container 93's items, else FAILED naming both (an empty widget over
+    a full container leaves every item_action unfound); waits until the logged-in client has built the widget's slots."""
+    while True:
+        try:
+            slots = json.loads(call(port, "get_widget", componentId=INVENTORY_ITEMS)).get("dynamicChildren") or []
+        except Refused:  # not built yet: the interface opens after LOGGED_IN
+            slots = []
+        if slots:
+            break
+        time.sleep(1)
+    shown = {c["childIndex"]: (c["itemId"], c["itemQuantity"]) for c in slots if not c.get("selfHidden") and c.get("itemId", -1) > 0}
+    try:
+        held = {i["slot"]: (i["itemId"], i["quantity"]) for i in json.loads(call(port, "get_inventory", inventoryId=93))["items"]}
+    except Refused:  # no container 93: the server sent no inventory, an empty one
+        held = {}
+    return "LOGGED_IN" if shown == held else f"FAILED: the inventory widget shows {shown} but container 93 holds {held}"
 
 
 def logout(port):
