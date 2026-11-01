@@ -32,6 +32,15 @@ class NoPowerShell(unittest.TestCase):
         s.assertEqual(re.findall(r'(?:^|[\s(|;&])[\w.-]+\.exe\b', src), [])
 
 
+class AccountName(unittest.TestCase):
+    def test_each_login_name_fits_the_client_and_is_unique_per_slug_and_client(s):  # the client refuses a login name over 12 characters
+        fn = next(l for l in (HERE.parent / "track.sh").read_text().splitlines() if l.startswith("account()"))
+        name = lambda slug, i: subprocess.run(["bash", "-c", f'{fn}\nslug=$1; account $2', "-", slug, str(i)], capture_output=True, text=True).stdout.strip()
+        names = {name(slug, i) for slug in ("harness-no-powershell", "harness-server-account-name-length") for i in (1, 5)}
+        s.assertEqual(len(names), 4)
+        for n in names: s.assertRegex(n, r"^[a-z][a-z0-9]{1,11}$")
+
+
 class Repo(unittest.TestCase):
     def setUp(s):
         s.repo = tempfile.mkdtemp()

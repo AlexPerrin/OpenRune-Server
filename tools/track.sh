@@ -30,6 +30,7 @@ ready() {  # ready <container> [since]: blocks until "Server ready in" or the co
   done
 }
 port() { echo $(( 20000 + 16#$(printf %s "$slug" | sha1sum | cut -c1-3) * 2 + $1 )); }   # game +0, http +1; shortcut: two slugs may hash alike, pick from up.json when it happens
+account() { echo "h$(printf %s "$slug" | sha1sum | cut -c1-9)$1"; }   # the Nth client's login name and password: 11 characters (a login name takes 12 at most), listed in the slug's up.json
 
 sys32=${WINDOWS_SYSTEM32:-/mnt/c/Windows/System32}; desk=${DESKTOP_DIR:-/mnt/c/osrs-test}
 need() { [ -x "$1" ] || { echo "$1 not found: set $2" >&2; exit 2; }; }   # need <program> <the variable that locates it>
@@ -107,18 +108,18 @@ up() {
   ready "server-$slug"
   python3 "$self/server/javcheck.py" "http://127.0.0.1:$http/jav_config.ws" || { down; return 1; }   # no client is pointed at a foreign host
   modulus=$(openssl rsa -in "$state/key/game.key" -noout -modulus | cut -d= -f2 | tr A-F a-f)
-  clients=()
+  clients=(); accounts=()
   for i in $(seq 1 "$n"); do
     inst=$(desktop_start)
     dt=${inst##* }; inst=${inst%% *}
-    python3 "$self/server/desktop_login.py" "$dt" "$slug$i" "$slug$i"      # creates the account on first login; prints LOGGED_IN or FAILED: reason
-    clients+=("$inst:$dt")
+    python3 "$self/server/desktop_login.py" "$dt" "$(account "$i")" "$(account "$i")"      # creates the account on first login; prints LOGGED_IN or FAILED: reason
+    clients+=("$inst:$dt"); accounts+=("$(account "$i")")
   done
   pg=$(docker logs "server-$slug" 2>&1 | grep -oE 'jdbc:postgresql://localhost:[0-9]+' | tail -1 | grep -oE '[0-9]+$')
   docker run --rm --network "container:server-$slug" postgres:16-alpine psql -h 127.0.0.1 -p "$pg" -U postgres -d postgres -q -c \
-    "update account_characters set members = true where account_id in (select id from accounts where lower(account_name) like '$slug%')" >/dev/null
+    "update account_characters set members = true where account_id in (select id from accounts where lower(account_name) like '$(account)%')" >/dev/null
   for c in "${clients[@]}"; do python3 "$self/server/desktop_login.py" "${c##*:}" relog; done   # members applies at login
-  printf '{"game": %s, "http": %s, "clients": "%s"}\n' "$game" "$http" "${clients[*]}" > "$state/up.json"
+  printf '{"game": %s, "http": %s, "clients": "%s", "accounts": "%s"}\n' "$game" "$http" "${clients[*]}" "${accounts[*]}" > "$state/up.json"
   echo "up: game $game http $http clients ${clients[*]}"
 }
 down() {
