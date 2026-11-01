@@ -48,6 +48,30 @@ class AccountName(unittest.TestCase):
         for n in names: s.assertRegex(n, r"^[a-z][a-z0-9]{1,11}$")
 
 
+class DesktopInstance(unittest.TestCase):
+    def test_concurrent_ups_take_distinct_instances(s):  # two ups once took the same client and one acted on the other's server
+        src = (HERE.parent / "track.sh").read_text()
+        fns = src[src.index("sys32="):src.index("desktop_stop()")]
+        t = Path(tempfile.mkdtemp()); (t / "state").mkdir(); (t / "bin").mkdir(); (t / "sys32").mkdir()
+        exe = lambda p, body: (p.write_text("#!/bin/bash\n" + body), p.chmod(0o755))
+        exe(t / "sys32/netstat.exe", f'for i in 1 2 3 4 5; do [ -e {t}/desk${{i#1}}/listening ] && echo "  TCP 0.0.0.0:$((7779 + i)) 0.0.0.0:0 LISTENING"; done; true\n')
+        exe(t / "bin/wslpath", 'sleep 0.5; echo "$2"\n')   # widens the window between picking an instance and claiming it
+        for i in range(1, 6):
+            d = t / f"desk{'' if i == 1 else i}"; (d / "home/.rsprox").mkdir(parents=True); (d / "jdk/bin").mkdir(parents=True)
+            exe(d / "jdk/bin/java.exe", "touch listening; exec sleep 30\n")
+        env = {**os.environ, "PATH": f"{t / 'bin'}:{os.environ['PATH']}", "WINDOWS_SYSTEM32": str(t / "sys32"), "DESKTOP_DIR": str(t / "desk")}
+        run = lambda: subprocess.Popen(["bash", "-c", f"set -euo pipefail; root={t}; slug=s; http=1; game=2; modulus=3\n{fns}\ndesktop_start", ], stdout=subprocess.PIPE, text=True, env=env)
+        ps = [run() for _ in range(3)]
+        got = [p.communicate(timeout=60)[0].split()[0] for p in ps]
+        [subprocess.run(["kill", f.read_text().strip()]) for f in t.glob("desk*/rsprox.pid")]; shutil.rmtree(t, ignore_errors=True)
+        s.assertEqual(len(set(got)), 3, got)
+
+    def test_up_records_each_client_before_its_login(s):  # a failed login aborts up under set -e; down must still stop that client
+        up = (HERE.parent / "track.sh").read_text().split("\nup() {")[1].split("\n}")[0]
+        s.assertLess(up.index('> "$state/up.json"'), up.index("desktop_login.py\" \"$dt\""))
+        s.assertLess(up.index("down >/dev/null"), up.index("desktop_start"))
+
+
 class Repo(unittest.TestCase):
     def setUp(s):
         s.repo = tempfile.mkdtemp()

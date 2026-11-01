@@ -38,7 +38,8 @@ listening() { "$sys32/netstat.exe" -anp TCP | tr -d '\r' | awk '$4=="LISTENING"{
 # The desktop test clients: the staged dirs DESKTOP_DIR, DESKTOP_DIR2 .. DESKTOP_DIR5 (JDK, RSProx launcher, RuneLite with
 # the devtools plugin), devtools port 7779+N for the Nth, run through WSL interop by absolute path.
 desktop_start() {  # the first instance whose devtools port is free and that has no pid file, against this change; prints "desktopN <port>"
-  need "$sys32/netstat.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/java.exe" DESKTOP_DIR; busy=$(listening)
+  need "$sys32/netstat.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/java.exe" DESKTOP_DIR
+  exec 9> "$root/state/desktop.lock"; flock 9; busy=$(listening)   # one up at a time picks an instance, until its pid file claims it
   for i in 1 2 3 4 5; do d=$desk${i#1}; dp=$((7779 + i)); grep -qx "$dp" <<< "$busy" || [ -e "$d/rsprox.pid" ] || break; d=; done
   [ -n "$d" ] || { echo "no free desktop instance" >&2; return 1; }
   w=$(wslpath -w "$d")
@@ -46,8 +47,8 @@ desktop_start() {  # the first instance whose devtools port is free and that has
     "  game_server_port: $game" "  runelite_bootstrap_commithash: e617bef1a7f5c39fbe8768994d27d638941efd5d" "  binary_folder: openrune-qa" > "$d/home/.rsprox/proxy-targets.yaml"
   (cd "$d" && JAVA_TOOL_OPTIONS="-Duser.home=$w\\home -Dosrstest.marker=osrs-test-$i" WSLENV=${WSLENV:+$WSLENV:}JAVA_TOOL_OPTIONS \
     exec setsid "$d/jdk/bin/java.exe" "-Dosrstest.marker=osrs-test-$i" "-Dosrstest.portskip=$((20 * (i - 1)))" "-Dosrstest.target=OpenRune Test - $slug" \
-    -cp "$w\\rsprox\\launcher;$w\\rsprox\\lib\\*" OsrsTestLauncher) < /dev/null > /dev/null 2>&1 &   # nothing may hold the caller's $( ) pipe
-  echo $! > "$d/rsprox.pid"
+    -cp "$w\\rsprox\\launcher;$w\\rsprox\\lib\\*" OsrsTestLauncher) < /dev/null > /dev/null 2>&1 9>&- &   # nothing may hold the caller's $( ) pipe or the lock
+  echo $! > "$d/rsprox.pid"; flock -u 9
   until listening | grep -qx "$dp"; do   # the devtools endpoint answers, or the client died
     kill -0 "$(cat "$d/rsprox.pid")" 2>/dev/null || { echo "client $i exited" >&2; rm -f "$d/rsprox.pid"; return 1; }; sleep 2
   done
@@ -100,7 +101,7 @@ up() {
   n=${arg:-1}; T=${T:-$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["T"])' "$state/build.json")}
   docker image inspect "or:$T" >/dev/null 2>&1 || { echo "no image or:$T: build first"; return 1; }
   game=$(port 0); http=$(port 1)
-  docker rm -f "server-$slug" "http-$slug" >/dev/null 2>&1 || true
+  down >/dev/null   # a previous up's clients and containers
   docker run -d --name "server-$slug" --cpus=4 --memory=4g -p "$game:43594" --tmpfs /app/.data/postgres:uid=1000,gid=1000,mode=0700 \
     -v "$state/key/game.key:/app/.data/game.key:ro" -v "$state/key/client.key:/app/.data/client.key:ro" "or:$T" >/dev/null
   docker run -d --name "http-$slug" -p "$http:8080" -v "$sidecar_data:/data:ro" -v "$self/server/jav_config.ws.template:/app/protocol/jav_config.ws.template:ro" \
@@ -113,14 +114,14 @@ up() {
   for i in $(seq 1 "$n"); do
     inst=$(desktop_start)
     dt=${inst##* }; inst=${inst%% *}
-    python3 "$self/server/desktop_login.py" "$dt" "$(account "$i")" "$(account "$i")"      # creates the account on first login; prints LOGGED_IN or FAILED: reason
     clients+=("$inst:$dt"); accounts+=("$(account "$i")")
+    printf '{"game": %s, "http": %s, "clients": "%s", "accounts": "%s"}\n' "$game" "$http" "${clients[*]}" "${accounts[*]}" > "$state/up.json"   # before the login: down stops exactly the clients this up started
+    python3 "$self/server/desktop_login.py" "$dt" "$(account "$i")" "$(account "$i")"      # creates the account on first login; prints LOGGED_IN or FAILED: reason
   done
   pg=$(docker logs "server-$slug" 2>&1 | grep -oE 'jdbc:postgresql://localhost:[0-9]+' | tail -1 | grep -oE '[0-9]+$')
   docker run --rm --network "container:server-$slug" postgres:16-alpine psql -h 127.0.0.1 -p "$pg" -U postgres -d postgres -q -c \
     "update account_characters set members = true where account_id in (select id from accounts where lower(account_name) like '$(account)%')" >/dev/null
   for c in "${clients[@]}"; do python3 "$self/server/desktop_login.py" "${c##*:}" relog; done   # members applies at login
-  printf '{"game": %s, "http": %s, "clients": "%s", "accounts": "%s"}\n' "$game" "$http" "${clients[*]}" "${accounts[*]}" > "$state/up.json"
   echo "up: game $game http $http clients ${clients[*]}"
 }
 down() {

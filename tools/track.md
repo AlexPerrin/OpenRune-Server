@@ -61,7 +61,9 @@ yours; `hd show <slug>` first, always.
 
 The desktop clients are Windows programs run from bash through WSL interop by absolute path, located by
 `WINDOWS_SYSTEM32` (default `/mnt/c/Windows/System32`: netstat.exe, taskkill.exe) and `DESKTOP_DIR` (default
-`/mnt/c/osrs-test`, the Nth instance `DESKTOP_DIR<N>`); a missing program fails naming its variable.
+`/mnt/c/osrs-test`, the Nth instance `DESKTOP_DIR<N>`); a missing program fails naming its variable. An up takes
+each instance under `state/desktop.lock` until its pid file claims it, and lists each client in `up.json` before its
+login, so `down` stops exactly the clients its up started.
 
 ## The reviewer
 Never writes the code it checks. Judges every contract row from the same build (`tools/track.sh up <slug>`),
