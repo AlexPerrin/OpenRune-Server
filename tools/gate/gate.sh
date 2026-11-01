@@ -108,7 +108,7 @@ gate() {
 }
 gate_sha() {  # a child of TCOMMIT whose workflows move the ephemeral ports off the game port, and with CENTRAL hold that Central tree at .central/ built in
   set -e   # a command substitution does not inherit it
-  d=$(mktemp -d); trap 'rm -rf "$d"' EXIT; idx=$d/index   # one index per run: gates of other changes run at once
+  idx=$state/gate-ci.index   # the change's own index (gates of other changes run at once), read-tree replaces it: no temp dir a killed gate leaves behind
   GIT_INDEX_FILE=$idx git -C "$repo" read-tree "$TCOMMIT"
   step='      - name: Ephemeral ports above the game port (tools/gate/gate.sh gate-ci)
         run: sysctl net.ipv4.ip_local_port_range; sudo sysctl -w net.ipv4.ip_local_port_range="49152 65535"'
