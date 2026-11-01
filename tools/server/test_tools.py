@@ -604,6 +604,20 @@ class GateCi(Repo):
         s.assertEqual(git(fork, "diff", "--name-only", t, g).split(), sorted([".central.init.gradle", ".central/settings.gradle.kts", ".github/workflows/ci.yml", ".github/workflows/format.yml"]))
         for d in (fork, bin, root, central): shutil.rmtree(d)
 
+    def test_two_gates_at_once_each_use_their_own_index(s):  # five gate-ci rows failed on 'gate-index.lock': File exists, one index per repo
+        for f in ("ci", "format"): s.write(f".github/workflows/{f}.yml", s.WF)
+        t = s.commit("ci")
+        fork = tempfile.mkdtemp(); git(fork, "init", "-q", "--bare"); git(s.repo, "remote", "add", "fork", fork)
+        bin = Path(tempfile.mkdtemp()); (bin / "gh").write_text("#!/bin/sh\necho success/completed\n"); (bin / "gh").chmod(0o755)
+        root = tempfile.mkdtemp(); change(root, "s1"); change(root, "s2")
+        gd = Path(s.repo) / ".git"; (gd / "gate-index.lock").write_text("")  # what the old shared index left for a concurrent gate
+        ps = [subprocess.Popen(["bash", str(HERE.parent / "track.sh"), "gate-ci", k], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                               env={**os.environ, **s.env, "HD_ROOT": root, "TCOMMIT": t, "PATH": f"{bin}:{os.environ['PATH']}"}) for k in ("s1", "s2")]
+        for p in ps: s.assertEqual(p.wait(), 0, p.stderr.read())
+        for k in ("s1", "s2"): s.assertEqual(git(fork, "rev-parse", f"refs/heads/gate/{k}^"), t)
+        s.assertEqual(sorted(x.name for x in gd.iterdir() if x.name.startswith("gate-index")), ["gate-index.lock"])
+        for d in (fork, bin, root): shutil.rmtree(d)
+
 
 class Measure(unittest.TestCase):
     def test_measure_writes_under_the_goal_not_the_target(s):
