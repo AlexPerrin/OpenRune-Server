@@ -82,9 +82,10 @@ build() {
     eclipse-temurin:21 bash -c '
       set -e; mkdir -p "$HOME"; g="./gradlew --console=plain --build-cache --no-configuration-cache --max-workers=4 -Dorg.gradle.jvmargs=-Xmx1536m"
       mkdir -p ~/.openrune/caches && cp -an /dl/. ~/.openrune/caches/ 2>/dev/null || true
-      if [ -d /store/$CK ]; then cp -a /store/$CK/. .data/cache/; else
+      s=/store/s-$CK   # every output of the cache step: api/generated is compiled, the gamevals are read at boot
+      if [ -d $s ]; then cp -a $s/. .; else
         $g :or-cache:freshCache :or-cache:mergePluginGamevals :or-cache:buildCache
-        mkdir -p /store/$CK && cp -a .data/cache/. /store/$CK/
+        rm -rf $s.tmp && mkdir -p $s.tmp && cp -a --parents .data/cache .data/gamevals .data/gamevals-binary api/generated $s.tmp/ && mv $s.tmp $s
         for z in ~/.openrune/caches/*/*/*-disk.zip; do [ -e "$z" ] || continue; d=/dl/$(basename $(dirname $(dirname $z)))/$(basename $(dirname $z)); mkdir -p $d; cp -n $z $d/; done
       fi
       $g generateRsa :server:app:installDist -x test' > "$log" 2>&1 || { record false build < "$log"; echo "build failed: $log"; return 1; }

@@ -32,6 +32,13 @@ class NoPowerShell(unittest.TestCase):
         s.assertEqual(re.findall(r'(?:^|[\s(|;&])[\w.-]+\.exe\b', src), [])
 
 
+class CacheStore(unittest.TestCase):
+    def test_a_store_hit_restores_every_output_of_the_cache_step(s):  # a hit without api/generated fails :api:music:compileKotlin
+        line = next(l for l in (HERE.parent / "track.sh").read_text().splitlines() if "cp -a --parents" in l)
+        for out in (".data/cache ", ".data/gamevals ", ".data/gamevals-binary ", "api/generated "):
+            s.assertIn(out, line)
+
+
 class AccountName(unittest.TestCase):
     def test_each_login_name_fits_the_client_and_is_unique_per_slug_and_client(s):  # the client refuses a login name over 12 characters
         fn = next(l for l in (HERE.parent / "track.sh").read_text().splitlines() if l.startswith("account()"))
