@@ -4,7 +4,8 @@
   text.py commits    every commit $BASE..$HEAD not on an existing PR's head fork/$PUBLIC_BRANCH: subject feat:/fix:, no Claude-Session trailer, only a Co-Authored-By trailer
   text.py texts      pr-body.md has upstream's template sections (read live from origin/main), no fork PR link anywhere,
                      pr-comment.md names $HEAD
-  text.py dupes      a module whose main sources gain an item-moving call has a test source added or changed ($BASE...$HEAD)
+  text.py dupes      a module whose main sources gain an item-moving call has a test source added or changed ($BASE...$HEAD,
+                     on an existing PR fork/$PUBLIC_BRANCH...$HEAD)
 Env: EVIDENCE, CLONE, BASE, HEAD, PR, PUBLIC_BRANCH.
 """
 import os, re, subprocess, sys
@@ -27,11 +28,14 @@ def evidence():
     return [f"{n} missing or empty in {E}" for n in ("accuracy.md", "pr-title.txt", "pr-body.md", "pr-comment.md") if not text(n).strip()]
 
 
+def live():
+    # an existing PR's public head (fork/$PUBLIC_BRANCH) cannot change without a force-push: check only what follows it
+    return f"fork/{os.environ['PUBLIC_BRANCH']}" if os.environ.get("PR") and os.environ.get("PUBLIC_BRANCH") else ""
+
+
 def commits():
     bad = []
-    # an existing PR's public head (fork/$PUBLIC_BRANCH) cannot change without a force-push: check only what follows it
-    live = [f"^fork/{os.environ['PUBLIC_BRANCH']}"] if os.environ.get("PR") and os.environ.get("PUBLIC_BRANCH") else []
-    for c in git("log", "--format=%H%x01%s%x01%b%x02", HEAD, f"^{BASE}", *live).split("\x02"):
+    for c in git("log", "--format=%H%x01%s%x01%b%x02", HEAD, f"^{BASE}", *([f"^{live()}"] if live() else [])).split("\x02"):
         if not c.strip():
             continue
         sha, subject, body = (c.strip("\n") + "\x01\x01").split("\x01")[:3]
@@ -62,7 +66,7 @@ def texts():
 
 def dupes():
     flows, tested, path = {}, set(), None
-    for line in git("diff", "--unified=0", f"{BASE}...{HEAD}").splitlines():
+    for line in git("diff", "--unified=0", f"{live() or BASE}...{HEAD}").splitlines():
         if line.startswith("+++ b/"):
             path = line[6:]
             if m := re.search("/src/(test|integration)/", path):

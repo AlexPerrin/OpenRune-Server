@@ -433,6 +433,17 @@ class Text(Repo):
         rc, out = s.row("text.py", "commits", HEAD=head, PR="9", PUBLIC_BRANCH="content/x")
         s.assertEqual(rc, 0, out)
 
+    def test_dupes_after_an_existing_prs_head(s):  # cannon-354: the dev ref at #354's live head failed on the whole PR's item flows
+        s.write("mod/src/main/kotlin/A.kt", "fun a() { invAdd(x) }\n")
+        public = s.commit("feat: already public on the PR")
+        git(s.repo, "update-ref", "refs/remotes/fork/content/x", public)
+        s.assertEqual(s.row("text.py", "dupes", HEAD=public)[0], 1)
+        s.assertEqual(s.row("text.py", "dupes", HEAD=public, PR="9", PUBLIC_BRANCH="content/x"), (0, "dupes: ok\n"))
+        s.write("mod/src/main/kotlin/A.kt", "fun a() { invAdd(x) }\nfun b() { invDel(y) }\n")
+        head = s.commit("fix: the review finding")
+        rc, out = s.row("text.py", "dupes", HEAD=head, PR="9", PUBLIC_BRANCH="content/x")
+        s.assertEqual(rc, 1); s.assertIn("item flow in mod/src/main/kotlin/A.kt: invDel\n", out)
+
 
 class TestVerb(Repo):
     def test_runs_the_touched_modules_tests_and_spotless_with_the_copys_git_readable(s):  # a dev ran gradle by hand; spotless's JGit could not open the worktree
