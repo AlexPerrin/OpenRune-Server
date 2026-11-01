@@ -6,9 +6,10 @@
 #                     (server/central.init.gradle substitutes each, :central-app included)
 #   up [N]            server-<slug> and http-<slug> from or:<T> on the change's ports (quest mode: QUEST_MODE, else the change's front
 #                     matter quest-mode, else respect-progress; or assume-completed), N desktops logged in,
-#                     each loading the live client's devtools jar (CLIENT_TRACK: the client track's script, its build of slug live)
+#                     each loading the live client's devtools jar (CLIENT_TRACK: the client track's script, its build of slug live);
+#                     a fresh database, or with RESUME=1 the accounts as the change's last down saved them
 #   restart           restarts server-<slug>, its game.yml and database kept, and logs up's desktops in again
-#   down              stops the desktops, removes the containers
+#   down              stops the desktops, waits until the server has saved and dropped their characters, removes the containers
 #   gate TCOMMIT      every check: and gate: row of the contract from the build copy (`hd rows`)
 #   gate-ci           fork CI and Formatting green on gate/<slug> at TCOMMIT (blocks until both conclude)
 #   ship TCOMMIT      the integration tree: build, the deploy image with the live key, boot check, deploy, or roll back
@@ -39,6 +40,10 @@ quest_mode() { m=${QUEST_MODE:-$(awk '/^---$/{n++; next} n==1 && /^quest-mode:/{
 quests() { case $1 in respect-progress|assume-completed) ;; *) echo "quest-mode \"$1\": respect-progress or assume-completed" >&2; return 1 ;; esac   # quests MODE: stdin game.yml with quest-requirements mode MODE
   y=$(sed -E "/^[[:space:]]*quest-requirements:/,/^[[:space:]]*mode:/ s/(mode:[[:space:]]*).*/\1\"$1\"/"); grep -q "mode: \"$1\"" <<< "$y" || { echo "game.yml has no quest-requirements mode" >&2; return 1; }; printf '%s\n' "$y"; }
 account() { echo "h$(printf %s "$slug" | sha1sum | cut -c1-9)${1:-}"; }   # the Nth desktop's login name and password (no N: the prefix of this slug's names): 11 characters (a login name takes 12 at most), listed in the slug's up.json
+mine="select c.id from account_characters c join accounts a on a.id = c.account_id where lower(a.account_name) like '$(account)%'"   # this slug's characters
+sql() { local pg; pg=$(docker logs "server-$slug" 2>&1 | grep -oE 'jdbc:postgresql://localhost:[0-9]+' | tail -1 | grep -oE '[0-9]+$')
+  docker run --rm --network "container:server-$slug" postgres:16-alpine psql -h 127.0.0.1 -p "$pg" -U postgres -d postgres -tAq -c "$1"; }
+offline() { until [ "$(sql "select count(*) from main.character_progress where online_central_world_id is not null and character_id in ($mine)")" = 0 ]; do sleep 1; done; }   # each character saved at its logout
 
 sys32=${WINDOWS_SYSTEM32:-/mnt/c/Windows/System32}; desk=${DESKTOP_DIR:-/mnt/c/osrs-test}
 need() { [ -x "$1" ] || { echo "$1 not found: set $2" >&2; exit 2; }; }   # need <program> <the variable that locates it>
@@ -138,7 +143,7 @@ up() {
   game=$(port 0); http=$(port 1)
   down >/dev/null   # a previous up's desktops and containers
   docker run --rm --entrypoint cat "or:$T" /app/game.yml | quests "$(quest_mode)" > "$state/game.yml"   # upstream's default assume-completed skips every quest check
-  rm -rf "$state/postgres"; mkdir -m 700 "$state/postgres"   # a fresh database each up, kept through restart (owner uid 1000, the server's)
+  [ -n "${RESUME:-}" ] || rm -rf "$state/postgres"; mkdir -p -m 700 "$state/postgres"   # fresh, or RESUME: the last down's (owner uid 1000, the server's)
   docker run -d --name "server-$slug" --cpus=4 --memory=4g -p "$game:43594" -v "$state/postgres:/app/.data/postgres" \
     -v "$state/key/game.key:/app/.data/game.key:ro" -v "$state/key/client.key:/app/.data/client.key:ro" -v "$state/game.yml:/app/game.yml:ro" "or:$T" >/dev/null
   docker run -d --name "http-$slug" -p "$http:8080" -v "$sidecar_data:/data:ro" -v "$self/server/jav_config.ws.template:/app/protocol/jav_config.ws.template:ro" \
@@ -157,10 +162,7 @@ up() {
   done
   # members is written by the character save at logout: log out, wait until no character of this up is online, update, log in
   for c in "${desktops[@]}"; do python3 "$self/server/desktop_login.py" "$(cut -d: -f2 <<< "$c")" logout; done
-  pg=$(docker logs "server-$slug" 2>&1 | grep -oE 'jdbc:postgresql://localhost:[0-9]+' | tail -1 | grep -oE '[0-9]+$')
-  sql() { docker run --rm --network "container:server-$slug" postgres:16-alpine psql -h 127.0.0.1 -p "$pg" -U postgres -d postgres -tAq -c "$1"; }
-  mine="select c.id from account_characters c join accounts a on a.id = c.account_id where lower(a.account_name) like '$(account)%'"
-  until [ "$(sql "select count(*) from main.character_progress where online_central_world_id is not null and character_id in ($mine)")" = 0 ]; do sleep 1; done
+  offline
   sql "update account_characters set members = true where id in ($mine)" >/dev/null
   for i in "${!desktops[@]}"; do python3 "$self/server/desktop_login.py" "$(cut -d: -f2 <<< "${desktops[$i]}")" "${accounts[$i]}" "${accounts[$i]}"; done
   echo "up: game $game http $http desktops ${desktops[*]}"
@@ -176,6 +178,7 @@ down() {
   for c in $(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d.get("desktops", d.get("clients", "")))' "$state/up.json" 2>/dev/null); do
     (desktop_stop "$(cut -d: -f1 <<< "$c")" "$(cut -d: -f3 <<< "$c")") || true   # a missing program still lets the containers go
   done
+  if [ "$(docker inspect -f '{{.State.Running}}' "server-$slug" 2>/dev/null)" = true ] && docker logs "server-$slug" 2>&1 | grep -q "Server ready in"; then offline; fi   # the server drops each disconnected character and saves it: RESUME starts there
   docker rm -f "server-$slug" "http-$slug" >/dev/null 2>&1 || true; rm -f "$state/up.json"; echo "down"
 }
 gate() {

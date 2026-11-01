@@ -106,6 +106,33 @@ class QuestMode(unittest.TestCase):
         s.assertIn('docker restart "server-$slug"', restart); s.assertNotIn("docker run", restart); s.assertNotIn("> \"$state/game.yml\"", restart)
 
 
+class Resume(unittest.TestCase):
+    def test_down_saves_the_characters_and_resume_up_keeps_them(s):  # each up wiped the account: a long quest review replayed the quest every run
+        src = (HERE.parent / "track.sh").read_text()
+        fn = lambda name: f"{name}() {{" + src.split(f"\n{name}() {{")[1].split("\n}")[0] + "\n}"
+        line = lambda pre: next(l for l in src.splitlines() if l.startswith(pre))
+        root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, root); (root / "bin").mkdir(); (root / "st").mkdir()
+        # a fake docker: the server is ready, its characters go offline one per count, and every call is logged
+        (root / "bin/docker").write_text(f"""#!/bin/bash
+echo "$*" >> {root}/calls
+case $1 in inspect) echo true ;; logs) echo "Server ready in 1s" ;;
+  run) n=$(cat {root}/online); echo $n; [ $n = 0 ] || echo $((n - 1)) > {root}/online ;; esac
+""")
+        (root / "bin/docker").chmod(0o755); (root / "online").write_text("2")
+        script = "\n".join(["set -euo pipefail", f"slug=x; state={root}/st", line("account()"), line("mine="), fn("sql"), line("offline()"), fn("down"),
+                            "desktop_stop() { :; }", "down"])
+        r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={**os.environ, "PATH": f"{root}/bin:{os.environ['PATH']}"})
+        s.assertEqual(r.returncode, 0, r.stderr)
+        calls = (root / "calls").read_text().splitlines()
+        s.assertEqual([c.split()[0] for c in calls if c.startswith(("run", "rm"))], ["run", "run", "run", "rm"])   # removed only once none is online
+        wipe = line('  [ -n "${RESUME:-}" ] || rm -rf "$state/postgres"')
+        for env, kept in (("", False), ("RESUME=1", True)):
+            (root / "st/postgres").mkdir(exist_ok=True); (root / "st/postgres/PG_VERSION").write_text("14")
+            subprocess.run(["bash", "-c", f"set -euo pipefail; state={root}/st; {env}\n{wipe}"], check=True)
+            s.assertEqual((root / "st/postgres/PG_VERSION").exists(), kept)
+        s.assertIn('-v "$state/postgres:/app/.data/postgres"', src.split("\nup() {")[1].split("\n}")[0])
+
+
 class DesktopInstance(unittest.TestCase):
     """A fake Windows: each process is win/<pid>.jvm (its jps line) and win/<pid>.port (the port it listens on)."""
     def setUp(s):
@@ -220,8 +247,8 @@ class DesktopLogin(unittest.TestCase):
 
     def test_up_sets_members_while_its_characters_are_offline(s):  # the logout save wrote members back to false over an update made in game
         up = (HERE.parent / "track.sh").read_text().split("\nup() {")[1].split("\n}")[0]
-        s.assertLess(up.index('desktop_login.py" "$(cut -d: -f2 <<< "$c")" logout'), up.index("online_central_world_id is not null"))
-        s.assertLess(up.index("online_central_world_id is not null"), up.index("set members = true"))
+        s.assertLess(up.index('desktop_login.py" "$(cut -d: -f2 <<< "$c")" logout'), up.index("  offline\n"))
+        s.assertLess(up.index("  offline\n"), up.index("set members = true"))
         s.assertLess(up.index("set members = true"), up.rindex('desktop_login.py" "$(cut -d: -f2 <<< "${desktops[$i]}")"'))
         s.assertNotIn("::", (HERE / "desktop_login.py").read_text())
 
