@@ -25,10 +25,7 @@ import org.rsmod.api.player.protect.ProtectedAccessContextFactory
 import org.rsmod.api.player.protect.clearPendingAction
 import org.rsmod.api.player.vars.VarPlayerIntMapSetter
 import org.rsmod.api.registry.npc.NpcRegistry
-import org.rsmod.api.registry.zone.ZoneUpdateMap
 import org.rsmod.api.repo.npc.NpcRepository
-import org.rsmod.api.repo.world.WorldRepository
-import org.rsmod.content.quest.manager.QUEST_STAGE_MAP_ATTR
 import org.rsmod.coroutine.GameCoroutine
 import org.rsmod.events.EventBus
 import org.rsmod.game.MapClock
@@ -159,17 +156,15 @@ class ErnestTheChickenInteractionTest {
             worn = Inventory(checkNotNull(ServerCacheManager.getInventory("inv.worn".asRSCM())), arrayOfNulls(14))
         }
 
-        val script = ErnestTheChicken(WorldRepository(ZoneUpdateMap()), npcRepo, collision)
+        val script = ErnestTheChicken(npcRepo)
 
         init {
             for (x in 3104..3119 step 8) for (z in 3360..3375 step 8) {
                 collision.allocateIfAbsent(x, z, 2)
             }
             with(script) { ScriptContext(events, CheatCommandMap(), EngineQueueCache()).startup() }
-            player.attr.getOrPut(QUEST_STAGE_MAP_ATTR) { mutableMapOf() }[script.quest.key] = 1
-            VarPlayerIntMapSetter.set(player, "varp.haunted", 1)
+            VarPlayerIntMapSetter.set(player, "varp.haunted", 2)
             VarPlayerIntMapSetter.set(player, "varbit.ernesthandin_complete", if (partsReceived) 1 else 0)
-            ErnestProgress(script.quest).foundErnest.set(player, true)
         }
 
         fun fillInventory() {
@@ -236,8 +231,8 @@ class ErnestTheChickenInteractionTest {
         }
 
         fun assertPending() {
-            assertEquals(1, script.quest.getQuestStage(player))
-            assertEquals(1, player.vars["varp.haunted"])
+            assertEquals(2, script.quest.getQuestStage(player))
+            assertEquals(2, player.vars["varp.haunted"])
             assertEquals(1, player.vars["varbit.ernesthandin_complete"])
             assertEquals(0, player.vars["varp.qp"])
             assertEquals(0, player.vars["varbit.quests_completed_count"])

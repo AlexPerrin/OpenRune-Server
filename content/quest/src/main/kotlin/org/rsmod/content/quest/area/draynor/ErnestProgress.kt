@@ -9,10 +9,10 @@ import org.rsmod.game.entity.Player
 import org.rsmod.game.inv.InvObj
 
 internal class ErnestProgress(private val quest: Quest) {
-    val foundErnest = quest.attribute(name = "FOUND_ERNEST", default = false)
-
     private var Player.partsReceived by boolVarBit("varbit.ernesthandin_complete")
     private var Player.hauntedStage by intVarp("varp.haunted")
+
+    fun foundErnest(player: Player): Boolean = player.hauntedStage >= FoundErnestStage
 
     fun hasReceivedParts(player: Player): Boolean = player.partsReceived
 
@@ -20,7 +20,7 @@ internal class ErnestProgress(private val quest: Quest) {
 
     fun receiveParts(access: ProtectedAccess): Boolean {
         val player = access.player
-        if (!quest.isQuestInProgress(player) || !foundErnest.get(player)) {
+        if (!quest.isQuestInProgress(player) || !foundErnest(player)) {
             return false
         }
         if (player.partsReceived) {
@@ -43,22 +43,23 @@ internal class ErnestProgress(private val quest: Quest) {
         ).success
 
     suspend fun restoreErnest(access: ProtectedAccess, scene: suspend () -> Unit) {
-        if (quest.isQuestCompleted(access.player)) {
+        val player = access.player
+        if (!quest.isQuestInProgress(player) || !player.partsReceived) {
             return
         }
-        check(access.player.partsReceived)
+        val stage = player.hauntedStage
         try {
-            access.player.hauntedStage = quest.maxSteps
+            player.hauntedStage = quest.maxSteps
             scene()
         } finally {
-            if (!quest.completeQuest(access)) {
-                access.player.hauntedStage = quest.getQuestStage(access.player)
-            }
+            player.hauntedStage = stage
+            quest.completeQuest(access)
         }
     }
 
     companion object {
         const val CoinReward = 300
+        private const val FoundErnestStage = 2
         private val Parts = listOf("obj.rubber_tube", "obj.pressure_gauge", "obj.oil_can")
     }
 }

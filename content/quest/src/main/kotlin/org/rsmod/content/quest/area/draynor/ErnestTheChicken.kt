@@ -7,28 +7,20 @@ import dev.openrune.rscm.RSCMType
 import jakarta.inject.Inject
 import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.player.protect.ProtectedAccess
+import org.rsmod.api.player.subjectPronoun
 import org.rsmod.api.repo.npc.NpcRepository
-import org.rsmod.api.repo.world.WorldRepository
 import org.rsmod.api.script.onOpNpc1
 import org.rsmod.content.quest.manager.ItemRewardDisplay
-import org.rsmod.content.quest.manager.QuestProgressState
 import org.rsmod.content.quest.manager.QuestScript
 import org.rsmod.content.quest.manager.rewards
 import org.rsmod.game.entity.Npc
-import org.rsmod.game.entity.util.PathingEntityCommon
-import org.rsmod.game.proj.ProjAnim
 import org.rsmod.map.CoordGrid
 import org.rsmod.map.zone.ZoneKey
 import org.rsmod.plugin.scripts.ScriptContext
-import org.rsmod.routefinder.collision.CollisionFlagMap
 
 class ErnestTheChicken
 @Inject
-constructor(
-    private val worldRepo: WorldRepository,
-    private val npcRepo: NpcRepository,
-    private val collision: CollisionFlagMap,
-) :
+constructor(private val npcRepo: NpcRepository) :
     QuestScript(
         "quest_ernestthechicken",
         "varp.haunted",
@@ -36,6 +28,7 @@ constructor(
             item("obj.coins", ErnestProgress.CoinReward, label = "${ErnestProgress.CoinReward} Coins")
         },
         ItemRewardDisplay("obj.coins"),
+        questVarbit = "varp.haunted",
     ) {
 
     private val logger = InlineLogger()
@@ -56,10 +49,10 @@ constructor(
             )
 
             objective("I should speak to whoever lives in the manor.") {
-                attribute(progress.foundErnest, "I found Ernest. He is a chicken.").strike()
+                stageAtLeast(2, "I found Ernest. He is a chicken.", finalise = true).strike()
             }
 
-            if (progress.foundErnest.get(access.player) && !progress.hasReceivedParts(access.player)) {
+            if (progress.foundErnest(access.player) && !progress.hasReceivedParts(access.player)) {
                 line(
                     "<red>Professor Oddenstein</red> needs three parts for his machine before he can " +
                         "turn Ernest back."
@@ -100,23 +93,51 @@ constructor(
     private suspend fun ProtectedAccess.startVeronica(npc: Npc) = startDialogue(npc) { veronica() }
 
     private suspend fun ProtectedAccess.startOddenstein(npc: Npc) =
-        startDialogue(npc) { oddenstein(npc) }
+        startDialogue(npc) { oddenstein() }
 
     private suspend fun Dialogue.veronica() {
         if (quest.isQuestCompleted(player)) {
-            chatNpc(happy, "Thank you again for finding my Ernest.")
+            chatNpc(happy, "Thank you for rescuing Ernest.")
+            chatPlayer(quiz, "Where is he now?")
+            chatNpc(
+                happy,
+                "Oh he went off to talk to some green warty guy. I'm sure he'll be back soon.",
+            )
             return
         }
-        if (quest.questState(player) == QuestProgressState.IN_PROGRESS) {
-            chatNpc(sad, "Have you found my Ernest yet?")
+        if (quest.isQuestInProgress(player)) {
+            chatNpc(sad, "Have you found my sweetheart yet?")
+            if (!progress.foundErnest(player)) {
+                chatPlayer(sad, "No, not yet.")
+                return
+            }
+            chatPlayer(neutral, "Yes, he's a chicken.")
+            chatNpc(
+                angry,
+                "I know he's not exactly brave but I think you're being a bit harsh.",
+            )
+            chatPlayer(
+                neutral,
+                "No no, he's been turned into an actual chicken by a mad scientist.",
+            )
+            chatNpc(shocked, "Eeeeeek!")
+            chatNpc(sad, "My poor darling, why must these things happen to us.")
+            chatPlayer(neutral, "Well I'm doing my best to turn him back.")
+            chatNpc(sad, "Well be quick, I'm sure being a chicken can't be good for him.")
             return
         }
 
         chatNpc(sad, "Can you please help me? I'm in a terrible spot of trouble.")
-
-        val start = choice2("Yes.", true, "No.", false, title = "Start Ernest the Chicken?")
+        val start =
+            choice2(
+                "Aha, sounds like a quest. I'll help.",
+                true,
+                "No, I'm looking for something to kill.",
+                false,
+            )
         if (!start) {
-            chatPlayer(neutral, "Sorry, I'm too busy right now.")
+            chatPlayer(angry, "No, I'm looking for something to kill.")
+            chatNpc(shocked, "Oooh, you violent person you.")
             return
         }
 
@@ -134,77 +155,110 @@ constructor(
             "That was an hour ago. That house looks spooky, can you go and see if you can find " +
                 "him for me?",
         )
-        quest.advanceQuestStage(access)
         chatPlayer(neutral, "Ok, I'll see what I can do.")
         chatNpc(happy, "Thank you, thank you. I'm very grateful.")
+        quest.advanceQuestStage(access)
     }
 
-    private suspend fun Dialogue.oddenstein(npc: Npc) {
-        if (quest.isQuestCompleted(player)) {
-            afterQuest()
+    private suspend fun Dialogue.oddenstein() {
+        if (quest.isQuestInProgress(player) && progress.foundErnest(player)) {
+            if (progress.hasReceivedParts(player)) {
+                restore()
+                return
+            }
+            chatNpc(neutral, "Have you found anything yet?")
+            if (progress.hasAllParts(player)) handIn() else progressReport()
             return
         }
 
         chatNpc(neutral, "Be careful in here, there's lots of dangerous equipment.")
-
-        if (quest.questState(player) != QuestProgressState.IN_PROGRESS) {
-            return
+        val machine =
+            if (quest.isQuestCompleted(player)) "What does the portal machine do?"
+            else "What does this machine do?"
+        val option =
+            if (quest.isQuestInProgress(player)) {
+                choice3(
+                    "I'm looking for a guy called Ernest.",
+                    0,
+                    machine,
+                    1,
+                    "Is this your house?",
+                    2,
+                )
+            } else {
+                choice2(machine, 1, "Is this your house?", 2)
+            }
+        when (option) {
+            0 -> introduceErnest()
+            1 -> if (quest.isQuestCompleted(player)) portalMachine() else brokenMachine()
+            else -> {
+                chatPlayer(quiz, "Is this your house?")
+                chatNpc(
+                    neutral,
+                    "No, I'm just one of the tenants. It belongs to the count who lives in the " +
+                        "basement.",
+                )
+            }
         }
+    }
 
-        if (!progress.foundErnest.get(player)) {
-            introduceErnest()
-            return
-        }
+    private suspend fun Dialogue.brokenMachine() {
+        chatPlayer(quiz, "What does this machine do?")
+        chatNpc(
+            neutral,
+            "Nothing at the moment... It's broken. It's meant to be a transmutation machine.",
+        )
+        chatNpc(
+            neutral,
+            "It has also spent time as a time travel machine, and a dramatic lightning " +
+                "generator, and a thing for generating monsters.",
+        )
+    }
 
-        if (progress.hasReceivedParts(player) || progress.hasAllParts(player)) {
-            handIn(npc)
-            return
-        }
-
-        progressReport()
+    private suspend fun Dialogue.portalMachine() {
+        chatPlayer(quiz, "What does the portal machine do?")
+        chatNpc(
+            happy,
+            "Ah, an interesting question! I believe it should create a rift in the very fabric " +
+                "of space! Opening a portal to some, hitherto undiscovered plane that exists " +
+                "parallel to our own.",
+        )
+        chatPlayer(confused, "Huh?")
+        chatNpc(neutral, "It's a teleport machine.")
     }
 
     private suspend fun Dialogue.progressReport() {
-        val held = PARTS.filter { player.inv.count(it) > 0 }
-        chatNpc(neutral, "Have you found anything yet?")
-
-        when (held.size) {
-            0 -> {
-                chatPlayer(sad, "I'm afraid I don't have any of them yet!")
-                chatNpc(
-                    neutral,
-                    "I need a rubber tube, a pressure gauge and a can of oil. Then your friend " +
-                        "can stop being a chicken.",
-                )
+        val tube = player.inv.count(RubberTube) > 0
+        val gauge = player.inv.count(PressureGauge) > 0
+        val oil = player.inv.count(OilCan) > 0
+        val (held, needed) =
+            when {
+                tube && gauge -> "I've got the rubber tube and the pressure gauge." to "oil can"
+                tube && oil -> "I've got the oil can and the rubber tube." to "pressure gauge"
+                gauge && oil -> "I've got the oil can and the pressure gauge." to "rubber tube"
+                tube -> "I've only got the rubber tube so far." to "pressure gauge and oil can"
+                gauge -> "I've only got the pressure gauge so far." to "oil can and rubber tube"
+                oil -> "I've only got the oil can so far." to "pressure gauge and rubber tube"
+                else -> null to null
             }
-            1 -> {
-                val missing = PARTS.filterNot { it in held }
-                chatPlayer(neutral, "I've only got the ${partName(held[0])} so far.")
-                chatNpc(
-                    neutral,
-                    "It's a good start, but I'll need my ${partName(missing[0])} and " +
-                        "${partName(missing[1])} too.",
-                )
-                chatPlayer(neutral, "Ok, I'll go and look for them.")
-            }
-            2 -> {
-                val missing = PARTS.first { it !in held }
-                chatPlayer(
-                    neutral,
-                    "I've got the ${partName(held[0])} and the ${partName(held[1])}.",
-                )
-                chatNpc(neutral, "That's good, but I still need my ${partName(missing)}.")
-                chatPlayer(neutral, "Ok, I'll go and look for it.")
-            }
+        if (held == null) {
+            chatPlayer(sad, "I'm afraid I don't have any of them yet!")
+            chatNpc(
+                neutral,
+                "I need a rubber tube, a pressure gauge and a can of oil. Then your friend " +
+                    "can stop being a chicken.",
+            )
+            return
+        }
+        chatPlayer(neutral, held)
+        if (listOf(tube, gauge, oil).count { it } == 1) {
+            chatNpc(neutral, "It's a good start, but I'll need my $needed too.")
+            chatPlayer(neutral, "Ok, I'll go and look for them.")
+        } else {
+            chatNpc(neutral, "That's good, but I still need my $needed.")
+            chatPlayer(neutral, "Ok, I'll go and look for it.")
         }
     }
-
-    private fun partName(part: String): String =
-        when (part) {
-            RubberTube -> "rubber tube"
-            PressureGauge -> "pressure gauge"
-            else -> "oil can"
-        }
 
     private suspend fun Dialogue.introduceErnest() {
         chatPlayer(quiz, "I'm looking for a guy called Ernest.")
@@ -222,7 +276,25 @@ constructor(
             "It was originally going to be called a transmutation machine. But after testing " +
                 "pouletmorph seems more appropriate.",
         )
-        chatPlayer(angry, "Change him back this instant!")
+        val glad =
+            choice2(
+                "I'm glad Veronica didn't actually get engaged to a chicken.",
+                true,
+                "Change him back this instant!",
+                false,
+            )
+        if (glad) {
+            chatPlayer(
+                laugh,
+                "I'm glad Veronica didn't actually get engaged to a chicken.",
+            )
+            chatNpc(quiz, "Who's Veronica?")
+            chatPlayer(neutral, "Ernest's fiancee. She probably doesn't want to marry a chicken.")
+            chatNpc(happy, "Ooh I dunno. She could have free eggs for breakfast.")
+            chatPlayer(neutral, "I think you'd better change him back.")
+        } else {
+            chatPlayer(angry, "Change him back this instant!")
+        }
         chatNpc(sad, "Umm... It's not so easy...")
         chatNpc(
             sad,
@@ -239,94 +311,55 @@ constructor(
             "I'm missing the pressure gauge and a rubber tube. They've also taken my oil can, " +
                 "which I'm going to need to get this thing started again.",
         )
-        progress.foundErnest.set(player, true)
+        quest.advanceQuestStage(access)
     }
 
-    private suspend fun Dialogue.handIn(npc: Npc) {
-        if (!progress.hasReceivedParts(player)) {
-            chatPlayer(happy, "I have everything!")
-            chatNpc(happy, "Give 'em here then.")
-
-            if (!progress.receiveParts(access)) {
-                return
-            }
-
-            access.mes("You give a rubber tube, a pressure gauge, ")
-            access.mes("and a can of oil to the professor.")
-            chatNpc(neutral, "Let's get this fixed then.")
+    private suspend fun Dialogue.handIn() {
+        chatPlayer(happy, "I have everything!")
+        chatNpc(happy, "Give 'em here then.")
+        if (!progress.receiveParts(access)) {
+            return
         }
+        access.mes("You give the rubber tube, a pressure gauge, and a can of oil to the professor.")
+        chatNpc(neutral, "Let's get this fixed then.")
+        restore()
+    }
 
+    private suspend fun Dialogue.restore() {
         if (!progress.canReceiveReward(access)) {
             chatNpc(neutral, "Make some room for your reward, then speak to me again.")
             return
         }
 
-        PathingEntityCommon.telejump(npc, collision, OddensteinMachineTile)
-        npc.faceSquare(MachineCoord)
-        npc.anim(MachineSeq)
         access.mes("Oddenstein starts up the machine.")
         access.delay(2)
-
         access.mes("The machine hums and shakes.")
-        access.soundSynth(RumbleSound)
-        access.delay(3)
-
-        val chicken = findChicken()
-        access.spotanimMap(worldRepo, CastSpotanim, MachineCoord, height = MachineSpotanimHeight)
-        if (chicken != null) {
-            worldRepo.projAnim(
-                ProjAnim(
-                    spotanim = TravelSpotanim.asRSCM(RSCMType.SPOTANIM),
-                    startHeight = MachineSpotanimHeight,
-                    endHeight = 0,
-                    startTime = 15,
-                    endTime = 45,
-                    angle = 0,
-                    progress = 0,
-                    sourceIndex = 0,
-                    targetIndex = chicken.slotId + 1,
-                    startCoord = MachineCoord,
-                    endCoord = chicken.coords,
-                )
-            )
-            chicken.spotanim(ImpactSpotanim, delay = 45, height = 0)
-        }
-        access.soundSynth(StunSound, loops = 2)
         access.delay(2)
 
+        val chicken = findChicken()
+        val at = chicken?.coords ?: ChickenSpawn
+        chicken?.spotanim(Smokepuff)
+        access.soundSynth(TransformSound)
+        access.mes("The machine turns Ernest back into human form.")
+        access.delay(1)
+
         progress.restoreErnest(access) {
-            spawnHumanErnest(findChicken()?.coords ?: ChickenSpawn)
-            access.soundSynth(TransformSound)
+            spawnHumanErnest(at)
+            val thanks =
+                when (player.subjectPronoun()) {
+                    "He" -> "Thank you sir. "
+                    "She" -> "Thank you m'lady. "
+                    else -> "Thank you. "
+                }
             chatNpcSpecific(
                 "Ernest",
                 "npc.ernest",
                 happy,
-                "Thank you, sir. It was dreadfully irritating being a chicken. How can I ever " +
-                    "thank you?",
+                thanks + "It was dreadfully irritating being a chicken. How can I ever thank you?",
             )
             chatPlayer(happy, "Well a cash reward is always nice...")
             chatNpcSpecific("Ernest", "npc.ernest", happy, "Of course, of course.")
         }
-        if (!quest.isQuestCompleted(player)) {
-            chatNpc(neutral, "Make some room for your reward, then speak to me again.")
-        }
-    }
-
-    private suspend fun Dialogue.afterQuest() {
-        chatPlayer(quiz, "Is this your house?")
-        chatNpc(
-            neutral,
-            "No, I'm just one of the tenants. It belongs to the count who lives in the basement.",
-        )
-        chatPlayer(quiz, "What does the portal machine do?")
-        chatNpc(
-            happy,
-            "Ah, an interesting question! I believe it should create a rift in the very fabric " +
-                "of space! Opening a portal to some, hitherto undiscovered plane that exists " +
-                "parallel to our own.",
-        )
-        chatPlayer(quiz, "Huh?")
-        chatNpc(neutral, "It's a teleport machine.")
     }
 
     private fun findChicken(): Npc? =
@@ -349,18 +382,9 @@ constructor(
         private const val RubberTube = "obj.rubber_tube"
         private const val PressureGauge = "obj.pressure_gauge"
         private const val OilCan = "obj.oil_can"
-        private val PARTS = listOf(RubberTube, PressureGauge, OilCan)
 
-        private const val RumbleSound = "synth.swan_rumble"
-        private const val StunSound = "synth.stun_all"
         private const val TransformSound = "synth.chicken_into_human"
-
-        private const val MachineSeq = "seq.human_pickuptable"
-
-        private const val CastSpotanim = "spotanim.stun_casting"
-        private const val TravelSpotanim = "spotanim.stun_travel"
-        private const val ImpactSpotanim = "spotanim.stunned"
-        private const val MachineSpotanimHeight = 50
+        private const val Smokepuff = "spotanim.draynor_ernest_smokepuff"
 
         private const val ChickenNpc = "npc.ernest_multichicken"
 
@@ -371,7 +395,5 @@ constructor(
         private val ChickenSpawn = CoordGrid(3110, 3364, 2)
 
         private val MachineCoord = CoordGrid(3111, 3366, 2)
-
-        private val OddensteinMachineTile = CoordGrid(3111, 3367, 2)
     }
 }
