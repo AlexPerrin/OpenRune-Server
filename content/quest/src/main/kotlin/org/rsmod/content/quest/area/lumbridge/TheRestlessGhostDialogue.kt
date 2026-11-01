@@ -310,13 +310,16 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
 
         chatNpc(
             angry,
-            "Well, I can't go back and exorcise it. I vowed not to leave this place until I had " +
+            "Well, I can't go back and exorcise it. I vowed not to leave this place. Until I had " +
                 "done a full two years of prayer and meditation.",
         )
         chatNpc(neutral, "Tell you what I can do though; take this amulet.")
 
+        if (!giveAmulet()) {
+            return
+        }
         quest.setQuestStage(access, TheRestlessGhostStage.HasAmulet)
-        giveAmulet("Father Urhney hands you an amulet.")
+        mesbox("Father Urhney hands you an amulet.")
 
         chatNpc(neutral, "It is an Amulet of Ghostspeak.")
         chatNpc(
@@ -366,20 +369,28 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
             "How careless can you get? Those things aren't easy to come by you know! It's a good " +
                 "job I've got a spare.",
         )
-        giveAmulet("Father Urhney hands you an amulet of ghostspeak.")
+        if (!giveAmulet()) {
+            return
+        }
+        objbox(Amulet, "Father Urhney hands you an amulet of ghostspeak.")
         chatNpc(angry, "Be more careful this time.")
         chatPlayer(neutral, "Okay, I'll try to be.")
     }
 
-    private suspend fun Dialogue.giveAmulet(announcement: String) {
+    private fun Dialogue.giveAmulet(): Boolean {
         if (access.invAdd(access.inv, Amulet, 1).failure) {
             access.mes(constants.dm_take_invspace)
-            return
+            return false
         }
-        mesbox(announcement)
+        return true
     }
 
     private suspend fun Dialogue.ghost() {
+        if (quest.isQuestCompleted(player)) {
+            access.mes("The ghost doesn't seem interested in talking to you.")
+            return
+        }
+
         chatPlayer(neutral, "Hello ghost, how are you?")
 
         val wearingAmulet = player.worn[Wearpos.Front.slot]?.isType(Amulet) == true
@@ -388,26 +399,10 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
             return
         }
 
-        when {
-            quest.isQuestCompleted(player) -> {
-                chatNpcSpecific(
-                    GhostTitle,
-                    Ghost,
-                    happy,
-                    "Hello again, adventurer. I am doing much better now that my skull is back " +
-                        "where it belongs.",
-                )
-                chatNpcSpecific(
-                    GhostTitle,
-                    Ghost,
-                    happy,
-                    "Thank you again for helping me. I can finally rest in peace.",
-                )
-            }
-
-            quest.getQuestStage(player) >= TheRestlessGhostStage.GhostSpoken -> ghostSkullProgress()
-
-            else -> ghostFirstMeeting()
+        if (quest.getQuestStage(player) >= TheRestlessGhostStage.GhostSpoken) {
+            ghostSkullProgress()
+        } else {
+            ghostFirstMeeting()
         }
     }
 
@@ -536,7 +531,7 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
         chatNpc(
             happy,
             "Hurrah! Now I can stop being a ghost! You just need to put it in my coffin there, " +
-                "and I will be free!",
+                "then I'll be free!",
         )
     }
 
@@ -670,7 +665,6 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
         const val Aereck = "npc.father_aereck"
         const val Urhney = "npc.father_urhney"
         const val Ghost = "npc.ghostx"
-        const val GhostTitle = "Restless ghost"
 
         const val Amulet = "obj.amulet_of_ghostspeak"
         const val GhostSkull = "obj.ghostskull"

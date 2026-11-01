@@ -4,6 +4,7 @@ import dev.openrune.ServerCacheManager
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import org.rsmod.api.attr.AttributeKey
+import org.rsmod.api.config.constants
 import org.rsmod.api.npc.interact.AiPlayerInteractions
 import org.rsmod.api.npc.opPlayer2
 import org.rsmod.api.player.output.soundSynth
@@ -11,6 +12,7 @@ import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.player.vars.intVarBit
 import org.rsmod.api.repo.loc.LocRepository
 import org.rsmod.api.repo.npc.NpcRepository
+import org.rsmod.api.repo.obj.ObjRepository
 import org.rsmod.api.repo.world.WorldRepository
 import org.rsmod.api.script.onOpHeld1
 import org.rsmod.api.script.onOpHeld5
@@ -18,20 +20,25 @@ import org.rsmod.api.script.onOpLoc1
 import org.rsmod.api.script.onOpLoc2
 import org.rsmod.api.script.onOpLocU
 import org.rsmod.api.script.onOpNpcU
+import org.rsmod.api.script.onOpObj3
 import org.rsmod.api.script.onPlayerCoordsChanged
 import org.rsmod.api.script.onPlayerSoftTimer
 import org.rsmod.content.quest.manager.Quest
 import org.rsmod.game.entity.Npc
 import org.rsmod.game.entity.Player
+import org.rsmod.game.interact.InteractionPlayer
 import org.rsmod.game.loc.BoundLocInfo
+import org.rsmod.game.obj.Obj
 import org.rsmod.game.proj.ProjAnim
 import org.rsmod.map.CoordGrid
+import org.rsmod.map.zone.ZoneKey
 import org.rsmod.plugin.scripts.ScriptContext
 
 internal class TheRestlessGhostScenery(
     private val quest: Quest,
     private val locRepo: LocRepository,
     private val npcRepo: NpcRepository,
+    private val objRepo: ObjRepository,
     private val worldRepo: WorldRepository,
     private val cutscene: TheRestlessGhostCutscene,
     private val aiPlayerInteractions: AiPlayerInteractions,
@@ -53,7 +60,7 @@ internal class TheRestlessGhostScenery(
         onOpLoc1(OpenCoffin) { searchOpenCoffin(it.loc) }
         onOpLoc2(OpenCoffin) { closeCoffin(it.loc) }
 
-        onOpLocU(OpenCoffin, GhostSkull) { searchOpenCoffin(it.loc) }
+        onOpLocU(OpenCoffin, GhostSkull) { useSkullOnOpenCoffin(it.loc) }
         onOpLocU(ClosedCoffin, GhostSkull) { mesbox("Maybe I should open it first.") }
 
         onOpLoc1(Altar) { searchAltar(it.loc) }
@@ -62,6 +69,8 @@ internal class TheRestlessGhostScenery(
             checkNotNull(ServerCacheManager.getNpc(GhostNpc.asRSCM())),
             checkNotNull(ServerCacheManager.getItem(GhostSkull.asRSCM())),
         ) { offerSkullToGhost(it.npc) }
+
+        onOpObj3(checkNotNull(ServerCacheManager.getItem(GhostSkull.asRSCM()))) { takeSkull(it.obj) }
 
         onOpHeld1(GhostSkull) { inspectSkull() }
         onOpHeld5(GhostSkull) { dropSkull(it.slot) }
@@ -80,7 +89,7 @@ internal class TheRestlessGhostScenery(
 
         locRepo.change(coffin, OpenCoffin, CoffinOpenTicks)
 
-        if (quest.isQuestCompleted(player)) {
+        if (!player.ghostCanRise()) {
             return
         }
 
@@ -105,7 +114,7 @@ internal class TheRestlessGhostScenery(
         val tile = CoordGrid(savedTile)
         val player = this
 
-        if (quest.isQuestCompleted(player)) {
+        if (!ghostCanRise()) {
             return
         }
 
@@ -118,6 +127,11 @@ internal class TheRestlessGhostScenery(
         ghost.noneMode()
         ghost.anim(GhostAppearAnim)
         player.soundSynth(GhostAppearSound)
+    }
+
+    private fun Player.ghostCanRise(): Boolean {
+        val stage = quest.getQuestStage(this)
+        return stage >= TheRestlessGhostStage.HasAmulet && stage < TheRestlessGhostStage.Complete
     }
 
     private fun restoreScenerySkeleton(player: Player) {
@@ -141,17 +155,21 @@ internal class TheRestlessGhostScenery(
         arriveDelay()
         faceSquare(coffin.coords)
 
-        val stage = quest.getQuestStage(player)
-        val holdingSkull = inv.contains(GhostSkull)
-
-        when {
-            quest.isQuestCompleted(player) ->
-                mesbox("There's a nice and complete skeleton in here!")
-
-            holdingSkull && stage >= TheRestlessGhostStage.GhostSpoken -> returnSkull(coffin)
-
-            else -> mes("You search the coffin and find some human remains.")
+        if (quest.isQuestCompleted(player)) {
+            mesbox("There's a nice and complete skeleton in here!")
+        } else {
+            mesbox("There's a skeleton without a skull in here.")
         }
+    }
+
+    private suspend fun ProtectedAccess.useSkullOnOpenCoffin(coffin: BoundLocInfo) {
+        if (quest.getQuestStage(player) != TheRestlessGhostStage.SkullFound) {
+            searchOpenCoffin(coffin)
+            return
+        }
+        arriveDelay()
+        faceSquare(coffin.coords)
+        returnSkull(coffin)
     }
 
     private suspend fun ProtectedAccess.returnSkull(coffin: BoundLocInfo) {
@@ -182,32 +200,71 @@ internal class TheRestlessGhostScenery(
             return
         }
 
-        if (inv.contains(GhostSkull)) {
-            mesbox("You already have the Ghost's skull.")
+        if (quest.getQuestStage(player) < TheRestlessGhostStage.GhostSpoken) {
+            mesbox(ScarySkull)
             return
         }
 
-        if (inv.isFull()) {
-            mes("You don't have enough inventory space.")
+        if (hasSkull()) {
+            mesbox(AlreadyHaveSkull)
             return
         }
 
-        if (player.altarSkeletonRisen == 0) {
+        val skeletonTile = altar.coords.translateZ(SkeletonSpawnOffsetZ)
+        val busySkeleton = npcRepo.findAll(ZoneKey.from(skeletonTile), 1).firstOrNull {
+            it.isType(SkeletonNpc) && (it.interaction as? InteractionPlayer)?.target.let { target ->
+                target != null && target != player
+            }
+        }
+        if (busySkeleton != null) {
+            npcRepo.del(busySkeleton, Int.MAX_VALUE)
+        }
+        if (busySkeleton != null || player.altarSkeletonRisen == 0) {
             mes("The skeleton in the corner suddenly comes to life!")
-            wakeSkeleton(altar)
+            wakeSkeleton(skeletonTile)
             player.altarSkeletonRisen = 1
         }
 
         player.altarSkullTaken = 1
-        invAdd(inv, GhostSkull, 1)
+        if (invAdd(inv, GhostSkull, 1).failure) {
+            objRepo.add(GhostSkull, player.coords, FloorSkullTicks, player)
+        }
 
         if (quest.getQuestStage(player) == TheRestlessGhostStage.GhostSpoken) {
             quest.setQuestStage(this, TheRestlessGhostStage.SkullFound)
         }
     }
 
-    private fun ProtectedAccess.wakeSkeleton(altar: BoundLocInfo) {
-        val skeleton = Npc(SkeletonNpc, altar.coords.translateZ(SkeletonSpawnOffsetZ))
+    private fun ProtectedAccess.hasSkull(): Boolean =
+        inv.contains(GhostSkull) || bank.contains(GhostSkull)
+
+    internal suspend fun ProtectedAccess.takeSkull(obj: Obj) {
+        if (quest.getQuestStage(player) !in TheRestlessGhostStage.GhostSpoken until TheRestlessGhostStage.Complete) {
+            mesbox(ScarySkull)
+            return
+        }
+        if (hasSkull()) {
+            mesbox(AlreadyHaveSkull)
+            return
+        }
+        if (player.coords != obj.coords) {
+            delay(1)
+            anim(PlaceSkullAnim)
+        }
+        if (inv.isFull()) {
+            mes(constants.dm_take_invspace)
+            return
+        }
+        if (!objRepo.del(obj)) {
+            mes(constants.dm_take_taken)
+            return
+        }
+        soundSynth(TakeSound)
+        invAdd(inv, GhostSkull, 1)
+    }
+
+    private fun ProtectedAccess.wakeSkeleton(tile: CoordGrid) {
+        val skeleton = Npc(SkeletonNpc, tile)
         npcRepo.add(skeleton, SkeletonLifespanTicks)
         skeleton.anim(SkeletonRiseAnim)
         soundSynth(SkeletonWakeSound)
@@ -311,6 +368,11 @@ internal class TheRestlessGhostScenery(
         const val PlaceSkullSound = "synth.rg_place_skull"
         const val SkeletonWakeSound = "synth.rg_skeleton_awake"
         const val DestroySound = "synth.destroy_object"
+        const val TakeSound = "synth.pick2"
+
+        const val ScarySkull =
+            "That skull looks scary. I've got no reason to take it, I think I'll leave it alone."
+        const val AlreadyHaveSkull = "You already have the Ghost's skull."
 
         const val SoulSpotanim = "spotanim.restless_ghost_travel_spotanim"
         const val ApproachStartHeight = 163
@@ -321,7 +383,8 @@ internal class TheRestlessGhostScenery(
 
         const val GhostLifespanTicks = 100
         const val SkeletonLifespanTicks = 100
-        const val CoffinOpenTicks = 100
+        const val CoffinOpenTicks = 300
+        const val FloorSkullTicks = 200
 
         const val GhostSpawnTimer = "timer.restless_ghost_coffin_ghost"
         const val SkeletonAttackTimer = "timer.restless_skeleton_attack"

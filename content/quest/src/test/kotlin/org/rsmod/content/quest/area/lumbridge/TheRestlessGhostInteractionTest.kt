@@ -25,6 +25,7 @@ import org.rsmod.api.npc.interact.AiPlayerInteractions
 import org.rsmod.api.player.dialogue.align.TextAlignment
 import org.rsmod.api.player.events.PlayerTimerEvent
 import org.rsmod.api.player.events.interact.NpcEvents
+import org.rsmod.api.player.events.interact.ObjEvents
 import org.rsmod.api.player.events.interact.OpEvent
 import org.rsmod.api.player.hook.PlayerTeleportValidator
 import org.rsmod.api.player.input.ResumePauseButtonInput
@@ -40,11 +41,13 @@ import org.rsmod.api.registry.loc.LocRegistry
 import org.rsmod.api.registry.loc.LocRegistryNormal
 import org.rsmod.api.registry.loc.LocRegistryRegion
 import org.rsmod.api.registry.npc.NpcRegistry
+import org.rsmod.api.registry.obj.ObjRegistry
 import org.rsmod.api.registry.region.RegionRegistry
 import org.rsmod.api.registry.zone.ZonePlayerActivityBitSet
 import org.rsmod.api.registry.zone.ZoneUpdateMap
 import org.rsmod.api.repo.loc.LocRepository
 import org.rsmod.api.repo.npc.NpcRepository
+import org.rsmod.api.repo.obj.ObjRepository
 import org.rsmod.api.repo.region.RegionRepository
 import org.rsmod.api.repo.world.WorldRepository
 import org.rsmod.api.route.BoundValidator
@@ -74,6 +77,7 @@ import org.rsmod.game.loc.BoundLocInfo
 import org.rsmod.game.loc.LocEntity
 import org.rsmod.game.loc.LocInfo
 import org.rsmod.game.map.LocZoneStorage
+import org.rsmod.game.obj.Obj
 import org.rsmod.game.queue.EngineQueueCache
 import org.rsmod.game.region.RegionListLarge
 import org.rsmod.game.region.RegionListSmall
@@ -107,6 +111,20 @@ class TheRestlessGhostInteractionTest {
         f.talk("npc.father_urhney")
         f.finish(listOf(2, 1))
         assertEquals(1, f.player.inv.count("obj.amulet_of_ghostspeak"), f.output())
+        assertEquals(TheRestlessGhostStage.HasAmulet, f.quest.getQuestStage(f.player))
+    }
+
+    @Test fun `Urhney keeps the stage when the amulet does not fit`() {
+        val f = Fixture(TheRestlessGhostStage.Started)
+        f.fillInventory()
+        f.talk("npc.father_urhney")
+        f.finish(listOf(2, 1))
+        assertEquals(0, f.player.inv.count("obj.amulet_of_ghostspeak"))
+        assertEquals(TheRestlessGhostStage.Started, f.quest.getQuestStage(f.player))
+        f.player.inv[0] = null
+        f.talk("npc.father_urhney")
+        f.finish(listOf(2, 1))
+        assertEquals(1, f.player.inv.count("obj.amulet_of_ghostspeak"))
         assertEquals(TheRestlessGhostStage.HasAmulet, f.quest.getQuestStage(f.player))
     }
 
@@ -155,15 +173,47 @@ class TheRestlessGhostInteractionTest {
         assertEquals(1, f.player.vars["varbit.restless_ghost_skeleton_var"])
     }
 
-    @Test fun `a full inventory cannot consume the altar skull or wake the skeleton`() {
+    @Test fun `a full inventory puts the altar skull on the floor once`() {
         val f = Fixture(TheRestlessGhostStage.GhostSpoken)
-        for (slot in f.player.inv.objs.indices) f.player.inv[slot] = InvObj("obj.bucket_empty", 1)
+        f.fillInventory()
+        f.searchAltar()
+        f.finish()
+        assertEquals(0, f.player.inv.count("obj.ghostskull"))
+        assertEquals(1, f.groundSkulls())
+        assertEquals(TheRestlessGhostStage.SkullFound, f.quest.getQuestStage(f.player))
+        f.player.inv[0] = InvObj("obj.ghostskull", 1)
+        f.searchAltar()
+        f.finish()
+        assertEquals(1, f.groundSkulls())
+        assertEquals(1, f.player.inv.count("obj.ghostskull"))
+    }
+
+    @Test fun `the altar skull is left alone before the ghost explains it`() {
+        val f = Fixture(TheRestlessGhostStage.HasAmulet)
         f.searchAltar()
         f.finish()
         assertEquals(0, f.player.inv.count("obj.ghostskull"))
         assertEquals(0, f.player.vars["varbit.restless_ghost_altar_var"])
         assertEquals(0, f.npcs.count { it.isType("npc.skull_skeleton") })
-        assertTrue(f.output().contains("enough inventory space"))
+    }
+
+    @Test fun `a ground skull is taken once and never beside a held one`() {
+        val f = Fixture(TheRestlessGhostStage.SkullFound)
+        val skull = f.dropSkull()
+        f.player.inv[0] = InvObj("obj.ghostskull", 1)
+        f.takeSkull(skull)
+        assertEquals(1, f.groundSkulls())
+        assertEquals(1, f.player.inv.count("obj.ghostskull"))
+        f.player.inv[0] = null
+        f.fillInventory()
+        f.takeSkull(skull)
+        assertEquals(1, f.groundSkulls())
+        assertEquals(0, f.player.inv.count("obj.ghostskull"))
+        f.player.inv[0] = null
+        f.takeSkull(skull)
+        f.takeSkull(skull)
+        assertEquals(0, f.groundSkulls())
+        assertEquals(1, f.player.inv.count("obj.ghostskull"))
     }
 
     @Test fun `a lost skull can be retrieved again without waking another skeleton`() {
@@ -257,6 +307,7 @@ class TheRestlessGhostInteractionTest {
         val player = Player().apply {
             this.client = this@Fixture.client
             uuid = 456L
+            observerUUID = 456L
             slotId = 1
             assignUid()
             coords = ReleaseScene.ReturnTile
@@ -272,6 +323,9 @@ class TheRestlessGhostInteractionTest {
         private val collision = CollisionFlagMap()
         private lateinit var regions: RegionRegistry
         private lateinit var npcRepo: NpcRepository
+        private val clock = MapClock(100)
+        private val objRegistry = ObjRegistry(ZoneUpdateMap())
+        private val objRepo = ObjRepository(clock, objRegistry)
         private val context = ProtectedAccessContextFactory.empty().copy(
             getEventBus = { events }, getAlignment = { TextAlignment() },
             getCollision = { collision }, getNpcList = { npcs },
@@ -283,7 +337,6 @@ class TheRestlessGhostInteractionTest {
         private var result: Result<Unit>? = null
 
         init {
-            val clock = MapClock(100)
             val updates = ZoneUpdateMap()
             val storage = LocZoneStorage()
             val normal = LocRegistryNormal(updates, collision, storage)
@@ -297,7 +350,7 @@ class TheRestlessGhostInteractionTest {
             val scene = TheRestlessGhostCutscene(quest, RegionRepository(regions), npcRepo, locs, WorldRepository(updates))
             val scripts = ScriptContext(events, CheatCommandMap(), EngineQueueCache())
             with(scene) { scripts.register() }
-            with(TheRestlessGhostScenery(quest, locs, npcRepo, WorldRepository(updates), scene,
+            with(TheRestlessGhostScenery(quest, locs, npcRepo, objRepo, WorldRepository(updates), scene,
                 AiPlayerInteractions(events, PlayerList()))) { scripts.register() }
             with(TheRestlessGhostDialogue(quest)) { scripts.register() }
             with(QuestEvents()) { scripts.startup() }
@@ -318,6 +371,19 @@ class TheRestlessGhostInteractionTest {
             val npc = Npc(symbol, player.coords.translateX(1))
             npcRepo.add(npc, 100)
             dispatch(NpcEvents.Op1(npc))
+        }
+
+        fun fillInventory() {
+            for (slot in player.inv.objs.indices) player.inv[slot] = InvObj("obj.bucket_empty", 1)
+        }
+
+        fun dropSkull() = objRepo.add("obj.ghostskull", player.coords, 200, player)
+
+        fun groundSkulls() = objRegistry.findAll(player.coords).count { it.type == "obj.ghostskull".asRSCM() }
+
+        fun takeSkull(skull: Obj) {
+            dispatch(ObjEvents.Op3(skull))
+            finish()
         }
 
         fun timer(symbol: String) {

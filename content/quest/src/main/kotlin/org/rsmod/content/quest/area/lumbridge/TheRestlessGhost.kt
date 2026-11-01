@@ -5,6 +5,7 @@ import org.rsmod.api.npc.interact.AiPlayerInteractions
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.repo.loc.LocRepository
 import org.rsmod.api.repo.npc.NpcRepository
+import org.rsmod.api.repo.obj.ObjRepository
 import org.rsmod.api.repo.region.RegionRepository
 import org.rsmod.api.repo.world.WorldRepository
 import org.rsmod.content.quest.manager.ItemRewardDisplay
@@ -17,6 +18,7 @@ class TheRestlessGhost
 constructor(
     private val regionRepo: RegionRepository,
     private val npcRepo: NpcRepository,
+    private val objRepo: ObjRepository,
     private val locRepo: LocRepository,
     private val worldRepo: WorldRepository,
     private val aiPlayerInteractions: AiPlayerInteractions,
@@ -33,7 +35,9 @@ constructor(
     ) {
 
     private val cutscene = TheRestlessGhostCutscene(quest, regionRepo, npcRepo, locRepo, worldRepo)
-    private val scenery = TheRestlessGhostScenery(quest, locRepo, npcRepo, worldRepo, cutscene, aiPlayerInteractions)
+    private val scenery = TheRestlessGhostScenery(
+            quest, locRepo, npcRepo, objRepo, worldRepo, cutscene, aiPlayerInteractions
+        )
     private val dialogue = TheRestlessGhostDialogue(quest)
 
     override fun ScriptContext.init() {
