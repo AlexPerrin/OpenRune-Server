@@ -77,10 +77,11 @@ spotless() {  # the check row: spotlessCheck on every module T changes from orig
   tree; [ -d "$copy" ] || git -C "$repo" worktree add -q --detach "$copy" "$tc"; gradle_check spotless
 }
 gradle_check() {  # gradle_check test|spotless [MODULE...]: spotless's JGit cannot open a linked worktree: the container sees the copy's .git as a plain repo of T, its objects borrowed
-  local kind=$1; shift; git -C "$copy" reset -q --hard "$tc" && git -C "$copy" clean -fdq
-  local mods=("$@") f d g=$state/$kind.git out=${EVIDENCE:-$root/evidence/$slug}
-  if [ ${#mods[@]} = 0 ]; then
-    mapfile -t mods < <(projects $(git -C "$repo" diff --name-only "$(git -C "$repo" merge-base origin/main "$tc")" "$tc"))
+  local kind=$1; shift; git -C "$copy" reset -q --hard "$tc"; git -C "$copy" clean -fdq   # apart: a failed reset in an && list would not stop the verb
+  local mods=("$@") f d g=$state/$kind.git out=${EVIDENCE:-$root/evidence/$slug} mb changed
+  if [ ${#mods[@]} = 0 ]; then   # each read on its own line, so one that fails stops the verb instead of reading as no module touched
+    mb=$(git -C "$repo" merge-base origin/main "$tc"); changed=$(git -C "$repo" diff --name-only "$mb" "$tc")
+    mapfile -t mods < <(projects $changed)
   fi
   if [ ${#mods[@]} = 0 ]; then [ "$kind" = spotless ] && { echo "no module touched"; record true spotless <<< "no module touched"; return 0; }
     echo "no module touched: tools/track.sh test <slug> MODULE..."; return 2; fi
@@ -91,6 +92,7 @@ gradle_check() {  # gradle_check test|spotless [MODULE...]: spotless's JGit cann
   git -C "$copy" update-index -q --refresh || true; cp "$(git -C "$copy" rev-parse --absolute-git-dir)/index" "$g/index"
   echo "gitdir: $g" > "$state/$kind.gitfile"; mkdir -p "$out"
   for d in "${mods[@]}"; do rm -rf "$copy/$(projdir "$d")/build/test-results/test"; done   # the report is this run's
+  docker run --rm -v "gradle-$slug:/gradle" -v or-dl:/dl eclipse-temurin:21 chown 1000:1000 /gradle /dl   # creates or reuses the slug's volumes: one docker makes is root's, the run is 1000 (spotless runs on a slug never built)
   central; docker run --rm --name "$kind-$slug" --cpus=4 --memory=5g -u 1000:1000 -e HOME=/gradle/home -e GRADLE_USER_HOME=/gradle -e CDIR="$cdir" \
     -v "gradle-$slug:/gradle" -v or-dl:/dl "${cvols[@]}" -v "$repo/.git:$repo/.git:ro" -v "$g:$g:ro" -v "$copy:$copy" -v "$state/$kind.gitfile:$copy/.git:ro" -w "$copy" \
     eclipse-temurin:21 bash -c 'mkdir -p ~/.openrune/caches && cp -an /dl/. ~/.openrune/caches/ 2>/dev/null || true

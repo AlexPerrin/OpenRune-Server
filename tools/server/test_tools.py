@@ -519,6 +519,7 @@ class TestVerb(Repo):
         root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, root); (root / "bin").mkdir(); (root / "st").mkdir()
         # a fake docker: the container's view of the copy's git (as spotless reads it), the gradle tasks, a test report
         (root / "bin/docker").write_text(f"""#!/bin/bash
+case " $* " in *" chown "*) exit 0 ;; esac
 for a in "$@"; do case $a in *:{copy}/.git:ro) gd=$(sed 's/^gitdir: //' "${{a%%:*}}") ;; esac; done
 git --git-dir="$gd" rev-parse HEAD origin/main > {root}/git; git --git-dir="$gd" status --porcelain >> {root}/git
 while [ "$1" != _ ]; do shift; done; shift; echo "$@" > {root}/tasks
@@ -549,8 +550,11 @@ mkdir -p {copy}/mod/build/test-results/test; echo '<testsuite name="ATest" tests
         tc = s.commit("feat: touch B")
         copy = Path(s.repo) / ".worktrees/s1-build"
         root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, root); (root / "bin").mkdir(); (root / "st").mkdir()
-        # a fake gradle in docker: spotlessCheck of a module whose file holds the double space fails, as the ratchet does on a touched file
+        # a fake gradle in docker: spotlessCheck of a module whose file holds the double space fails, as the ratchet does on a touched file;
+        # the slug was never built: its volume is docker's new root-owned one until the verb chowns it to the run's user
         (root / "bin/docker").write_text(f"""#!/bin/bash
+case " $* " in *" -v gradle-s1:/gradle "*" chown 1000:1000 /gradle "*) touch {root}/owned; exit 0 ;; esac
+[ -e {root}/owned ] || {{ echo "/gradle: Permission denied"; exit 1; }}
 while [ "$1" != _ ]; do shift; done; shift; echo "$@" > {root}/tasks
 for t; do m=${{t#:}}; m=${{m%:spotlessCheck}}; ! grep -rq 'fun  ' {copy}/$m/src 2>/dev/null || {{ echo "> Task :$m:spotlessCheck FAILED: format violations"; exit 1; }}; done
 """)
@@ -567,6 +571,9 @@ for t; do m=${{t#:}}; m=${{m%:spotlessCheck}}; ! grep -rq 'fun  ' {copy}/$m/src 
         s.assertEqual((root / "tasks").read_text().split(), [":mod:spotlessCheck"])   # no test task, only the touched module
         s.assertIn("violations", (root / "evidence/s1/spotless.log").read_text())
         s.assertFalse(json.loads((root / "st/spotless.json").read_text())["ok"])
+        tree = git(s.repo, "rev-parse", f"{tc}^{{tree}}")   # a tree for TCOMMIT (as a gate's T once was): the row fails, never "no module touched"
+        r = subprocess.run(["bash", "-c", script.replace(tc, tree)], capture_output=True, text=True, env={**os.environ, "EVIDENCE": "", "PATH": f"{root}/bin:{os.environ['PATH']}"})
+        s.assertNotEqual(r.returncode, 0); s.assertNotIn("no module touched", r.stdout)
         s.write("mod/src/main/kotlin/B.kt", "fun b() {}\nfun c() {}\n"); tc2 = s.commit("fix: the lint"); script = script.replace(tc, tc2)
         r = run()
         s.assertEqual(r.returncode, 0, r.stderr + r.stdout)
