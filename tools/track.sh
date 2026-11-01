@@ -19,8 +19,9 @@
 #   test [MODULE...]  build, then each module's tests and spotlessCheck on the build copy (no module: those holding a file
 #                     the change's tree changes from origin/main); log evidence/<slug>/test.log, result state/<slug>/test.json
 #   gate TCOMMIT      every check: and gate: row of the contract from the build copy (`hd rows`)
-#   gate-ci           fork CI and Formatting green on gate/<slug> at TCOMMIT (blocks until both conclude); with CENTRAL at a child
-#                     of TCOMMIT whose workflows build that Central in, as build does (the change's head unchanged)
+#   gate-ci           fork CI and Formatting green on gate/<slug> (blocks until both conclude) at a child of TCOMMIT whose
+#                     workflows first move the runner's ephemeral ports above the game port 43594 (an outgoing socket on it
+#                     fails the boot's bind), and with CENTRAL build that Central in, as build does (the change's head unchanged)
 #   ship TCOMMIT      the integration tree: build, the deploy image with the live key, boot check, deploy, or roll back
 #   measure GOAL      the content inventory's share of rows whose unit is in PASSES
 #   log <slug> PATTERN  the lines of the change's server container matching PATTERN (slug `live`: the live server)
@@ -265,21 +266,26 @@ gate() {
   tc=$arg; build; git -C "$copy" reset -q --hard "$tc" && git -C "$copy" clean -fdq
   if out=$(HD_ROOT=$root python3 "$root/hd.py" rows "$slug" "$tc" "$copy" 2>&1); then record true gate <<< "$out"; else record false gate <<< "$out"; fi
 }
-gate_sha() {  # TCOMMIT, or with CENTRAL a child of it holding that Central tree at .central/ and a workflow step building it in, as build does
-  set -e; [ -n "${CENTRAL:-}" ] || { echo "$TCOMMIT"; return; }   # set -e: a command substitution does not inherit it
-  IFS=: read -r cpath ccommit <<< "$CENTRAL"; git -C "$repo" fetch -q "$cpath" "$ccommit"
-  idx=$(git -C "$repo" rev-parse --git-path gate-index); rm -f "$idx"
-  GIT_INDEX_FILE=$idx git -C "$repo" read-tree "$TCOMMIT"; GIT_INDEX_FILE=$idx git -C "$repo" read-tree --prefix=.central/ "$ccommit"
-  GIT_INDEX_FILE=$idx git -C "$repo" update-index --add --cacheinfo "100644,$(git -C "$repo" hash-object -w "$self/server/central.init.gradle"),.central.init.gradle"
-  step='      - name: Central of the gate tree (tools/track.sh gate-ci)
+gate_sha() {  # a child of TCOMMIT whose workflows move the ephemeral ports off the game port, and with CENTRAL hold that Central tree at .central/ built in
+  set -e   # a command substitution does not inherit it
+  idx=$(git -C "$repo" rev-parse --git-path gate-index); rm -f "$idx"; GIT_INDEX_FILE=$idx git -C "$repo" read-tree "$TCOMMIT"
+  step='      - name: Ephemeral ports above the game port (tools/track.sh gate-ci)
+        run: sysctl net.ipv4.ip_local_port_range; sudo sysctl -w net.ipv4.ip_local_port_range="49152 65535"'
+  if [ -n "${CENTRAL:-}" ]; then
+    IFS=: read -r cpath ccommit <<< "$CENTRAL"; git -C "$repo" fetch -q "$cpath" "$ccommit"
+    GIT_INDEX_FILE=$idx git -C "$repo" read-tree --prefix=.central/ "$ccommit"
+    GIT_INDEX_FILE=$idx git -C "$repo" update-index --add --cacheinfo "100644,$(git -C "$repo" hash-object -w "$self/server/central.init.gradle"),.central.init.gradle"
+    step="$step"'
+      - name: Central of the gate tree (tools/track.sh gate-ci)
         run: |
           mv .central "$RUNNER_TEMP/central"; echo "CDIR=$RUNNER_TEMP/central" >> "$GITHUB_ENV"
           mkdir -p "${GRADLE_USER_HOME:-$HOME/.gradle}/init.d"; mv .central.init.gradle "${GRADLE_USER_HOME:-$HOME/.gradle}/init.d/central.gradle"'
+  fi
   for f in ci format; do f=.github/workflows/$f.yml
     y=$(git -C "$repo" show "$TCOMMIT:$f" | awk -v step="$step" '{print} /uses: gradle\/actions\/setup-gradle@/{print step; n++} END{exit n!=1}') || { echo "$f: no single setup-gradle step to follow" >&2; return 1; }
     GIT_INDEX_FILE=$idx git -C "$repo" update-index --cacheinfo "100644,$(printf '%s\n' "$y" | git -C "$repo" hash-object -w --stdin),$f"
   done
-  git -C "$repo" commit-tree "$(GIT_INDEX_FILE=$idx git -C "$repo" write-tree)" -p "$TCOMMIT" -m "gate: $TCOMMIT with Central $ccommit"
+  git -C "$repo" commit-tree "$(GIT_INDEX_FILE=$idx git -C "$repo" write-tree)" -p "$TCOMMIT" -m "gate: $TCOMMIT${CENTRAL:+ with Central ${ccommit:-}}"
 }
 gate_ci() {  # pushes T (gate_sha) to gate/<slug>; a run of each workflow at that sha concludes green, or the row fails
   sha=$(gate_sha); git -C "$repo" push -q --force fork "$sha:refs/heads/gate/$slug"

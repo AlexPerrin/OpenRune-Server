@@ -563,20 +563,27 @@ class Snapshot(Repo):
 
 
 class GateCi(Repo):
-    def test_a_row_without_a_slug_pushes_gate_of_the_env_slug(s):
+    WF = "jobs:\n  b:\n    steps:\n      - uses: actions/checkout@v7\n      - name: Set up Gradle\n        uses: gradle/actions/setup-gradle@v6\n      - run: ./gradlew test\n"
+
+    def test_a_row_without_a_slug_pushes_gate_of_the_env_slug(s):  # its CI moves the runner's ephemeral ports above 43594 before gradle: run 41312919759's boot bind failed
+        for f in ("ci", "format"): s.write(f".github/workflows/{f}.yml", s.WF)
+        t = s.commit("ci")
         fork = tempfile.mkdtemp(); git(fork, "init", "-q", "--bare"); git(s.repo, "remote", "add", "fork", fork)
         bin = Path(tempfile.mkdtemp()); (bin / "gh").write_text("#!/bin/sh\necho success/completed\n"); (bin / "gh").chmod(0o755)
         root = tempfile.mkdtemp(); change(root, "s1")
         r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "gate-ci"], capture_output=True, text=True,
-                           env={**os.environ, **s.env, "HD_ROOT": root, "TCOMMIT": s.base, "PATH": f"{bin}:{os.environ['PATH']}"})
+                           env={**os.environ, **s.env, "HD_ROOT": root, "TCOMMIT": t, "PATH": f"{bin}:{os.environ['PATH']}"})
         s.assertEqual(r.returncode, 0, r.stderr)
-        s.assertEqual(git(fork, "rev-parse", "refs/heads/gate/s1"), s.base)
+        g = git(fork, "rev-parse", "refs/heads/gate/s1"); s.assertEqual(git(fork, "rev-parse", f"{g}^"), t)
+        s.assertEqual(git(fork, "diff", "--name-only", t, g).split(), [".github/workflows/ci.yml", ".github/workflows/format.yml"])
+        for f in ("ci", "format"):
+            y = git(fork, "show", f"{g}:.github/workflows/{f}.yml")
+            s.assertLess(y.index('sudo sysctl -w net.ipv4.ip_local_port_range="49152 65535"'), y.index("./gradlew test"), f)
         s.assertTrue((Path(root) / "state/s1").is_dir())
         for d in (fork, bin, root): shutil.rmtree(d)
 
     def test_with_central_ci_runs_a_child_of_t_that_builds_that_central_in(s):  # server-token-auth's CI resolved Central 2.0.3 from the network: unpublished
-        wf = "jobs:\n  b:\n    steps:\n      - uses: actions/checkout@v7\n      - name: Set up Gradle\n        uses: gradle/actions/setup-gradle@v6\n      - run: ./gradlew test\n"
-        for f in ("ci", "format"): s.write(f".github/workflows/{f}.yml", wf)
+        for f in ("ci", "format"): s.write(f".github/workflows/{f}.yml", s.WF)
         t = s.commit("ci")
         central = tempfile.mkdtemp(); git(central, "init", "-q"); (Path(central) / "settings.gradle.kts").write_text("// central\n")
         git(central, "add", "."); git(central, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "c"); c = git(central, "rev-parse", "HEAD")
