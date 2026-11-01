@@ -121,7 +121,7 @@ case $1 in inspect) echo true ;; logs) echo "Server ready in 1s" ;;
         (root / "bin/docker").chmod(0o755); (root / "online").write_text("2")
         script = "\n".join(["set -euo pipefail", f"slug=x; state={root}/st", line("account()"), line("mine="), fn("sql"), line("offline()"), fn("down"),
                             "desktop_stop() { :; }", "down"])
-        r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={**os.environ, "PATH": f"{root}/bin:{os.environ['PATH']}"})
+        r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={**os.environ, "EVIDENCE": "", "PATH": f"{root}/bin:{os.environ['PATH']}"})
         s.assertEqual(r.returncode, 0, r.stderr)
         calls = (root / "calls").read_text().splitlines()
         s.assertEqual([c.split()[0] for c in calls if c.startswith(("run", "rm"))], ["run", "run", "run", "rm"])   # removed only once none is online
@@ -352,14 +352,14 @@ mkdir -p {copy}/mod/build/test-results/test; echo '<testsuite name="ATest" tests
         line = lambda pre: next(l for l in src.splitlines() if l.startswith(pre))
         script = "\n".join(["set -euo pipefail", f"slug=s1; repo={s.repo}; copy={copy}; state={root}/st; root={root}; T=t1; tc={tc}",
                             line("record()"), "build() { :; }", fn("tests"), "tests"])
-        r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={**os.environ, "PATH": f"{root}/bin:{os.environ['PATH']}"})
+        r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={**os.environ, "EVIDENCE": "", "PATH": f"{root}/bin:{os.environ['PATH']}"})
         s.assertEqual(r.returncode, 0, r.stderr + r.stdout)
         s.assertEqual((root / "tasks").read_text().split(), [":mod:test", ":mod:spotlessCheck"])
         s.assertEqual((root / "git").read_text().split(), [tc, git(s.repo, "rev-parse", "origin/main")])
         s.assertIn('<testsuite name="ATest" tests="3"', (root / "evidence/s1/test.log").read_text())
         s.assertTrue(json.loads((root / "st/test.json").read_text())["ok"])
         (copy / "other/build/test-results/test").mkdir(parents=True); (copy / "other/build/test-results/test/old.xml").write_text('<testsuite name="Old" tests="1" skipped="0" failures="1" errors="0">')
-        r = subprocess.run(["bash", "-c", script + " :other"], capture_output=True, text=True, env={**os.environ, "PATH": f"{root}/bin:{os.environ['PATH']}"})
+        r = subprocess.run(["bash", "-c", script + " :other"], capture_output=True, text=True, env={**os.environ, "EVIDENCE": "", "PATH": f"{root}/bin:{os.environ['PATH']}"})
         s.assertEqual(r.returncode, 0, r.stderr); s.assertEqual((root / "tasks").read_text().split(), [":other:test", ":other:spotlessCheck"])
         s.assertNotIn("Old", (root / "evidence/s1/test.log").read_text())   # a report this run did not write is never read
 
