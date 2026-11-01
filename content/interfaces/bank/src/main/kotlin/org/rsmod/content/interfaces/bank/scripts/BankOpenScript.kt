@@ -69,6 +69,7 @@ constructor(
         }
 
         startInvTransmit(bank)
+        startInvTransmit(invMap.getOrPut("inv.looting_bag"))
     }
 
     private fun Player.onBankClose() {
