@@ -14,7 +14,7 @@
 #                     ones (--exp -5), another account's, and forged ones (another key DIR)
 #   restart           restarts server-<slug>, its game.yml and database kept, and logs up's desktops in again
 #   down              stops the desktops, waits until the server has saved and dropped their characters, removes the containers (token-<slug> too)
-#   ship TCOMMIT      the integration tree: build, the deploy image with the live key, boot check, deploy, or roll back
+#   ship TCOMMIT      the integration tree: build, the deploy image with the live key and the issuer's secret, boot check, deploy, or roll back
 #   measure GOAL      the content inventory's share of rows whose unit is in PASSES
 #   log <slug> PATTERN  the lines of the change's server container matching PATTERN (slug `live`: the live server)
 #   recordings <slug> REGEX  the RSProx transcripts holding a packet type or text (any case: CLANSETTINGS finds clansettings_delta)
@@ -192,9 +192,14 @@ down() {
 ship() {  # the integration tree → the live test server
   arg=${arg:-$TCOMMIT}; "$self/gate/gate.sh" build integration "$arg"; T=${T:-$(git -C "$repo" rev-parse "$arg^{tree}")}
   slug=integration; state=$root/state/live; mkdir -p "$state"
+  # the issuer (compose's ISSUER_DIR): its secret in the image's game.yml; the APK's sign-in and tokens for the tester account it has always played
+  export ISSUER_DIR=$state/token; { docker run --rm --entrypoint cat "or:$T" /app/game.yml; echo; python3 "$self/server/issuer.py" key "$ISSUER_DIR"; } > "$state/game.yml"
+  [ -s "$ISSUER_DIR/account" ] || echo tester > "$ISSUER_DIR/account"
+  sed -E "s#^param=(11|20|22|28)=.*#param=\1=http://{{WORLD_HOST}}:${OPENRUNE_ISSUER_PORT:-8083}/#" "$self/server/jav_config.ws.template" > "$ISSUER_DIR/jav_config.ws.template"
   cat > "$state/Dockerfile" <<EOF
 FROM or:$T
 COPY --from=$live_image --chown=1000:1000 /app/.data/game.key /app/.data/client.key /app/.data/
+COPY --chown=1000:1000 game.yml /app/game.yml
 EOF
   docker build -q -f "$state/Dockerfile" -t "osrs-openrune:$T" "$state" >/dev/null
   a=$(docker run --rm --entrypoint sha256sum "$live_image" /app/.data/client.key | cut -c1-16); b=$(docker run --rm --entrypoint sha256sum "osrs-openrune:$T" /app/.data/client.key | cut -c1-16)
@@ -205,7 +210,7 @@ EOF
   prev=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("tree","none"))' "$state/tree.json" 2>/dev/null || echo none)
   docker tag "$live_image" "osrs-openrune:rollback-${prev:0:12}"; docker tag "osrs-openrune:$T" "$live_image"
   since=$(date -u +%FT%TZ)
-  (cd "$compose_dir" && docker compose --env-file switch.env up -d --no-deps openrune http http-desktop) >/dev/null
+  (cd "$compose_dir" && docker compose --env-file switch.env up -d --no-deps openrune http http-desktop issuer) >/dev/null
   if ready osrs-openrune "$since"; then
     python3 -c 'import json,sys;print(json.dumps({"tree":sys.argv[1],"commit":sys.argv[2],"heads":sys.argv[3].split(),"names":sys.argv[4].split(),"rollback":sys.argv[5]}))' \
       "$T" "$arg" "${HEADS:-}" "${NAMES:-}" "rollback-${prev:0:12}" | atomic "$state/tree.json"; echo "live: $T"

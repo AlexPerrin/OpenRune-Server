@@ -857,6 +857,22 @@ class TokenLogin(unittest.TestCase):  # a test desktop's token login (auth type 
         s.assertIn('"token-$slug"', down)
         s.assertIn('"-Dosrstest.token=${tok:-false}"', sh); s.assertIn("JX_SESSION_ID:JX_CHARACTER_ID:JX_DISPLAY_NAME", sh)
 
+    def test_live_takes_the_apks_tokens_from_the_issuer_whose_secret_its_game_yml_holds(s):  # the sidecar's LOCAL_AUTH tokens were unsigned
+        import javcheck
+        compose = (HERE / "docker-compose.yml").read_text(); ship = SRC.split("\nship() {")[1].split("\n}")[0]
+        s.assertNotIn('LOCAL_AUTH: "true"', compose); s.assertIn('"${ISSUER_DIR}/jav_config.ws.template:/app/protocol/jav_config.ws.template:ro"', compose)
+        s.assertIn('"${ISSUER_DIR}:/t:ro"', compose); s.assertIn("command: [python3, /issuer.py, serve, /t]", compose)
+        s.assertIn("up -d --no-deps openrune http http-desktop issuer", ship); s.assertIn("COPY --chown=1000:1000 game.yml /app/game.yml", ship)
+        s.assertIn('python3 "$self/server/issuer.py" key "$ISSUER_DIR"; } > "$state/game.yml"', ship)
+        d = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, d)
+        line = next(l for l in ship.splitlines() if "param=(11|20|22|28)" in l)
+        subprocess.run(["bash", "-c", line], check=True, env={**os.environ, "self": str(HERE.parent), "ISSUER_DIR": str(d)})
+        t = (d / "jav_config.ws.template").read_text(encoding="utf-8"); orig = (HERE / "jav_config.ws.template").read_text(encoding="utf-8")
+        params = dict(l[6:].split("=", 1) for l in t.splitlines() if l.startswith("param="))
+        s.assertEqual({k: params[k] for k in ("11", "20", "22", "28")}, dict.fromkeys(("11", "20", "22", "28"), "http://{{WORLD_HOST}}:8083/"))
+        s.assertEqual(len(t.splitlines()), len(orig.splitlines())); s.assertEqual(params["17"], "{{HTTP_BASE}}/slr.ws?order=LPWM")
+        s.assertEqual(javcheck.foreign(t.replace("{{HTTP_BASE}}", "http://10.0.2.2:8080").replace("{{WORLD_HOST}}", "10.0.2.2")), [])
+
     def test_the_launcher_refuses_a_jagex_access_or_refresh_token_in_every_mode(s):
         src = (HERE / "OsrsTestLauncher.java").read_text()
         s.assertIn('"JX_ACCESS_TOKEN", "JX_REFRESH_TOKEN"', src)
