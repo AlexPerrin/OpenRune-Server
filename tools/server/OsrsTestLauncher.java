@@ -9,7 +9,8 @@
 // moves this instance's ports up by n: RSProx serves jav_config on 43600+n and proxies on proxy.port.min (43701)+n.
 // -Dosrstest.token=true: a token login; the client inherits JX_SESSION_ID, JX_CHARACTER_ID and JX_DISPLAY_NAME
 // (set by track.sh) and fetches its token from the local issuer jav_config param 11 names. A Jagex access or
-// refresh token is refused in every mode.
+// refresh token is refused in every mode. OPENRUNE_ENDPOINT (set by track.sh, http://127.0.0.1:<port>) is our server's HTTP
+// front: the target's jav_config must be its jav_config.ws, and that jav_config names every other endpoint.
 
 import io.netty.buffer.ByteBufAllocator;
 import java.util.List;
@@ -26,7 +27,6 @@ import net.rsprox.shared.property.RootProperty;
 public final class OsrsTestLauncher
 {
 	static final String TARGET = System.getProperty("osrstest.target", "OpenRune Test");
-	static final String JAV_CONFIG_PREFIX = "http://127.0.0.1:";
 
 	static void log(String s)
 	{
@@ -64,6 +64,11 @@ public final class OsrsTestLauncher
 		if (System.getenv("RSPS_JAVCONFIG_URL") != null || System.getenv("RSPS_RSA") != null)
 		{
 			die("RSPS_* overrides are set");
+		}
+		String endpoint = System.getenv("OPENRUNE_ENDPOINT");
+		if (endpoint == null || !endpoint.matches("http://(127\\.0\\.0\\.1|localhost):[0-9]+"))
+		{
+			die("OPENRUNE_ENDPOINT is not a local http://127.0.0.1:<port>: " + endpoint);
 		}
 		boolean token = Boolean.getBoolean("osrstest.token");
 		for (String v : new String[]{"JX_ACCESS_TOKEN", "JX_REFRESH_TOKEN", "JX_SESSION_ID", "JX_CHARACTER_ID", "JX_DISPLAY_NAME"})
@@ -111,9 +116,9 @@ public final class OsrsTestLauncher
 			die("no proxy target named " + TARGET + " in ~/.rsprox/proxy-targets.yaml");
 		}
 		ProxyTargetConfig cfg = targets.get(index);
-		if (cfg.getId() == 0 || !cfg.getJavConfigUrl().startsWith(JAV_CONFIG_PREFIX) || cfg.getModulus() == null)
+		if (cfg.getId() == 0 || !cfg.getJavConfigUrl().equals(endpoint + "/jav_config.ws") || cfg.getModulus() == null)
 		{
-			die("target " + TARGET + " is not a local target with its own modulus: " + cfg);
+			die("target " + TARGET + " is not OPENRUNE_ENDPOINT's jav_config with its own modulus: " + cfg);
 		}
 		service.setSelectedProxyTarget(index);
 		if (service.getSelectedProxyTarget() != index)

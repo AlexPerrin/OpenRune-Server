@@ -235,6 +235,17 @@ class DesktopInstance(unittest.TestCase):
         src = (HERE / "OsrsTestLauncher.java").read_text()
         s.assertIn("catch (Throwable e)", src); s.assertIn('die("launcher failed: " + e)', src)   # the launcher exits on any start exception
 
+    def test_the_desktop_takes_jav_config_from_openrune_endpoint_alone(s):  # the user's word: one variable points every Jagex endpoint at our server
+        java = s.t / "desk/jdk/bin/java.exe"
+        java.write_text(java.read_text().replace("exec sleep 30", f'echo "$OPENRUNE_ENDPOINT $WSLENV" > {s.t}/env; exec sleep 30'))
+        p = s.sh("a", "desktop_start"); p.communicate(timeout=60)
+        s.assertEqual(p.returncode, 0)
+        ep, wslenv = (s.t / "env").read_text().split()
+        s.assertEqual(ep, "http://127.0.0.1:1"); s.assertIn("OPENRUNE_ENDPOINT", wslenv.split(":"))
+        s.assertIn(f"  jav_config_url: {ep}/jav_config.ws\n", (s.t / "desk/run/1/home/.rsprox/proxy-targets.yaml").read_text())
+        src = (HERE / "OsrsTestLauncher.java").read_text()
+        s.assertIn('System.getenv("OPENRUNE_ENDPOINT")', src); s.assertIn('getJavConfigUrl().equals(endpoint + "/jav_config.ws")', src)
+
     def test_up_records_each_desktop_before_its_login(s):  # a failed login aborts up under set -e; restart and the tools read up.json
         up = (HERE.parent / "track.sh").read_text().split("\nup() {")[1].split("\n}")[0]
         s.assertLess(up.index('> "$state/up.json"'), up.index('login "$dt"'))
