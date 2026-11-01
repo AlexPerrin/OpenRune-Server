@@ -49,6 +49,17 @@ class Central(unittest.TestCase):
         s.assertIn("CENTRAL=${CENTRAL:-$cen}", (HERE.parent / "track.sh").read_text())
 
 
+class DesktopDevtools(unittest.TestCase):
+    def test_each_desktop_loads_the_live_clients_devtools_jar(s):  # the client track's build, not a jar staged by hand
+        t = (HERE.parent / "track.sh").read_text()
+        f = t.split("\ndevtools_jar() {")[1].split("\n}")[0]
+        s.assertIn('"$c" build live "$tc"', f); s.assertIn("-u T -u EVIDENCE", f)
+        s.assertIn('jar=$root/evidence/live/$(git -C "$(dirname "$c")" rev-parse "$tc^{tree}").devtools-desktop.jar', f)
+        s.assertIn("  devtools_jar", t.split("\nup() {")[1].split("\n}")[0])
+        start = t.split("\ndesktop_start() {")[1].split("\n}")[0]
+        s.assertLess(start.index('cp "$jar" "$d/home/.rlcustom/sideloaded-plugins/OpenRune-Developer-Tools.jar"'), start.index("exec setsid"))
+
+
 class AccountName(unittest.TestCase):
     def test_each_login_name_fits_the_client_and_is_unique_per_slug_and_client(s):  # the client refuses a login name over 12 characters
         fn = next(l for l in (HERE.parent / "track.sh").read_text().splitlines() if l.startswith("account()"))
@@ -92,6 +103,7 @@ class DesktopInstance(unittest.TestCase):
             d = t / f"desk{'' if i == 1 else i}"; (d / "home/.rsprox").mkdir(parents=True); (d / "jdk/bin").mkdir(parents=True)
             exe(d / "jdk/bin/java.exe", f'echo "$$ OsrsTestLauncher $*" > {t}/win/$$.jvm; echo $((7779 + ${{1##*-}})) > {t}/win/$$.port; exec sleep 30\n')
             exe(d / "jdk/bin/jps.exe", f'cat {t}/win/*.jvm 2>/dev/null; true\n')
+        (t / "devtools.jar").write_text("jar")
         src = (HERE.parent / "track.sh").read_text()
         s.fns = src[src.index("sys32="):src.index("\ntree() {")]
         s.env = {**os.environ, "PATH": f"{t / 'bin'}:{os.environ['PATH']}", "WINDOWS_SYSTEM32": str(t / "sys32"), "DESKTOP_DIR": str(t / "desk")}
@@ -109,7 +121,7 @@ class DesktopInstance(unittest.TestCase):
         if live: (s.t / f"live-server-{slug}").touch()
 
     def sh(s, slug, body):
-        return subprocess.Popen(["bash", "-c", f"set -euo pipefail; root={s.t}; slug={slug}; http=1; game=2; modulus=3\n{s.fns}\n{body}"], stdout=subprocess.PIPE, text=True, env=s.env)
+        return subprocess.Popen(["bash", "-c", f"set -euo pipefail; root={s.t}; slug={slug}; http=1; game=2; modulus=3; jar={s.t}/devtools.jar\n{s.fns}\n{body}"], stdout=subprocess.PIPE, text=True, env=s.env)
 
     def killed(s):
         return sorted((s.t / "killed").read_text().split()) if (s.t / "killed").exists() else []

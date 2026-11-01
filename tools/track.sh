@@ -3,7 +3,8 @@
 # TCOMMIT BASE CLONE EVIDENCE PINS HD_ROOT CENTRAL (HEADS NAMES for ship). Verbs:
 #   build [TCOMMIT]   the image or:<T> of the tree T (a dev: the working copy snapshotted, T from `hd tree`); cached by T;
 #                     CENTRAL=<Central clone>:<commit> builds that Central in place of the published dev.or2 modules
-#   up [N]            server-<slug> and http-<slug> from or:<T> on the change's ports (quest mode respect-progress), N desktops logged in
+#   up [N]            server-<slug> and http-<slug> from or:<T> on the change's ports (quest mode respect-progress), N desktops logged in,
+#                     each loading the live client's devtools jar (CLIENT_TRACK: the client track's script, its build of slug live)
 #   down              stops the desktops, removes the containers
 #   gate TCOMMIT      every check: and gate: row of the contract from the build copy (`hd rows`)
 #   gate-ci           fork CI and Formatting green on gate/<slug> at TCOMMIT (blocks until both conclude)
@@ -44,8 +45,8 @@ owned() {  # the desktops a live run's up.json lists (its server container runs)
     python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print("\n".join(d.get("desktops", d.get("clients", "")).split()))' "$f"   # shortcut: reads an up.json written before the rename to desktops; drop "clients" once no live run's up.json carries it
   done
 }
-# The desktops: the staged dirs DESKTOP_DIR, DESKTOP_DIR2 .. DESKTOP_DIR5 (JDK, RSProx launcher, RuneLite with
-# the devtools plugin), devtools port 7779+N for the Nth, run through WSL interop by absolute path. Every JVM of instance N
+# The desktops: the staged dirs DESKTOP_DIR, DESKTOP_DIR2 .. DESKTOP_DIR5 (JDK, RSProx launcher, RuneLite; the devtools
+# plugin is the live client's build, copied in at each start), devtools port 7779+N for the Nth, run through WSL interop by absolute path. Every JVM of instance N
 # carries -Dosrstest.marker=osrs-test-N; nothing without it is ever stopped (the user's own RuneLite).
 desktop_start() {  # under state/desktop.lock: stops the desktops no live run owns, starts the first instance no desktop answers on;
   # sets inst dt pids (desktopN, its devtools port, the launcher's and the port's Windows PIDs) and keeps the lock until the caller lists the desktop in up.json
@@ -57,6 +58,7 @@ desktop_start() {  # under state/desktop.lock: stops the desktops no live run ow
   busy=$(tcp | cut -d' ' -f1)
   for i in 1 2 3 4 5; do d=$desk${i#1}; dp=$((7779 + i)); grep -qx "desktop$i" <<< "$own" || grep -qx "$dp" <<< "$busy" || [ -n "$(marked "$i")" ] || break; d=; done
   [ -n "$d" ] || { echo "no free desktop instance" >&2; return 1; }
+  mkdir -p "$d/home/.rlcustom/sideloaded-plugins" && cp "$jar" "$d/home/.rlcustom/sideloaded-plugins/OpenRune-Developer-Tools.jar"
   w=$(wslpath -w "$d")
   printf '%s\n' "- name: OpenRune Test - $slug" "  jav_config_url: http://127.0.0.1:$http/jav_config.ws" "  modulus: $modulus" "  revision: 241.1" \
     "  game_server_port: $game" "  runelite_bootstrap_commithash: e617bef1a7f5c39fbe8768994d27d638941efd5d" "  binary_folder: openrune-qa" > "$d/home/.rsprox/proxy-targets.yaml"
@@ -74,6 +76,14 @@ desktop_stop() {  # desktopN [pids]: the process tree of each recorded Windows P
   local i=${1#desktop} m p t=${2:-}; need "$sys32/taskkill.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/jps.exe" DESKTOP_DIR
   m=$(marked "$i" | cut -d' ' -f1)
   t=${t//,/ }; for p in ${t:-$m}; do grep -qx "$p" <<< "$m" && "$sys32/taskkill.exe" /F /T /PID "$p" > /dev/null 2>&1 || true; done
+}
+
+devtools_jar() {  # sets jar: the devtools classes jar of the client track's build of slug live (origin/HEAD of the client), cached by its T
+  local c=${CLIENT_TRACK:-$HOME/osrs-plugins-reverse/.worktrees/harness-v8/tools/track.sh} tc
+  tc=$(git -C "$(dirname "$c")" rev-parse "origin/HEAD^{commit}")
+  flock "$root/state/client-live.lock" env -u T -u EVIDENCE HD_ROOT="$root" "$c" build live "$tc" >&2   # one build copy for every up
+  jar=$root/evidence/live/$(git -C "$(dirname "$c")" rev-parse "$tc^{tree}").devtools-desktop.jar
+  [ -f "$jar" ] || { echo "no desktop devtools jar $jar" >&2; return 1; }
 }
 
 tree() {  # TCOMMIT and T: the pass gives them; a dev's build snapshots the working copy and asks hd
@@ -119,6 +129,7 @@ build() {
 up() {
   n=${arg:-1}; T=${T:-$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["T"])' "$state/build.json")}
   docker image inspect "or:$T" >/dev/null 2>&1 || { echo "no image or:$T: build first"; return 1; }
+  devtools_jar   # the jar every desktop of this up loads
   game=$(port 0); http=$(port 1)
   down >/dev/null   # a previous up's desktops and containers
   docker run --rm --entrypoint cat "or:$T" /app/game.yml | quests > "$state/game.yml"   # upstream's default assume-completed skips every quest check
