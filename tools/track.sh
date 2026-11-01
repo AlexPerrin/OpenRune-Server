@@ -23,13 +23,20 @@
 # Windows locations, run through WSL interop (override in the environment):
 #   WINDOWS_SYSTEM32  /mnt/c/Windows/System32   netstat.exe, taskkill.exe, robocopy.exe
 #   DESKTOP_DIR       /mnt/c/osrs-test          the desktops' template; each up's instances are DESKTOP_DIR/run/N (jdk/bin/java.exe, jps.exe)
-case ${1:-} in build|test|spotless|gate|gate-ci|tree) exec "$(dirname "$0")/gate/gate.sh" "$@" ;; esac
 set -euo pipefail
 verb=$1; slug=${2:-${SLUG:-}}; arg=${3:-}   # a contract row passes no slug: hd exports SLUG
 self=$(cd "$(dirname "$0")" && pwd)
 repo=${CLONE:-$HOME/src/OpenRune-Server}
 root=${HD_ROOT:-$HOME/osrs-harness}
 [ -f "$root/harness/changes/$slug.md" ] || [ -f "$root/harness/goals/$slug.md" ] || case $slug in live|integration) ;; *) echo "no change or goal \"$slug\": tools/track.sh <verb> <slug> [arg]" >&2; exit 2 ;; esac
+# a run reads its own copy of tools/, one per content under state/tools/: a ship of the tools branch moves the checkout under a
+# running script (bash reads it as it runs; a deploy's image build lost tools/server/Dockerfile mid-run)
+if [ -z "${TOOLS_COPY:-}" ]; then
+  k=$(cd "$self" && find . -type f ! -path '*/__pycache__/*' -print0 | sort -z | xargs -0 sha1sum | sha1sum | cut -c1-12); c=$root/state/tools/$k
+  [ -d "$c" ] || { mkdir -p "$root/state/tools"; d=$(mktemp -d "$root/state/tools/.$k.XXXXXX"); cp -a "$self/." "$d/"; mv -T "$d" "$c" 2>/dev/null || rm -rf "$d"; }   # shortcut: old copies stay, remove state/tools/ when no run is up
+  TOOLS_COPY=$c exec bash "$c/track.sh" "$@"
+fi
+case $verb in build|test|spotless|gate|gate-ci|tree) exec "$self/gate/gate.sh" "$@" ;; esac
 state=$root/state/$slug; mkdir -p "$state"
 live_image=osrs-openrune:241; compose_dir=$self/server
 export SIDECAR_DATA=${SIDECAR_DATA:-$HOME/src/openrune-work/server-tools/sidecar/data}; sidecar_data=$SIDECAR_DATA  # compose mounts ${SIDECAR_DATA}
@@ -189,7 +196,8 @@ down() {
   if [ "$(docker inspect -f '{{.State.Running}}' "server-$slug" 2>/dev/null)" = true ] && docker logs "server-$slug" 2>&1 | grep -q "Server ready in"; then offline; fi   # the server drops each disconnected character and saves it: RESUME starts there
   docker rm -f "server-$slug" "http-$slug" "token-$slug" >/dev/null 2>&1 || true; rm -f "$state/up.json"; echo "down"
 }
-ship() {  # the integration tree → the live test server
+ship() {  # the integration tree → the live test server; a failing step names itself in ship.log
+  set -E; trap 'echo "ship of ${T:-$arg} failed: $BASH_COMMAND (exit $?)"' ERR
   arg=${arg:-$TCOMMIT}; "$self/gate/gate.sh" build integration "$arg"; T=${T:-$(git -C "$repo" rev-parse "$arg^{tree}")}
   slug=integration; state=$root/state/live; mkdir -p "$state"
   # the issuer (compose's ISSUER_DIR): its secret in the image's game.yml; the APK's sign-in and tokens for the tester account it has always played

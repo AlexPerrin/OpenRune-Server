@@ -119,6 +119,48 @@ class BuildLock(unittest.TestCase):
         s.assertLess(b.index("flock 9"), b.index('docker image inspect "or:$T"'))
 
 
+class BuildAttempts(unittest.TestCase):
+    def setUp(s):
+        s.root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, s.root); change(s.root, "x"); (s.root / "bin").mkdir()
+        s.repo = s.root / "repo"; s.repo.mkdir(); git(s.repo, "init", "-q"); (s.repo / "game.example.yml").write_text("game: {}\n"); (s.repo / "settings.gradle.kts").write_text(""); (s.repo / "or-cache").mkdir(); (s.repo / "or-cache/x").write_text("")
+        git(s.repo, "add", "-A"); git(s.repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "t"); s.tc = git(s.repo, "rev-parse", "HEAD")
+        # docker: no image cached, the Gradle container fails
+        (s.root / "bin/docker").write_text('#!/bin/sh\ncase "$*" in "image inspect"*) exit 1;; *"--name build-x"*) echo "gradle: boom $$"; exit 1;; esac\n'); (s.root / "bin/docker").chmod(0o755)
+
+    def build(s):
+        return subprocess.run(["bash", str(HERE.parent / "track.sh"), "build", "x", s.tc], capture_output=True, text=True,
+                              env={**os.environ, "HD_ROOT": str(s.root), "CLONE": str(s.repo), "PATH": f"{s.root / 'bin'}:{os.environ['PATH']}", "CENTRAL": ""})
+
+    def test_two_attempts_keep_two_logs_each_named_in_the_output(s):  # a deploy's retry overwrote the first attempt's log: its failure was gone
+        outs = [s.build(), s.build()]
+        T = git(s.repo, "rev-parse", f"{s.tc}^{{tree}}"); logs = [s.root / f"state/x/build-{T}-{n}.log" for n in (1, 2)]
+        for r, log in zip(outs, logs):
+            s.assertNotEqual(r.returncode, 0); s.assertIn(f"build failed: {log}", r.stdout)
+            s.assertIn("gradle: boom", log.read_text())
+        s.assertNotEqual(logs[0].read_text(), logs[1].read_text())
+
+    def test_a_run_reads_its_own_copy_of_the_tools(s):  # the tools checkout moved under a running deploy: its Dockerfile vanished
+        s.build()
+        copies = [d for d in (s.root / "state/tools").iterdir() if not d.name.startswith(".")]
+        s.assertEqual(len(copies), 1); s.assertTrue((copies[0] / "gate/Dockerfile").exists())
+        s.build(); s.assertEqual(len(list((s.root / "state/tools").iterdir())), 1)   # one copy per content
+
+
+class CacheDownload(unittest.TestCase):
+    def test_the_download_is_kept_from_the_jvms_home(s):  # the cache tool writes to user.home (the passwd home), so ~ with HOME set kept nothing: every new cache input downloaded 213 MB
+        g = (HERE.parent / "gate/gate.sh").read_text()
+        s.assertNotIn("~/.openrune", g)
+        s.assertEqual(g.count('oc=$(getent passwd "$(id -u)" | cut -d: -f6)/.openrune/caches'), 2)
+        s.assertIn('for z in $oc/*/*/*-disk.zip', g)
+
+
+class ShipFailure(unittest.TestCase):
+    def test_a_failing_step_names_itself(s):
+        f = SRC.split("\nship() {")[1].split("\n}")[0]
+        r = subprocess.run(["bash", "-c", "set -euo pipefail\nship() {" + f.split("\n")[0] + "\n" + f.split("\n")[1] + "\n  false\n}\narg=t; ship"], capture_output=True, text=True)
+        s.assertNotEqual(r.returncode, 0); s.assertIn("ship of t failed: false (exit 1)", r.stdout)
+
+
 class DesktopDevtools(unittest.TestCase):
     def test_each_desktop_loads_the_live_clients_devtools_jar(s):  # the client track's build, not a jar staged by hand
         t = SRC
