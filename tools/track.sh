@@ -136,11 +136,10 @@ build() {
   st=$copy/.image; rm -rf "$st"; mkdir -p "$st/data"
   cp -a "$copy/server/app/build/install/app" "$st/server"; cp "$copy/game.yml" "$st/"
   cp -a "$copy/.data/." "$st/data/"; rm -rf "$st/data/client.key" "$st/data/game.key" "$st/data/postgres"
-  mkdir -p "$state/key" && cp "$copy/.data/game.key" "$copy/.data/client.key" "$state/key/"
   docker build -q -f "$self/server/Dockerfile" -t "or:$T" "$st" >> "$log" 2>&1
   record true build < "$log"; echo "built or:$T"
 }
-keys() {  # the change's key pair in $state/key: build copies it only when it builds the image, so a cached or:<T> gets one made here
+keys() {  # the change's key pair in $state/key, made by up alone: whichever change built or:<T>, no key is copied from a build
   k=$state/key; [ -f "$k/game.key" ] && [ -f "$k/client.key" ] && return
   rm -rf "$k" 2>/dev/null || docker run --rm -v "$state:/s" postgres:16-alpine rm -rf /s/key; mkdir "$k"   # the root-owned directories docker made for missing mount sources go too
   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:1024 -out "$k/game.key" 2>/dev/null   # PKCS#8, as the server's generateRsa writes

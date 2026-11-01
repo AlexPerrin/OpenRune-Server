@@ -459,6 +459,7 @@ class KeyOnCachedBuild(unittest.TestCase):  # a cached or:<T> left state/<slug>/
     def test_up_makes_a_key_pair_before_the_server_runs_and_keeps_an_existing_one(s):
         up = s.t.split("\nup() {")[1].split("\n}")[0]
         s.assertLess(up.index("  keys "), up.index('docker run -d --name "server-$slug"'))
+        s.assertNotIn("state/key", s.t.split("\nbuild() {")[1].split("\n}")[0])   # no key comes from a build: one source for every up
         st = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, st)
         (st / "key/game.key").mkdir(parents=True); (st / "key/client.key").mkdir()   # what docker leaves after an up with no key
         run = lambda: subprocess.run(["bash", "-c", f"set -euo pipefail\nstate={st}\n{s.fn}\nkeys"], capture_output=True, text=True)
@@ -468,4 +469,4 @@ class KeyOnCachedBuild(unittest.TestCase):  # a cached or:<T> left state/<slug>/
         mod = subprocess.run(["openssl", "rsa", "-in", str(st / "key/game.key"), "-noout", "-modulus"], capture_output=True, text=True).stdout.split("=")[1].strip().lower()
         s.assertEqual(client, f"Exponent: 10001\nModulus: {mod}")
         s.assertEqual(len(mod), 256)
-        r = run(); s.assertEqual(r.returncode, 0, r.stderr); s.assertEqual((st / "key/game.key").read_text(), game)   # a built key is kept
+        r = run(); s.assertEqual(r.returncode, 0, r.stderr); s.assertEqual((st / "key/game.key").read_text(), game)   # an existing key is kept
