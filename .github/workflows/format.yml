@@ -29,6 +29,8 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
+      - name: Ephemeral ports above the game port (tools/track.sh gate-ci)
+        run: sysctl net.ipv4.ip_local_port_range; sudo sysctl -w net.ipv4.ip_local_port_range="49152 65535"
 
       # Spotless is configured with ratchetFrom("origin/main"), so only files
       # changed relative to main are checked. The ref must exist locally.
