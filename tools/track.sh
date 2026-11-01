@@ -36,7 +36,7 @@ root=${HD_ROOT:-$HOME/osrs-harness}
 state=$root/state/$slug; mkdir -p "$state"
 dev=$repo/.worktrees/$slug; copy=$repo/.worktrees/$slug-build
 live_image=osrs-openrune:241; compose_dir=$self/server
-sidecar_data=${SIDECAR_DATA:-$HOME/src/openrune-work/server-tools/sidecar/data}
+export SIDECAR_DATA=${SIDECAR_DATA:-$HOME/src/openrune-work/server-tools/sidecar/data}; sidecar_data=$SIDECAR_DATA  # compose mounts ${SIDECAR_DATA}
 record() { python3 -c 'import json,sys;print(json.dumps({"T":sys.argv[1],"ok":sys.argv[2]=="true","detail":sys.stdin.read()[-2000:]}))' "$T" "$1" > "$state/$2.json"; }
 ready() {  # ready <container> [since]: blocks until "Server ready in" or the container stops
   while ! docker logs ${2:+--since "$2"} "$1" 2>&1 | grep -q "Server ready in"; do

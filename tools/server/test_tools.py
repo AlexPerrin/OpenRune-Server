@@ -52,6 +52,15 @@ class Central(unittest.TestCase):
         s.assertIn("CENTRAL=${CENTRAL:-$cen}", (HERE.parent / "track.sh").read_text())
 
 
+class SidecarData(unittest.TestCase):
+    def test_compose_gets_the_sidecar_dir_the_script_resolves(s):  # ship's compose mounted ":/data:ro": SIDECAR_DATA was a shell variable only
+        line = next(l for l in (HERE.parent / "track.sh").read_text().splitlines() if "SIDECAR_DATA:-" in l)
+        env = {k: v for k, v in os.environ.items() if k != "SIDECAR_DATA"}
+        for extra, want in (({"HOME": "/h"}, "/h/src/openrune-work/server-tools/sidecar/data"), ({"SIDECAR_DATA": "/d"}, "/d")):
+            r = subprocess.run(["bash", "-c", line + '\nbash -c \'echo "$SIDECAR_DATA $0"\' "$sidecar_data"'], capture_output=True, text=True, env={**env, **extra})
+            s.assertEqual(r.stdout.split(), [want, want])
+
+
 class BuildLock(unittest.TestCase):
     def test_a_second_build_of_a_slug_waits_then_reuses_the_image(s):  # a dev's build was refused: the pass's build-<slug> container was running
         b = (HERE.parent / "track.sh").read_text().split("\nbuild() {")[1].split("\n}")[0]
