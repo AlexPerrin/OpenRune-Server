@@ -78,7 +78,7 @@ creates the desktops it needs: instance N is `DESKTOP_DIR/run/N`, claimed by its
 7779+N no program holds), naming the up's slug in `run/N/owner`, with its own home copied from the template's. Every JVM
 of instance N carries `-Dosrstest.marker=osrs-test-runN`, and only such a JVM is ever stopped (never the user's own
 RuneLite). up lists each desktop in `up.json` (field `desktops`: `desktopN:port`) before its login; `down` stops the
-JVMs of every instance its slug owns and removes those instances.
+JVMs of every instance its slug owns until none is alive and none holds a file (jps can miss a live one), then removes those instances, each owner file last so a failed down re-runs; a build waits for a running build of its slug (`state/<slug>/build.lock`) and reuses its image.
 
 ## The reviewer
 Never writes the code it checks. Judges every contract row from the same build (`tools/track.sh up <slug>`),

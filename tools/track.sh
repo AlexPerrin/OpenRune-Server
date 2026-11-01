@@ -81,14 +81,15 @@ desktop_start() {  # sets inst dt (desktopN, its devtools port)
   done
   inst=desktop$i; dt=$dp
 }
-desktops_remove() {  # stops every JVM carrying the marker of an instance this slug owns, then removes the instance
-  local o i p; need "$sys32/taskkill.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/jps.exe" DESKTOP_DIR
+desktops_remove() {  # stops every JVM carrying the marker of an instance this slug owns, then removes the instance, its owner last (a failed down re-runs)
+  local o d i p; need "$sys32/taskkill.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/jps.exe" DESKTOP_DIR
   for o in "$desk"/run/*/owner; do
-    [ -f "$o" ] && [ "$(cat "$o")" = "$slug" ] || continue; i=$(basename "$(dirname "$o")")
-    until [ -z "$(marked "$i")" ]; do   # a running JVM holds its files
+    [ -f "$o" ] && [ "$(cat "$o")" = "$slug" ] || continue; d=${o%/owner}; i=${d##*/}
+    # jps can list a live JVM as "process information unavailable": a file it still holds keeps the loop stopping marked JVMs
+    until [ -z "$(marked "$i")" ] && find "$d" -mindepth 1 -maxdepth 1 ! -name owner -exec rm -rf {} + 2>/dev/null; do
       for p in $(marked "$i" | cut -d' ' -f1); do "$sys32/taskkill.exe" /F /T /PID "$p" > /dev/null 2>&1 || true; done; sleep 1
     done
-    rm -rf "${o%/owner}"
+    rm -rf "$d"
   done
 }
 
@@ -109,6 +110,7 @@ tree() {  # TCOMMIT and T: the pass gives them; a dev's build snapshots the work
 }
 build() {
   tree
+  exec 9> "$state/build.lock"; flock 9   # one build of a slug at a time (the pass's and its dev's): the second waits, then reuses a cached or:<T>
   if docker image inspect "or:$T" >/dev/null 2>&1; then echo "cached or:$T"; record true build <<< "cached"; return; fi
   if [ -d "$copy" ]; then git -C "$copy" reset -q --hard "$tc" && git -C "$copy" clean -fdq; else git -C "$repo" worktree add -q --detach "$copy" "$tc"; fi
   [ -f "$copy/game.yml" ] || cp "$copy/game.example.yml" "$copy/game.yml"

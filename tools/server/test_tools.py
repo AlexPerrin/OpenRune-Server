@@ -52,6 +52,13 @@ class Central(unittest.TestCase):
         s.assertIn("CENTRAL=${CENTRAL:-$cen}", (HERE.parent / "track.sh").read_text())
 
 
+class BuildLock(unittest.TestCase):
+    def test_a_second_build_of_a_slug_waits_then_reuses_the_image(s):  # a dev's build was refused: the pass's build-<slug> container was running
+        b = (HERE.parent / "track.sh").read_text().split("\nbuild() {")[1].split("\n}")[0]
+        s.assertIn('exec 9> "$state/build.lock"; flock 9', b)
+        s.assertLess(b.index("flock 9"), b.index('docker image inspect "or:$T"'))
+
+
 class DesktopDevtools(unittest.TestCase):
     def test_each_desktop_loads_the_live_clients_devtools_jar(s):  # the client track's build, not a jar staged by hand
         t = (HERE.parent / "track.sh").read_text()
@@ -139,13 +146,13 @@ class DesktopInstance(unittest.TestCase):
         s.t = t = Path(tempfile.mkdtemp()); (t / "state").mkdir(); (t / "bin").mkdir(); (t / "sys32").mkdir(); (t / "win").mkdir()
         exe = lambda p, body: (p.write_text("#!/bin/bash\n" + body), p.chmod(0o755))
         exe(t / "sys32/netstat.exe", f'for f in {t}/win/*.port; do [ -e "$f" ] && echo "  TCP 127.0.0.1:$(cat $f) 0.0.0.0:0 LISTENING $(basename $f .port)"; done; true\n')
-        exe(t / "sys32/taskkill.exe", f'echo "$4" >> {t}/killed; rm -f {t}/win/$4.*\n')
+        exe(t / "sys32/taskkill.exe", f'echo "$4" >> {t}/killed; [ -e {t}/win/$4.dir ] && chmod u+w "$(cat {t}/win/$4.dir)/held"; rm -f {t}/win/$4.*\n')
         exe(t / "sys32/robocopy.exe", 'cp -r "$1" "${2//\\\\//}"; exit 1\n')   # 1: files copied
         exe(t / "bin/wslpath", 'sleep 0.5; echo "$2"\n')   # widens the window between picking an instance and claiming it
         d = t / "desk"; (d / "home/.rsprox").mkdir(parents=True); (d / "home/.rlcustom/profiles2").mkdir(parents=True); (d / "jdk/bin").mkdir(parents=True)
         (d / "home/.rlcustom/settings.properties").write_text("a=1\n"); (d / "home/.rlcustom/profiles2/p.properties").write_text("openrunedevtools.port=7780\n")
-        exe(d / "jdk/bin/java.exe", f'echo "$$ OsrsTestLauncher $*" > {t}/win/$$.jvm; echo $((7779 + ${{1##*run}})) > {t}/win/$$.port; exec sleep 30\n')
-        exe(d / "jdk/bin/jps.exe", f'cat {t}/win/*.jvm 2>/dev/null; true\n')
+        exe(d / "jdk/bin/java.exe", f'echo "$$ OsrsTestLauncher $*" > {t}/win/$$.jvm; echo $((7779 + ${{1##*run}})) > {t}/win/$$.port; pwd > {t}/win/$$.dir; mkdir held; touch held/f; chmod 555 held; exec sleep 30\n')   # a live JVM holds its files
+        exe(d / "jdk/bin/jps.exe", f'for f in {t}/win/*.jvm; do [ -e "$f" ] || continue; if [ -e "${{f%.jvm}}.flaky" ]; then rm "${{f%.jvm}}.flaky"; echo "${{f##*/}} -- process information unavailable"; else cat "$f"; fi; done\n')
         (t / "devtools.jar").write_text("jar")
         src = (HERE.parent / "track.sh").read_text()
         s.fns = src[src.index("sys32="):src.index("\ntree() {")]
@@ -153,6 +160,7 @@ class DesktopInstance(unittest.TestCase):
 
     def tearDown(s):
         for f in s.t.glob("win/*.jvm"): subprocess.run(["kill", f.stem], capture_output=True)
+        subprocess.run(["chmod", "-R", "u+w", s.t])
         shutil.rmtree(s.t, ignore_errors=True)
 
     def proc(s, pid, cls, marker=None, port=None):
@@ -188,6 +196,13 @@ class DesktopInstance(unittest.TestCase):
         s.assertEqual(s.killed(), mine)
         s.assertEqual(sorted(p.name for p in (s.t / "desk/run").iterdir()), ["2"])
         s.assertTrue((s.t / "win/500.jvm").exists())
+
+    def test_down_stops_a_jvm_jps_missed_before_it_removes_the_instance(s):  # quest-restlessghost: owner gone, three JVMs left holding run/4
+        s.sh("a", "desktop_start").communicate(timeout=60)
+        mine = sorted(f.stem for f in s.t.glob("win/*.jvm"))
+        for p in mine: (s.t / f"win/{p}.flaky").write_text("")   # jps's first listing shows it as unavailable
+        p = s.sh("a", "desktops_remove"); p.communicate(timeout=60)
+        s.assertEqual(p.returncode, 0); s.assertEqual(s.killed(), mine); s.assertFalse((s.t / "desk/run/1").exists())
 
     def test_up_records_each_desktop_before_its_login(s):  # a failed login aborts up under set -e; restart and the tools read up.json
         up = (HERE.parent / "track.sh").read_text().split("\nup() {")[1].split("\n}")[0]
