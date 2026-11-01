@@ -418,6 +418,11 @@ class RealmLikeLive(unittest.TestCase):  # Central seeds a dev realm: every logi
         r = call("1"); s.assertEqual(r.returncode, 0, r.stderr); s.assertIn("docker restart server-s", r.stderr); s.assertRegex(r.stderr, r"ready server-s \d")
         r = call(""); s.assertEqual(r.returncode, 0, r.stderr); s.assertEqual(r.stderr, "")   # already live (RESUME): no restart
 
+    def test_up_sets_the_realm_xp_rates_to_live(s):  # the dev realm seeds player xp at 15000 hundredths: a reward shows 150x
+        line = next(l for l in s.up.splitlines() if "dev_mode = 0" in l)
+        for col in ("player_xp_rate_in_hundreds", "global_xp_rate_in_hundreds"):
+            s.assertIn(f"{col} = 100", line); s.assertIn(f"{col} <> 100", line)   # set, and a 150x realm alone still restarts
+
     def test_every_account_is_a_player_unless_staff_names_its_desktop(s):
         line = next(l for l in s.up.splitlines() if "update accounts set rights" in l)
         s.assertLess(s.up.index("  offline"), s.up.index(line))

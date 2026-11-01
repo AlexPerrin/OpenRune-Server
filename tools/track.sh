@@ -8,7 +8,7 @@
 #                     matter quest-mode, else respect-progress; or assume-completed), N desktops logged in,
 #                     each loading the live client's devtools jar (CLIENT_TRACK: the client track's script, its build of slug live);
 #                     a fresh database, or with RESUME=1 the accounts as the change's last down saved them; the realm as live
-#                     (dev_mode off), every account a member at rank 0, or with STAFF=N the Nth desktop's an administrator
+#                     (dev_mode off, xp at 1x), every account a member at rank 0, or with STAFF=N the Nth desktop's an administrator
 #   restart           restarts server-<slug>, its game.yml and database kept, and logs up's desktops in again
 #   down              stops the desktops, waits until the server has saved and dropped their characters, removes the containers
 #   gate TCOMMIT      every check: and gate: row of the contract from the build copy (`hd rows`)
@@ -151,8 +151,8 @@ up() {
     -e WORLD_HOST=127.0.0.1 -e HTTP_PUBLIC_PORT="$http" -e WORLD_ID=255 -e SAVE_DIR=/tmp/saves -e JAV_CONFIG_TEMPLATE=/app/protocol/jav_config.ws.template \
     -e LOCAL_AUTH=false -e PROOF_OF_WORK=false -e VALIDATE_CRCS=false osrs-rsps-test:241 >/dev/null
   ready "server-$slug"
-  # Central seeds a dev realm (every login an administrator); the server reads its realm at boot: as live, then restarted
-  if [ -n "$(sql "update realms set dev_mode = 0 where dev_mode <> 0 returning 1")" ]; then since=$(date -u +%FT%TZ); docker restart "server-$slug" >/dev/null; ready "server-$slug" "$since"; fi
+  # Central seeds a dev realm (every login an administrator, xp at 150x); the server reads its realm at boot: as live, then restarted
+  if [ -n "$(sql "update realms set dev_mode = 0, player_xp_rate_in_hundreds = 100, global_xp_rate_in_hundreds = 100 where dev_mode <> 0 or player_xp_rate_in_hundreds <> 100 or global_xp_rate_in_hundreds <> 100 returning 1")" ]; then since=$(date -u +%FT%TZ); docker restart "server-$slug" >/dev/null; ready "server-$slug" "$since"; fi
   python3 "$self/server/javcheck.py" "http://127.0.0.1:$http/jav_config.ws" || { down; return 1; }   # no desktop is pointed at a foreign host
   modulus=$(openssl rsa -in "$state/key/game.key" -noout -modulus | cut -d= -f2 | tr A-F a-f)
   desktops=(); accounts=()
