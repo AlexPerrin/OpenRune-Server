@@ -33,6 +33,8 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
+      - name: Ephemeral ports above the game port (tools/track.sh gate-ci)
+        run: sysctl net.ipv4.ip_local_port_range; sudo sysctl -w net.ipv4.ip_local_port_range="49152 65535"
 
       # The downloaded game cache only changes when the revision in
       # game.example.yml bumps (~monthly), so cache it across runs. The
