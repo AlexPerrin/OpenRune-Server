@@ -41,6 +41,9 @@ internal object WorldLinkPackets {
     fun login(username: String, password: CharArray, loginCharacterId: Int?): ByteArray =
         GameToCentralPackets.login(username, password, loginCharacterId)
 
+    fun tokenLogin(username: String, loginCharacterId: Int?): ByteArray =
+        GameToCentralPackets.tokenLogin(username, loginCharacterId)
+
     fun logout(sessionToken: ByteArray): ByteArray = GameToCentralPackets.logout(sessionToken)
 
     fun heartbeat(sessionToken: ByteArray): ByteArray = GameToCentralPackets.heartbeat(sessionToken)
