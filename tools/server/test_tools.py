@@ -147,11 +147,13 @@ class DesktopInstance(unittest.TestCase):
         exe = lambda p, body: (p.write_text("#!/bin/bash\n" + body), p.chmod(0o755))
         exe(t / "sys32/netstat.exe", f'[ -e {t}/interop-fails ] && {{ rm {t}/interop-fails; echo "<3>WSL ERROR: UtilAcceptVsock:273: accept4 failed 110" >&2; exit 1; }}; for f in {t}/win/*.port; do [ -e "$f" ] && echo "  TCP 127.0.0.1:$(cat $f) 0.0.0.0:0 LISTENING $(basename $f .port)"; done; true\n')
         exe(t / "sys32/taskkill.exe", f'echo "$4" >> {t}/killed; [ -e {t}/win/$4.dir ] && chmod u+w "$(cat {t}/win/$4.dir)/held"; rm -f {t}/win/$4.*\n')
+        exe(t / "sys32/netsh.exe", 'printf "Start Port    End Port\\r\\n----------    --------\\r\\n     50000       50059     *\\r\\n"\n')
         exe(t / "sys32/robocopy.exe", 'cp -r "$1" "${2//\\\\//}"; exit 1\n')   # 1: files copied
         exe(t / "bin/wslpath", 'sleep 0.5; echo "$2"\n')   # widens the window between picking an instance and claiming it
         d = t / "desk"; (d / "home/.rsprox").mkdir(parents=True); (d / "home/.rlcustom/profiles2").mkdir(parents=True); (d / "jdk/bin").mkdir(parents=True)
         (d / "home/.rlcustom/settings.properties").write_text("a=1\n"); (d / "home/.rlcustom/profiles2/p.properties").write_text("openrunedevtools.port=7780\n")
         exe(d / "jdk/bin/java.exe", f'echo "$$ OsrsTestLauncher $*" > {t}/win/$$.jvm; echo $((7779 + ${{1##*run}})) > {t}/win/$$.port; pwd > {t}/win/$$.dir; mkdir held; touch held/f; chmod 555 held; exec sleep 30\n')   # a live JVM holds its files
+        exe(d / "jdk/bin/javac.exe", f'echo "$*" >> {t}/javac; touch "${{5//\\\\//}}/OsrsTestLauncher.class"\n')
         exe(d / "jdk/bin/jps.exe", f'for f in {t}/win/*.jvm; do [ -e "$f" ] || continue; if [ -e "${{f%.jvm}}.flaky" ]; then rm "${{f%.jvm}}.flaky"; echo "${{f##*/}} -- process information unavailable"; else cat "$f"; fi; done\n')
         (t / "devtools.jar").write_text("jar")
         src = (HERE.parent / "track.sh").read_text()
@@ -167,8 +169,8 @@ class DesktopInstance(unittest.TestCase):
         (s.t / f"win/{pid}.jvm").write_text(f"{pid} {cls} -Duser.home=C:\\x" + (f" -Dosrstest.marker=osrs-test-run{marker}" if marker else "") + "\n")
         if port: (s.t / f"win/{pid}.port").write_text(f"{port}\n")
 
-    def sh(s, slug, body):
-        return subprocess.Popen(["bash", "-c", f"set -euo pipefail; root={s.t}; slug={slug}; state={s.t}/state/{slug}; mkdir -p $state; http=1; game=2; modulus=3; jar={s.t}/devtools.jar\n{s.fns}\n{body}"], stdout=subprocess.PIPE, text=True, env=s.env)
+    def sh(s, slug, body, **kw):
+        return subprocess.Popen(["bash", "-c", f"set -euo pipefail; root={s.t}; slug={slug}; self={HERE.parent}; state={s.t}/state/{slug}; mkdir -p $state; http=1; game=2; modulus=3; jar={s.t}/devtools.jar\n{s.fns}\n{body}"], stdout=subprocess.PIPE, text=True, env=s.env, **kw)
 
     def killed(s):
         return sorted((s.t / "killed").read_text().split()) if (s.t / "killed").exists() else []
@@ -210,6 +212,28 @@ class DesktopInstance(unittest.TestCase):
         for p in mine: (s.t / f"win/{p}.flaky").write_text("")   # jps's first listing shows it as unavailable
         p = s.sh("a", "desktops_remove"); p.communicate(timeout=60)
         s.assertEqual(p.returncode, 0); s.assertEqual(s.killed(), mine); s.assertFalse((s.t / "desk/run/1").exists())
+
+    def test_rsprox_ports_skip_every_range_windows_refuses_a_bind_on(s):  # mirrored WSL reserved the boot's Linux ephemeral range 40525-44620 on Windows: every launcher failed to bind 43600
+        base = lambda ranges: subprocess.run(["bash", "-c", s.fns + "\nskip_base"], input=ranges, capture_output=True, text=True, env=s.env)
+        s.assertEqual(base("32768 40000\n50000 50059\n").stdout, "0\n")
+        s.assertEqual(base("40525 44620\n44621 44700\n50000 50059\n").stdout, f"{44701 - 43600}\n")   # past the first range, then past the next
+        s.assertEqual(base("40525 65535\n").returncode, 1)
+        p = s.sh("a", "desktop_start; echo $inst $dt"); out = p.communicate(timeout=60)[0].split()
+        lo, hi = map(int, Path("/proc/sys/net/ipv4/ip_local_port_range").read_text().split())
+        skip = int(next(s.t.glob("win/*.jvm")).read_text().split("-Dosrstest.portskip=")[1].split()[0])
+        s.assertEqual(out, ["desktop1", "7780"])
+        s.assertTrue(all(q < lo or q > hi for q in (43600 + skip, 43701 + skip)), (skip, lo, hi))
+        s.assertTrue(all(q < 50000 or q > 50059 for q in range(43600 + skip, 43752 + skip)))
+        s.assertIn("OsrsTestLauncher.java", (s.t / "javac").read_text())   # the tools tree's launcher, which takes any skip
+        s.assertNotIn("skip > 50", (HERE / "OsrsTestLauncher.java").read_text())
+
+    def test_a_launcher_whose_start_throws_fails_up_with_its_exception(s):  # RSProx's netty threads kept the failed launcher alive and up waited forever
+        (s.t / "desk/jdk/bin/java.exe").write_text("#!/bin/bash\necho 'Exception in thread \"main\" java.net.BindException: Address already in use: bind'; echo '[osrs-test] REFUSING: launcher failed'; exit 2\n")
+        p = s.sh("a", "desktop_start", stderr=subprocess.PIPE)
+        err = p.communicate(timeout=60)[1]
+        s.assertEqual(p.returncode, 1); s.assertIn("BindException", err)
+        src = (HERE / "OsrsTestLauncher.java").read_text()
+        s.assertIn("catch (Throwable e)", src); s.assertIn('die("launcher failed: " + e)', src)   # the launcher exits on any start exception
 
     def test_up_records_each_desktop_before_its_login(s):  # a failed login aborts up under set -e; restart and the tools read up.json
         up = (HERE.parent / "track.sh").read_text().split("\nup() {")[1].split("\n}")[0]

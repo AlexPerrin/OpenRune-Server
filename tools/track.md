@@ -72,10 +72,14 @@ it runs every script row of the contract and refuses on any failure. `hd ask <sl
 yours; `hd show <slug>` first, always.
 
 The desktops are Windows programs run from bash through WSL interop by absolute path, located by
-`WINDOWS_SYSTEM32` (default `/mnt/c/Windows/System32`: netstat.exe, taskkill.exe, robocopy.exe) and `DESKTOP_DIR`
+`WINDOWS_SYSTEM32` (default `/mnt/c/Windows/System32`: netstat.exe, netsh.exe, taskkill.exe, robocopy.exe) and `DESKTOP_DIR`
 (default `/mnt/c/osrs-test`: the template, its JDK, RSProx launcher and staged home; jps.exe locates JVMs). Each up
 creates the desktops it needs: instance N is `DESKTOP_DIR/run/N`, claimed by its mkdir (the first N whose devtools port
-7779+N no program holds), naming the up's slug in `run/N/owner`, with its own home copied from the template's. Every JVM
+7779+N no program holds), naming the up's slug in `run/N/owner`, with its own home copied from the template's. Its launcher is
+`tools/server/OsrsTestLauncher.java`, compiled once per source into `DESKTOP_DIR/rsprox/launcher-<sha>`; RSProx's ports
+(jav_config 43600+skip, proxy 43701+skip) are moved past every range Windows refuses a bind on (WSL's mirrored
+reservation of the Linux ephemeral range, which moves each boot, and Windows' excluded port ranges), and a launcher whose
+start throws exits, so up fails with its exception. Every JVM
 of instance N carries `-Dosrstest.marker=osrs-test-runN`, and only such a JVM is ever stopped (never the user's own
 RuneLite). up lists each desktop in `up.json` (field `desktops`: `desktopN:port`) before its login; `down` stops the
 JVMs of every instance its slug owns until none is alive and none holds a file (jps can miss a live one), then removes those instances, each owner file last so a failed down re-runs; The server logs out a desktop that sends no input
