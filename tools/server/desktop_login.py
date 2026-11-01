@@ -17,8 +17,15 @@ class Refused(Exception):
 def call(port, name, **args):
     req = urllib.request.Request(f"http://127.0.0.1:{port}/mcp", json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
                                  "params": {"name": name, "arguments": args}}).encode(), {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        body = r.read().decode()
+    while True:
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                body = r.read().decode()
+            break
+        except urllib.error.URLError as e:  # urlopen wraps a failure to connect or send: the request never reached the client
+            if name == "get_client_state" or not isinstance(e.reason, TimeoutError):
+                raise
+            wait(port, (), leave=True)  # the client is busy starting: resend once it answers a state read again
     line = next((l[5:] for l in body.splitlines() if l.startswith("data:")), body)
     msg = json.loads(line); out = msg.get("result", {})
     text = "".join(c.get("text", "") for c in out.get("content", []) if c.get("type") == "text") or json.dumps(out)

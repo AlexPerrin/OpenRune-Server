@@ -359,6 +359,22 @@ class DesktopLogin(unittest.TestCase):
             d.call(1, "press_key", key="BACK_SPACE")
         s.assertEqual(d.state(1), {})  # a refused state read is no state yet, read again
 
+    def test_a_key_the_starting_client_did_not_take_is_resent_once_it_answers(s):  # one RESUME=1 up: 'devtools endpoint on 7780: <urlopen error timed out>'
+        import desktop_login as d, io
+        sent, slow = [], iter([True, True, True])   # the press_key, then two state reads, time out connecting
+        def urlopen(req, timeout):
+            name = json.loads(req.data)["params"]["name"]; sent.append(name)
+            if next(slow, False):
+                raise d.urllib.error.URLError(TimeoutError("timed out"))
+            return io.BytesIO(json.dumps({"result": {"content": [{"type": "text", "text": '{"gameState": "LOGIN_SCREEN"}'}]}}).encode())
+        s.addCleanup(setattr, d.urllib.request, "urlopen", d.urllib.request.urlopen); s.addCleanup(setattr, d.time, "sleep", d.time.sleep)
+        d.urllib.request.urlopen, d.time.sleep = urlopen, lambda _: None
+        d.call(1, "press_key", key="ESCAPE")
+        s.assertEqual(sent, ["press_key", "get_client_state", "get_client_state", "get_client_state", "press_key"])   # resent only after a state read answered
+        d.urllib.request.urlopen = lambda *a, **k: (_ for _ in ()).throw(d.urllib.error.URLError(ConnectionRefusedError()))
+        with s.assertRaises(d.urllib.error.URLError):   # a refused connection (the desktop gone) is no start: it fails
+            d.call(1, "press_key", key="ESCAPE")
+
     def test_logout_uses_the_logout_button_not_a_command(s):  # the server has no ::drop; relog hung on it
         d, sent = s.fake(["LOGGED_IN", "LOGIN_SCREEN"])
         s.assertEqual(d.logout(1), "LOGIN_SCREEN")
