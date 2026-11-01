@@ -140,6 +140,12 @@ build() {
   docker build -q -f "$self/server/Dockerfile" -t "or:$T" "$st" >> "$log" 2>&1
   record true build < "$log"; echo "built or:$T"
 }
+keys() {  # the change's key pair in $state/key: build copies it only when it builds the image, so a cached or:<T> gets one made here
+  k=$state/key; [ -f "$k/game.key" ] && [ -f "$k/client.key" ] && return
+  rm -rf "$k" 2>/dev/null || docker run --rm -v "$state:/s" postgres:16-alpine rm -rf /s/key; mkdir "$k"   # the root-owned directories docker made for missing mount sources go too
+  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:1024 -out "$k/game.key" 2>/dev/null   # PKCS#8, as the server's generateRsa writes
+  printf 'Exponent: 10001\nModulus: %s' "$(openssl rsa -in "$k/game.key" -noout -modulus | cut -d= -f2 | tr A-F a-f)" > "$k/client.key"
+}
 up() {
   n=${arg:-1}; T=${T:-$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["T"])' "$state/build.json")}
   docker image inspect "or:$T" >/dev/null 2>&1 || { echo "no image or:$T: build first"; return 1; }
@@ -147,6 +153,7 @@ up() {
   game=$(port 0); http=$(port 1)
   down >/dev/null   # a previous up's desktops and containers
   docker run --rm --entrypoint cat "or:$T" /app/game.yml | quests "$(quest_mode)" > "$state/game.yml"   # upstream's default assume-completed skips every quest check
+  keys   # never a missing mount source: docker would make it a directory
   [ -n "${RESUME:-}" ] || rm -rf "$state/postgres"; mkdir -p -m 700 "$state/postgres"   # fresh, or RESUME: the last down's (owner uid 1000, the server's)
   docker run -d --name "server-$slug" --cpus=4 --memory=4g -p "$game:43594" -v "$state/postgres:/app/.data/postgres" \
     -v "$state/key/game.key:/app/.data/game.key:ro" -v "$state/key/client.key:/app/.data/client.key:ro" -v "$state/game.yml:/app/game.yml:ro" "or:$T" >/dev/null
