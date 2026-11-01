@@ -103,5 +103,20 @@ class Text(Repo):
         s.assertEqual(rc, 0, out)
 
 
+class Snapshot(Repo):
+    def test_build_snapshot_keeps_tracked_files_under_ignored_paths(s):
+        s.write(".gitignore", "generated/\n")
+        p = Path(s.repo) / "generated/build.gradle.kts"; p.parent.mkdir(); p.write_text("x\n")
+        git(s.repo, "add", "-f", "generated/build.gradle.kts"); s.commit("feat: a tracked file under an ignored path")
+        git(s.repo, "worktree", "add", "-q", ".worktrees/s1")
+        (Path(s.repo) / ".worktrees/s1/new.kt").write_text("y\n")
+        root = tempfile.mkdtemp(); out = Path(root) / "ls"
+        (Path(root) / "hd.py").write_text(f"import subprocess,sys\nopen({str(out)!r},'w').write(subprocess.run(['git','-C',{s.repo!r},'ls-tree','-r','--name-only',sys.argv[3]],capture_output=True,text=True).stdout)\nsys.exit(1)\n")
+        subprocess.run(["bash", str(HERE.parent / "track.sh"), "build", "s1"], capture_output=True, env={**os.environ, "CLONE": s.repo, "HD_ROOT": root, "T": ""})
+        files = out.read_text().split()
+        s.assertIn("generated/build.gradle.kts", files); s.assertIn("new.kt", files)
+        shutil.rmtree(root)
+
+
 if __name__ == "__main__":
     unittest.main()
