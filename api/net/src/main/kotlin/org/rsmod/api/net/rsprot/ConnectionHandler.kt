@@ -50,7 +50,7 @@ private constructor(
         get() = config.world
 
     private val tokenVerifier: TokenLoginVerifier? =
-        config.tokenLogin?.let { TokenLoginVerifier(it.issuer, it.audience, it.publicKey) }
+        config.tokenLogin?.secret?.takeIf { it.isNotBlank() }?.let(::TokenLoginVerifier)
 
     private companion object {
         private const val PASSWORD_HASH_TIMING_INFO_MS = 50L

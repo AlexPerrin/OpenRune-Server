@@ -1,34 +1,25 @@
 package org.rsmod.api.net.rsprot
 
-import java.security.KeyPair
-import java.security.KeyPairGenerator
-import java.security.Signature
 import java.time.Instant
 import java.util.Base64
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 
 class TokenLoginVerifierTest {
-    private val issuerKey = rsaKeyPair()
-    private val verifier =
-        TokenLoginVerifier(ISSUER, AUDIENCE, Base64.getEncoder().encodeToString(issuerKey.public.encoded))
+    private val verifier = TokenLoginVerifier(SECRET)
 
     @Test
-    fun `a token the issuer signed for this audience names its account`() {
+    fun `a token the issuer signed names its account`() {
         assertEquals("tester", verifier.accountName(token()))
-        assertEquals("tester", verifier.accountName(token(aud = """["other","$AUDIENCE"]""")))
+        assertEquals("a.b", verifier.accountName(token(account = "a.b")))
     }
 
     @Test
-    fun `a token signed by another key is refused`() {
-        assertNull(verifier.accountName(token(key = rsaKeyPair())))
-    }
-
-    @Test
-    fun `a token of another issuer or audience is refused`() {
-        assertNull(verifier.accountName(token(iss = "https://other.example")))
-        assertNull(verifier.accountName(token(aud = "\"other\"")))
+    fun `a token signed by another secret is refused`() {
+        assertNull(verifier.accountName(token(secret = OTHER_SECRET)))
     }
 
     @Test
@@ -39,33 +30,24 @@ class TokenLoginVerifierTest {
     @Test
     fun `a malformed token is refused`() {
         assertNull(verifier.accountName("not-a-token"))
-        assertNull(verifier.accountName(token(alg = "none")))
-        assertNull(verifier.accountName(token(sub = "")))
-        assertNull(verifier.accountName(token().dropLast(4) + "!!!!"))
+        assertNull(verifier.accountName(token(account = "")))
+        assertNull(verifier.accountName(token().substringBeforeLast('.') + ".!!!!"))
+        assertNull(verifier.accountName(token().replace("tester", "admin")))
     }
 
     private fun token(
-        key: KeyPair = issuerKey,
-        alg: String = "RS256",
-        iss: String = ISSUER,
-        aud: String = "\"$AUDIENCE\"",
+        account: String = "tester",
         exp: Long = Instant.now().epochSecond + 300,
-        sub: String = "tester",
+        secret: String = SECRET,
     ): String {
-        val encoder = Base64.getUrlEncoder().withoutPadding()
-        val header = encoder.encodeToString("""{"alg":"$alg","typ":"JWT"}""".toByteArray())
-        val claims =
-            encoder.encodeToString("""{"iss":"$iss","aud":$aud,"exp":$exp,"sub":"$sub"}""".toByteArray())
-        val signature = Signature.getInstance("SHA256withRSA")
-        signature.initSign(key.private)
-        signature.update("$header.$claims".toByteArray())
-        return "$header.$claims.${encoder.encodeToString(signature.sign())}"
+        val body = "$account.$exp"
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(Base64.getDecoder().decode(secret), "HmacSHA256"))
+        return "$body.${Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(body.toByteArray()))}"
     }
 
     private companion object {
-        private const val ISSUER = "https://auth.example"
-        private const val AUDIENCE = "openrune"
-
-        private fun rsaKeyPair(): KeyPair = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
+        private val SECRET = Base64.getEncoder().encodeToString(ByteArray(32) { it.toByte() })
+        private val OTHER_SECRET = Base64.getEncoder().encodeToString(ByteArray(32) { (it + 1).toByte() })
     }
 }

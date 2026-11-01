@@ -1,55 +1,33 @@
 package org.rsmod.api.net.rsprot
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import java.security.KeyFactory
-import java.security.PublicKey
-import java.security.Signature
-import java.security.spec.X509EncodedKeySpec
+import java.security.MessageDigest
 import java.time.Instant
 import java.util.Base64
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 
-internal class TokenLoginVerifier(
-    private val issuer: String,
-    private val audience: String,
-    publicKey: String,
-) {
-    private val key: PublicKey =
-        KeyFactory.getInstance("RSA")
-            .generatePublic(X509EncodedKeySpec(Base64.getMimeDecoder().decode(publicKey.replace(PEM_ARMOR, ""))))
+internal class TokenLoginVerifier(secret: String) {
+    private val key = SecretKeySpec(Base64.getDecoder().decode(secret), "HmacSHA256")
 
     fun accountName(token: String): String? {
-        val parts = token.split('.')
-        if (parts.size != 3) {
+        val macStart = token.lastIndexOf('.')
+        val expiryStart = token.lastIndexOf('.', macStart - 1)
+        if (expiryStart <= 0) {
             return null
         }
-        return try {
-            val header = mapper.readTree(decoder.decode(parts[0]))
-            if (header.path("alg").asText() != "RS256") {
+        val expiry = token.substring(expiryStart + 1, macStart).toLongOrNull() ?: return null
+        val signature =
+            try {
+                Base64.getUrlDecoder().decode(token.substring(macStart + 1))
+            } catch (_: IllegalArgumentException) {
                 return null
             }
-            val signature = Signature.getInstance("SHA256withRSA")
-            signature.initVerify(key)
-            signature.update("${parts[0]}.${parts[1]}".toByteArray(Charsets.US_ASCII))
-            if (!signature.verify(decoder.decode(parts[2]))) {
-                return null
-            }
-            val claims = mapper.readTree(decoder.decode(parts[1]))
-            val aud = claims.path("aud")
-            val exp = claims.path("exp")
-            when {
-                claims.path("iss").asText() != issuer -> null
-                aud.none { it.asText() == audience } && aud.asText() != audience -> null
-                !exp.canConvertToLong() || exp.asLong() <= Instant.now().epochSecond -> null
-                else -> claims.path("sub").asText().takeIf { it.isNotBlank() }
-            }
-        } catch (_: Exception) {
-            null
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(key)
+        val expected = mac.doFinal(token.substring(0, macStart).toByteArray(Charsets.UTF_8))
+        if (!MessageDigest.isEqual(expected, signature) || expiry <= Instant.now().epochSecond) {
+            return null
         }
-    }
-
-    private companion object {
-        private val PEM_ARMOR = Regex("-----(BEGIN|END) PUBLIC KEY-----")
-        private val decoder = Base64.getUrlDecoder()
-        private val mapper = ObjectMapper()
+        return token.substring(0, expiryStart)
     }
 }

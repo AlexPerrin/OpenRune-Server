@@ -52,11 +52,9 @@ central:
   postgres:
     pool-size: 10
 
-# Token login (auth type 7): RS256 tokens of this issuer for this audience, verified with its RSA public key.
+# Token login (auth type 7): tokens <account>.<expiry>.<HMAC-SHA256> signed by the issuer with this base64 secret.
 #token-login:
-  #issuer: "https://auth.example.com"
-  #audience: "openrune"
-  #public-key: "-----BEGIN PUBLIC KEY----- ... -----END PUBLIC KEY-----"
+  #secret: ""
 
 
 # Central server connection settings (used when connecting to a different instance)

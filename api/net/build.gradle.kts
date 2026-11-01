@@ -10,7 +10,6 @@ dependencies {
     implementation(libs.openrune.central.worldlink)
     implementation("com.zaxxer:HikariCP:6.2.1")
     implementation(libs.bouncycastle.provider)
-    implementation(libs.jackson.databind)
     implementation(libs.kotlin.inline.logger)
     runtimeOnly(libs.logback.classic)
     implementation(libs.fastutil)

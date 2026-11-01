@@ -32,11 +32,7 @@ public data class CentralPostgresYaml(
 }
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public data class TokenLoginYaml(
-    val issuer: String = "",
-    val audience: String = "",
-    @JsonProperty("public-key") val publicKey: String = "",
-)
+public data class TokenLoginYaml(val secret: String = "")
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public data class GameDatabaseYaml(
