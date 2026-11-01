@@ -6,7 +6,7 @@ tempfile.tempdir = os.environ["TMPDIR"] = SUITE_TMP.name                        
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-SRC = (HERE.parent / "track.sh").read_text() + "\n" + (HERE.parent / "gate/gate.sh").read_text()   # the track script and the code a build or gate runs
+SRC = "\n".join((HERE.parent / f).read_text() for f in ("track.sh", "build/build.sh", "gate/gate.sh"))   # the track script and the code a build and a gate run
 
 
 def git(repo, *a, env=None):
@@ -97,7 +97,7 @@ class Central(unittest.TestCase):
             b = src.split(f"\n{verb}() {{")[1].split("\n}")[0]
             for want in ("central;", '"${cvols[@]}"', 'CDIR="$cdir"', "${CDIR:+ --init-script /central.init.gradle}"):
                 s.assertIn(want, b, verb)
-        init = (HERE.parent / "gate/central.init.gradle").read_text()  # openrune-central is named unlike its project: substituted explicitly
+        init = (HERE.parent / "build/central.init.gradle").read_text()  # openrune-central is named unlike its project: substituted explicitly
         for m, p in (("openrune-central", "central-app"), ("central-common", "central-common"), ("central-worldlink", "central-worldlink")):
             s.assertIn(f"substitute module('dev.or2:{m}') using project(':{p}')", init)
         s.assertIn("CENTRAL=${CENTRAL:-$cen}", SRC)
@@ -115,8 +115,15 @@ class SidecarData(unittest.TestCase):
 class BuildLock(unittest.TestCase):
     def test_a_second_build_of_a_slug_waits_then_reuses_the_image(s):  # a dev's build was refused: the pass's build-<slug> container was running
         b = SRC.split("\nbuild() {")[1].split("\n}")[0]
-        s.assertIn('exec 9> "$state/build.lock"; flock 9', b)
-        s.assertLess(b.index("flock 9"), b.index('docker image inspect "or:$T"'))
+        s.assertIn('{ flock 9; build_locked; } 9> "$state/build.lock"', b)
+        s.assertTrue(SRC.split("\nbuild_locked() {")[1].lstrip().startswith('if docker image inspect "or:$T"'))
+
+    def test_the_lock_ends_with_the_build(s):  # a gate's 20 minutes of gate-ci held it: rekeyed builds and a dev's build waited behind it
+        d = tempfile.mkdtemp(); line = next(l for l in SRC.splitlines() if l.startswith("build() {"))
+        r = subprocess.run(["bash", "-c", f"set -e; state={d}; tree() {{ :; }}; build_locked() {{ flock -n {d}/build.lock true && exit 3; :; }}\n{line}\nbuild; flock -n {d}/build.lock echo free"],
+                           capture_output=True, text=True)
+        s.assertEqual((r.returncode, r.stdout.strip()), (0, "free"))   # held during build_locked, free once build returns, the shell still alive
+        shutil.rmtree(d)
 
 
 class BuildAttempts(unittest.TestCase):
@@ -142,7 +149,7 @@ class BuildAttempts(unittest.TestCase):
     def test_a_run_reads_its_own_copy_of_the_tools(s):  # the tools checkout moved under a running deploy: its Dockerfile vanished
         s.build()
         copies = [d for d in (s.root / "state/tools").iterdir() if not d.name.startswith(".")]
-        s.assertEqual(len(copies), 1); s.assertTrue((copies[0] / "tools/gate/Dockerfile").exists())
+        s.assertEqual(len(copies), 1); s.assertTrue((copies[0] / "tools/build/Dockerfile").exists())
         s.build(); s.assertEqual(len(list((s.root / "state/tools").iterdir())), 1)   # one copy per content
 
 
@@ -163,14 +170,14 @@ esac\n'''); (root / "bin/docker").chmod(0o755)
                              env={**os.environ, "HD_ROOT": str(root), "CLONE": str(repo), "PATH": f"{root / 'bin'}:{os.environ['PATH']}", "CENTRAL": ""})
         threading.Thread(target=lambda: (p.wait(), os.close(os.open(go, os.O_RDONLY | os.O_NONBLOCK))), daemon=True).start()   # a build that ends early never holds the fifo open
         with open(go, "w") as f:   # opens once the build waits in Gradle: the ship moves the checkout now
-            shutil.rmtree(tools / "gate"); f.write("\n")
+            shutil.rmtree(tools / "build"); f.write("\n")
         out = p.communicate()[0]
         s.assertEqual(p.returncode, 0, out); s.assertIn("built or:", out)
 
 
 class CacheDownload(unittest.TestCase):
     def test_the_download_is_kept_from_the_jvms_home(s):  # the cache tool writes to user.home (the passwd home), so ~ with HOME set kept nothing: every new cache input downloaded 213 MB
-        g = (HERE.parent / "gate/gate.sh").read_text()
+        g = SRC
         s.assertNotIn("~/.openrune", g)
         s.assertEqual(g.count('oc=$(getent passwd "$(id -u)" | cut -d: -f6)/.openrune/caches'), 2)
         s.assertIn('for z in $oc/*/*/*-disk.zip', g)
@@ -757,7 +764,7 @@ class GateCi(Repo):
         g = git(fork, "rev-parse", "refs/heads/gate/s1")
         s.assertNotEqual(g, t); s.assertEqual(git(fork, "rev-parse", f"{g}^"), t)  # the change's head and T unchanged
         s.assertEqual(git(fork, "rev-parse", f"{g}:.central"), git(central, "rev-parse", f"{c}^{{tree}}"))
-        s.assertEqual(git(fork, "show", f"{g}:.central.init.gradle"), (HERE.parent / "gate/central.init.gradle").read_text().strip())
+        s.assertEqual(git(fork, "show", f"{g}:.central.init.gradle"), (HERE.parent / "build/central.init.gradle").read_text().strip())
         for f in ("ci", "format"):
             y = git(fork, "show", f"{g}:.github/workflows/{f}.yml")
             s.assertLess(y.index("setup-gradle@v6"), y.index('mv .central "$RUNNER_TEMP/central"'), f); s.assertLess(y.index("init.d/central.gradle"), y.index("./gradlew test"), f)

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tools/track.sh <verb> <slug> [arg]: the server track (docs/ARCHITECTURE.md of osrs-harness). Env from hd: SLUG HEAD T
-# TCOMMIT BASE CLONE EVIDENCE PINS HD_ROOT CENTRAL (HEADS NAMES for ship). build, test, spotless, gate, gate-ci and tree are
-# tools/gate/gate.sh's (the code a build or gate runs, its own files). Verbs:
+# TCOMMIT BASE CLONE EVIDENCE PINS HD_ROOT CENTRAL G (HEADS NAMES for ship). build and tree are tools/build/build.sh's (the code a
+# build runs, keyed alone), test, spotless, gate and gate-ci tools/gate/gate.sh's (the code a gate runs). Verbs:
 #   up [N]            server-<slug> and http-<slug> from or:<T> on the change's ports (quest mode: QUEST_MODE, else the change's front
 #                     matter quest-mode, else respect-progress; or assume-completed), N desktops logged in,
 #                     each loading the live client's devtools jar (CLIENT_TRACK: the client track's script, its build of slug live);
@@ -37,7 +37,7 @@ case $self in "$root"/state/tools/*) ;; *)
   [ -d "$c" ] || { d=$root/state/tools/.$k.$$; rm -rf "$d"; mkdir -p "$d/tools"; cp -a "$self/." "$d/tools/"; mv -T "$d" "$c" 2>/dev/null || rm -rf "$d"; }
   TOOLS_SRC=$self TOOLS_ROOT=$c exec bash "$c/tools/track.sh" "$@" ;;
 esac
-case $verb in build|test|spotless|gate|gate-ci|tree) exec "$self/gate/gate.sh" "$@" ;; esac
+case $verb in build|tree) exec "$self/build/build.sh" "$@" ;; test|spotless|gate|gate-ci) exec "$self/gate/gate.sh" "$@" ;; esac
 state=$root/state/$slug; mkdir -p "$state"
 live_image=osrs-openrune:241; compose_dir=$self/server
 export SIDECAR_DATA=${SIDECAR_DATA:-$HOME/src/openrune-work/server-tools/sidecar/data}; sidecar_data=$SIDECAR_DATA  # compose mounts ${SIDECAR_DATA}
@@ -199,7 +199,7 @@ down() {
 }
 ship() {  # the integration tree → the live test server; a failing step names itself in ship.log
   set -E; trap 'echo "ship of ${T:-$arg} failed: $BASH_COMMAND (exit $?)"' ERR
-  arg=${arg:-$TCOMMIT}; "$self/gate/gate.sh" build integration "$arg"; T=${T:-$(git -C "$repo" rev-parse "$arg^{tree}")}
+  arg=${arg:-$TCOMMIT}; "$self/build/build.sh" build integration "$arg"; T=${T:-$(git -C "$repo" rev-parse "$arg^{tree}")}
   slug=integration; state=$root/state/live; mkdir -p "$state"
   # the issuer (compose's ISSUER_DIR): its secret in the image's game.yml; the APK's sign-in and tokens for the tester account it has always played
   export ISSUER_DIR=$state/token; { docker run --rm --entrypoint cat "or:$T" /app/game.yml; echo; python3 "$self/server/issuer.py" key "$ISSUER_DIR"; } > "$state/game.yml"
