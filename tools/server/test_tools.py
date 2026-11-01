@@ -536,6 +536,29 @@ class GateCi(Repo):
         s.assertTrue((Path(root) / "state/s1").is_dir())
         for d in (fork, bin, root): shutil.rmtree(d)
 
+    def test_with_central_ci_runs_a_child_of_t_that_builds_that_central_in(s):  # server-token-auth's CI resolved Central 2.0.3 from the network: unpublished
+        wf = "jobs:\n  b:\n    steps:\n      - uses: actions/checkout@v7\n      - name: Set up Gradle\n        uses: gradle/actions/setup-gradle@v6\n      - run: ./gradlew test\n"
+        for f in ("ci", "format"): s.write(f".github/workflows/{f}.yml", wf)
+        t = s.commit("ci")
+        central = tempfile.mkdtemp(); git(central, "init", "-q"); (Path(central) / "settings.gradle.kts").write_text("// central\n")
+        git(central, "add", "."); git(central, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "c"); c = git(central, "rev-parse", "HEAD")
+        fork = tempfile.mkdtemp(); git(fork, "init", "-q", "--bare"); git(s.repo, "remote", "add", "fork", fork)
+        bin = Path(tempfile.mkdtemp()); (bin / "gh").write_text("#!/bin/sh\necho success/completed\n"); (bin / "gh").chmod(0o755)
+        root = tempfile.mkdtemp(); change(root, "s1")
+        r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "gate-ci"], capture_output=True, text=True,
+                           env={**os.environ, **s.env, "HD_ROOT": root, "TCOMMIT": t, "CENTRAL": f"{central}:{c}", "PATH": f"{bin}:{os.environ['PATH']}"})
+        s.assertEqual(r.returncode, 0, r.stderr)
+        g = git(fork, "rev-parse", "refs/heads/gate/s1")
+        s.assertNotEqual(g, t); s.assertEqual(git(fork, "rev-parse", f"{g}^"), t)  # the change's head and T unchanged
+        s.assertEqual(git(fork, "rev-parse", f"{g}:.central"), git(central, "rev-parse", f"{c}^{{tree}}"))
+        s.assertEqual(git(fork, "show", f"{g}:.central.init.gradle"), (HERE / "central.init.gradle").read_text().strip())
+        for f in ("ci", "format"):
+            y = git(fork, "show", f"{g}:.github/workflows/{f}.yml")
+            s.assertLess(y.index("setup-gradle@v6"), y.index('mv .central "$RUNNER_TEMP/central"'), f); s.assertLess(y.index("init.d/central.gradle"), y.index("./gradlew test"), f)
+            s.assertIn('echo "CDIR=$RUNNER_TEMP/central" >> "$GITHUB_ENV"', y)
+        s.assertEqual(git(fork, "diff", "--name-only", t, g).split(), sorted([".central.init.gradle", ".central/settings.gradle.kts", ".github/workflows/ci.yml", ".github/workflows/format.yml"]))
+        for d in (fork, bin, root, central): shutil.rmtree(d)
+
 
 class Measure(unittest.TestCase):
     def test_measure_writes_under_the_goal_not_the_target(s):
