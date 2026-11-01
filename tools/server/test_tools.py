@@ -264,6 +264,18 @@ class DesktopInstance(unittest.TestCase):
         s.assertEqual(sorted(p.name for p in (s.t / "desk/run").iterdir()), ["2"])
         s.assertTrue((s.t / "win/500.jvm").exists())
 
+    @unittest.skipUnless(shutil.which("systemd-run") and subprocess.run(["systemctl", "--user", "is-system-running"], capture_output=True).stdout.strip() in (b"running", b"degraded"), "no systemd user manager")
+    def test_each_desktop_jvm_is_recorded_under_the_runs_slice_until_down(s):  # osrs-harness R5: a run's end stops its Linux processes; a Windows JVM outlives them
+        sl = f"hd-t{os.getpid()}.slice"
+        p = subprocess.Popen(["systemd-run", "--user", "--scope", "-q", f"--slice={sl}", "bash", "-c", f"set -euo pipefail; root={s.t}; slug=a; self={HERE.parent}; state={s.t}/state/a; mkdir -p $state; http=1; game=2; modulus=3; jar={s.t}/devtools.jar\n{s.fns}\ndesktop_start"], env=s.env)
+        p.wait(timeout=60)
+        mine = sorted(f.stem for f in s.t.glob("win/*.jvm"))
+        s.assertEqual((p.returncode, sorted(f.name for f in (s.t / "state/winpids" / sl).iterdir())), (0, mine))
+        s.assertEqual((s.t / "state/winpids" / sl / mine[0]).read_text(), "java.exe\n")
+        s.sh("a", "desktops_remove").communicate(timeout=60)
+        s.assertEqual(list((s.t / "state/winpids" / sl).iterdir()), [])   # down ended them: nothing left for hd to stop
+        subprocess.run(["systemctl", "--user", "stop", sl])
+
     def test_down_stops_a_jvm_jps_missed_before_it_removes_the_instance(s):  # quest-restlessghost: owner gone, three JVMs left holding run/4
         s.sh("a", "desktop_start").communicate(timeout=60)
         mine = sorted(f.stem for f in s.t.glob("win/*.jvm"))

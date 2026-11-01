@@ -61,6 +61,9 @@ tcp() { timeout 20 "$sys32/netstat.exe" -ano -p TCP | tr -d '\r' | awk '$4=="LIS
 # RSProx binds jav_config on 43600+skip and proxies on 43701+skip; a bind in a range Windows reserves fails (WSL's mirrored
 # networking reserves the Linux ephemeral range, which moves each boot; Windows' own excluded ranges): stdin "<lo> <hi>" per range
 skip_base() { awk '{lo[NR] = $1; hi[NR] = $2} END {for (b = 0; 43751 + b <= 65535; b++) {ok = 1; for (r in lo) if (lo[r] <= 43751 + b && hi[r] >= 43600 + b) {ok = 0; b = hi[r] - 43600; break}; if (ok) {print b; exit}}; exit 1}'; }   # the least skip whose 51 instances' ports avoid every range
+# a Windows process a run started through WSL interop outlives the run's Linux processes: each is recorded, its Windows pid
+# and image, under the run's systemd slice (osrs-harness R5: hd ends them with the run); its down drops the record
+winpid() { local sl; sl=$(grep -o 'hd-[^/]*\.slice' /proc/self/cgroup) || return 0; mkdir -p "$root/state/winpids/$sl" && echo "$2" > "$root/state/winpids/$sl/$1"; }
 marked() { "$desk/jdk/bin/jps.exe" -v | tr -d '\r' | awk -v m="-Dosrstest.marker=osrs-test-run$1" '{for (f = 3; f <= NF; f++) if ($f == m) {print $1, $2; next}}'; }   # "<Windows PID> <main class>" of instance N's JVMs: only desktop_start sets the marker
 # The desktops: each up creates its own instances. DESKTOP_DIR is the template (JDK, RSProx and its launcher, a staged
 # home); instance N is the dir DESKTOP_DIR/run/N, claimed by its mkdir and naming its up's slug in run/N/owner, with its
@@ -68,7 +71,7 @@ marked() { "$desk/jdk/bin/jps.exe" -v | tr -d '\r' | awk -v m="-Dosrstest.marker
 # moved up by skip_base + N-1. Every JVM of instance N carries -Dosrstest.marker=osrs-test-runN;
 # nothing without it is ever stopped (the user's own RuneLite). down stops and removes the instances its slug owns.
 desktop_start() {  # sets inst dt (desktopN, its devtools port)
-  local i d dp w t l busy ex base ep
+  local i d dp w t l busy ex base ep p
   need "$sys32/netstat.exe" WINDOWS_SYSTEM32; need "$sys32/netsh.exe" WINDOWS_SYSTEM32; need "$sys32/robocopy.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/java.exe" DESKTOP_DIR; need "$desk/jdk/bin/jps.exe" DESKTOP_DIR
   mkdir -p "$desk/run"; until busy=$(tcp); do sleep 1; done; busy=$(cut -d' ' -f1 <<< "$busy")
   until ex=$(timeout 20 "$sys32/netsh.exe" interface ipv4 show excludedportrange protocol=tcp); do sleep 1; done
@@ -100,8 +103,10 @@ desktop_start() {  # sets inst dt (desktopN, its devtools port)
     "-Dosrstest.token=${tok:-false}" -cp "$t\\rsprox\\$l;$t\\rsprox\\lib\\*" OsrsTestLauncher) < /dev/null > "$state/desktop$i.log" 2>&1 &   # nothing may hold the caller's pipe
   w=$!
   until tcp | grep -q "^$dp "; do   # the devtools endpoint answers, or the desktop died
-    kill -0 "$w" 2>/dev/null || { echo "desktop $i exited: $(grep -m1 -E 'REFUSING|Exception' "$state/desktop$i.log" || tail -3 "$state/desktop$i.log")" >&2; return 1; }; sleep 2
+    kill -0 "$w" 2>/dev/null || { echo "desktop $i exited: $(grep -m1 -E 'REFUSING|Exception' "$state/desktop$i.log" || tail -3 "$state/desktop$i.log")" >&2; return 1; }
+    for p in $(marked "$i" | cut -d' ' -f1); do winpid "$p" "java.exe"; done; sleep 2
   done
+  for p in $(marked "$i" | cut -d' ' -f1); do winpid "$p" "java.exe"; done
   inst=desktop$i; dt=$dp
 }
 desktops_remove() {  # stops every JVM carrying the marker of an instance this slug owns, then removes the instance, its owner last (a failed down re-runs)
@@ -110,7 +115,7 @@ desktops_remove() {  # stops every JVM carrying the marker of an instance this s
     [ -f "$o" ] && [ "$(cat "$o")" = "$slug" ] || continue; d=${o%/owner}; i=${d##*/}
     # jps can list a live JVM as "process information unavailable": a file it still holds keeps the loop stopping marked JVMs
     until [ -z "$(marked "$i")" ] && find "$d" -mindepth 1 -maxdepth 1 ! -name owner -exec rm -rf {} + 2>/dev/null; do
-      for p in $(marked "$i" | cut -d' ' -f1); do "$sys32/taskkill.exe" /F /T /PID "$p" > /dev/null 2>&1 || true; done; sleep 1
+      for p in $(marked "$i" | cut -d' ' -f1); do "$sys32/taskkill.exe" /F /T /PID "$p" > /dev/null 2>&1 || true; rm -f "$root"/state/winpids/*/"$p"; done; sleep 1
     done
     rm -rf "$d"
   done
