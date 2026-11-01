@@ -154,6 +154,15 @@ class Measure(unittest.TestCase):
         s.assertFalse((root / "state/abc123").exists())
         shutil.rmtree(root)
 
+    def test_a_row_passes_by_its_unit_in_passes(s):
+        root = Path(tempfile.mkdtemp()); (root / "harness/goals").mkdir(parents=True); (root / "harness/goals/server-content.md").write_text("")
+        (root / "harness/goals/server-content.json").write_text(json.dumps([{"unit": "quest:a", "source": "x"}, {"unit": "quest:b", "source": "y"}]))
+        r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "measure", "server-content"], capture_output=True, text=True,
+                           env={**os.environ, "HD_ROOT": str(root), "TREE": "t1", "PASSES": "quest:b skill:z"})
+        s.assertEqual(r.returncode, 0, r.stderr)
+        s.assertEqual(json.loads((root / "state/server-content/measure.json").read_text())["value"], 50.0)
+        shutil.rmtree(root)
+
 
 class JavConfig(unittest.TestCase):
     def test_template_names_local_hosts_only(s):

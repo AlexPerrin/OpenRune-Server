@@ -7,7 +7,7 @@
 #   gate TCOMMIT      every check: and gate: row of the contract from the build copy (`hd rows`)
 #   gate-ci           fork CI and Formatting green on gate/<slug> at TCOMMIT (blocks until both conclude)
 #   ship TCOMMIT      the integration tree: build, the deploy image with the live key, boot check, deploy, or roll back
-#   measure GOAL      the content inventory's share of passing rows
+#   measure GOAL      the content inventory's share of rows whose unit is in PASSES
 #   log <slug> PATTERN  the change's server log since the run's marker (slug `live`: the live server)
 #   recordings <slug> REGEX  the RSProx transcripts holding a packet type or text
 set -euo pipefail
@@ -136,10 +136,11 @@ EOF
     echo "deploy of $T failed: rolled back to ${prev:0:12}"; return 1
   fi
 }
-measure() {  # the goal's inventory: share of rows passing
-  python3 - "$root/harness/goals/server-content.json" "$state/measure.json" "${TREE:-}" <<'EOF'
+measure() {  # the goal's inventory: share of rows whose unit is in PASSES (hd: named by a live change with a passing verdict)
+  python3 - "$root/harness/goals/server-content.json" "$state/measure.json" "${TREE:-}" "${PASSES:-}" <<'EOF'
 import json, sys
-rows = json.load(open(sys.argv[1])); value = 100.0 * sum(1 for r in rows if r.get("passes")) / len(rows) if rows else 0.0
+rows, passes = json.load(open(sys.argv[1])), set(sys.argv[4].split())
+value = 100.0 * sum(1 for r in rows if r["unit"] in passes) / len(rows) if rows else 0.0
 json.dump({"tree": sys.argv[3], "value": value, "report": sys.argv[1]}, open(sys.argv[2], "w")); print(f"server-content: {value:g}")
 EOF
 }
