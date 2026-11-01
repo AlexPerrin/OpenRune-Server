@@ -40,7 +40,8 @@ constructor(
 
     private suspend fun ProtectedAccess.shut(cupboard: BoundLocInfo) {
         arriveDelay()
-        anim(OPEN_SEQ)
+        anim(SHUT_SEQ)
+        soundSynth(SHUT_SYNTH)
         delay(1)
         locRepo.change(cupboard, SHUT, DURATION)
     }
@@ -86,6 +87,8 @@ constructor(
         const val SIR_VYVIN = "npc.sir_vyvin"
         const val OPEN_SEQ = "seq.human_openchest"
         const val OPEN_SYNTH = "synth.cupboard_open"
+        const val SHUT_SEQ = "seq.human_closechest"
+        const val SHUT_SYNTH = "synth.cupboard_close"
         const val DURATION = 500
     }
 }

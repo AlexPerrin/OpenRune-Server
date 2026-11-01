@@ -21,6 +21,7 @@ bookcase_open_and_close = 42
 chicken_into_human = 1564
 coffin_open = 54
 creakydoor_open = 56
+cupboard_close = 57
 cupboard_open = 58
 deadtree_attack = 651
 digspade = 1470

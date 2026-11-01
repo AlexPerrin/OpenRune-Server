@@ -153,16 +153,18 @@ class Squire @Inject constructor(private val knightsSword: KnightsSwordQuest) : 
             "a particularly skilled tribe of dwarven smiths. I doubt anyone could make it in the " +
                 "style they do.",
         )
-        val dwarves =
-            choice2(
+        when (
+            choice3(
                 "So would these dwarves make another one?",
-                true,
+                DWARVES,
                 "Well I hope you find it soon.",
-                false,
+                HOPE,
+                "Is he angry",
+                ANGRY,
             )
-        if (!dwarves) {
-            hopeYouFindIt()
-            return
+        ) {
+            HOPE -> return hopeYouFindIt()
+            ANGRY -> return isHeAngry()
         }
         chatPlayer(quiz, "So would these dwarves make another one?")
         chatNpc(
@@ -204,5 +206,6 @@ class Squire @Inject constructor(private val knightsSword: KnightsSwordQuest) : 
         const val HOPE = 4
         const val ANGRY = 5
         const val VAGUE = 6
+        const val DWARVES = 7
     }
 }

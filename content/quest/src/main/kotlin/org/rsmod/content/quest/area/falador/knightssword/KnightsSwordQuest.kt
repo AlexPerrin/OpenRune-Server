@@ -273,19 +273,14 @@ class KnightsSwordQuest :
                         add("Can you make that replacement sword now?" to ThurgoTopic.Materials)
                     }
             }
-            if (hasPie && stage >= STAGE_TOLD_BY_RELDO) {
+            if (hasPie && stage > STAGE_TOLD_BY_RELDO) {
                 add("Would you like a redberry pie?" to ThurgoTopic.Pie)
             }
             add("What is that cape you're wearing?" to ThurgoTopic.Cape)
         }
         when (menu(options)) {
             ThurgoTopic.Imcando -> thurgoImcando(cape)
-            ThurgoTopic.Pie ->
-                if (stage == STAGE_TOLD_BY_RELDO) {
-                    thurgoFirstPie(cape)
-                } else {
-                    pie()
-                }
+            ThurgoTopic.Pie -> pie()
             ThurgoTopic.Sword -> thurgoSpecialSword()
             ThurgoTopic.Portrait -> thurgoPortrait()
             ThurgoTopic.Materials -> thurgoMaterials()
@@ -301,8 +296,11 @@ class KnightsSwordQuest :
     private suspend fun Dialogue.thurgoImcando(cape: suspend Dialogue.() -> Unit) {
         chatPlayer(quiz, "Are you an Imcando dwarf? I need a special sword.")
         chatNpc(neutral, "I don't talk about that sort of thing anymore. I'm getting old.")
-        // TODO(content): [verify:in_game] whether the pie follow-up also shows before Reldo.
-        if (stage(player) != STAGE_TOLD_BY_RELDO || player.inv.count(REDBERRY_PIE) == 0) {
+        if (stage(player) == STAGE_STARTED) {
+            chatPlayer(neutral, "I'll come back another time.")
+            return
+        }
+        if (player.inv.count(REDBERRY_PIE) == 0) {
             return
         }
         val offer =
@@ -390,7 +388,7 @@ class KnightsSwordQuest :
             return
         }
         chatPlayer(neutral, "I have found a picture of the sword I would like you to make.")
-        objbox(PORTRAIT, "You give the portrait to Thurgo. Thurgo studies the portrait.")
+        objbox(PORTRAIT, "You give the Portrait to Thurgo. Thurgo studies the portrait.")
         // Every portrait in the inventory is taken.
         if (access.invDel(access.inv, PORTRAIT, portraits).failure) {
             return
