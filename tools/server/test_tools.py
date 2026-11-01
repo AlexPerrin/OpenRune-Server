@@ -39,6 +39,16 @@ class CacheStore(unittest.TestCase):
             s.assertIn(out, line)
 
 
+class Central(unittest.TestCase):
+    def test_a_build_with_central_includes_that_central_at_its_commit(s):  # a server change needing a Central change built against the published dev.or2
+        b = (HERE.parent / "track.sh").read_text().split("\nbuild() {")[1].split("\n}")[0]
+        s.assertIn('read -r cpath ccommit <<< "$CENTRAL"', b)
+        s.assertIn('worktree add -q --detach "$cdir" "$ccommit"', b)
+        s.assertIn('-v "$cdir:$cdir"', b)
+        s.assertIn("${CDIR:+ -Popenrune.central.includeBuild=$CDIR}", b)
+        s.assertIn("CENTRAL=${CENTRAL:-$cen}", (HERE.parent / "track.sh").read_text())
+
+
 class AccountName(unittest.TestCase):
     def test_each_login_name_fits_the_client_and_is_unique_per_slug_and_client(s):  # the client refuses a login name over 12 characters
         fn = next(l for l in (HERE.parent / "track.sh").read_text().splitlines() if l.startswith("account()"))

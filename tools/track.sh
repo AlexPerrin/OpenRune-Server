@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # tools/track.sh <verb> <slug> [arg]: the server track (docs/ARCHITECTURE.md of osrs-harness). Env from hd: SLUG HEAD T
-# TCOMMIT BASE CLONE EVIDENCE PINS HD_ROOT (HEADS NAMES for ship). Verbs:
-#   build [TCOMMIT]   the image or:<T> of the tree T (a dev: the working copy snapshotted, T from `hd tree`); cached by T
+# TCOMMIT BASE CLONE EVIDENCE PINS HD_ROOT CENTRAL (HEADS NAMES for ship). Verbs:
+#   build [TCOMMIT]   the image or:<T> of the tree T (a dev: the working copy snapshotted, T from `hd tree`); cached by T;
+#                     CENTRAL=<Central clone>:<commit> builds that Central in place of the published dev.or2 modules
 #   up [N]            server-<slug> and http-<slug> from or:<T> on the change's ports (quest mode respect-progress), N desktops logged in
 #   down              stops the desktops, removes the containers
 #   gate TCOMMIT      every check: and gate: row of the contract from the build copy (`hd rows`)
@@ -80,7 +81,7 @@ tree() {  # TCOMMIT and T: the pass gives them; a dev's build snapshots the work
   [ -d "$dev" ] || git -C "$repo" worktree add -q "$dev" -B "dev/$slug" "$(git -C "$repo" rev-parse -q --verify "fork/dev/$slug" || echo origin/main)"
   idx=$(git -C "$dev" rev-parse --git-path snapshot-index); rm -f "$idx"   # from HEAD: add -A alone drops tracked files under ignored paths
   GIT_INDEX_FILE=$idx git -C "$dev" read-tree HEAD && GIT_INDEX_FILE=$idx git -C "$dev" add -A . && snap=$(git -C "$dev" commit-tree "$(GIT_INDEX_FILE=$idx git -C "$dev" write-tree)" -p HEAD -m snapshot)
-  read -r tc T < <(HD_ROOT=$root python3 "$root/hd.py" tree "$slug" "$snap")
+  read -r tc T cen < <(HD_ROOT=$root python3 "$root/hd.py" tree "$slug" "$snap"); CENTRAL=${CENTRAL:-$cen}
 }
 build() {
   tree
@@ -89,12 +90,17 @@ build() {
   [ -f "$copy/game.yml" ] || cp "$copy/game.example.yml" "$copy/game.yml"
   ck=$(git -C "$copy" ls-tree -r "$tc" | grep -E 'or-cache/|/pack/|gamevals|raw-cache' | sha1sum | cut -c1-12)   # the cache's inputs
   log=$state/build-$T.log
-  vols=(-v "gradle-$slug:/gradle" -v or-dl:/dl -v or-cache-store:/store)
+  vols=(-v "gradle-$slug:/gradle" -v or-dl:/dl -v or-cache-store:/store); cdir=
+  if [ -n "${CENTRAL:-}" ]; then  # the change's Central dependencies, merged by hd, built in (settings.gradle.kts: openrune.central.includeBuild)
+    IFS=: read -r cpath ccommit <<< "$CENTRAL"; cdir=$cpath/.worktrees/$slug-central
+    if [ -d "$cdir" ]; then git -C "$cdir" reset -q --hard "$ccommit" && git -C "$cdir" clean -fdq; else git -C "$cpath" worktree add -q --detach "$cdir" "$ccommit"; fi
+    vols+=(-v "$cpath/.git:$cpath/.git:ro" -v "$cdir:$cdir")
+  fi
   docker run --rm "${vols[@]}" eclipse-temurin:21 chown 1000:1000 /gradle /dl /store   # docker makes a new volume root's; the build runs as 1000
-  docker run --rm --name "build-$slug" --cpus=4 --memory=5g -u 1000:1000 -e HOME=/gradle/home -e GRADLE_USER_HOME=/gradle -e CK="$ck" \
+  docker run --rm --name "build-$slug" --cpus=4 --memory=5g -u 1000:1000 -e HOME=/gradle/home -e GRADLE_USER_HOME=/gradle -e CK="$ck" -e CDIR="$cdir" \
     "${vols[@]}" -v "$repo/.git:$repo/.git:ro" -v "$copy:$copy" -w "$copy" \
     eclipse-temurin:21 bash -c '
-      set -e; mkdir -p "$HOME"; g="./gradlew --console=plain --build-cache --no-configuration-cache --max-workers=4 -Dorg.gradle.jvmargs=-Xmx1536m"
+      set -e; mkdir -p "$HOME"; g="./gradlew --console=plain --build-cache --no-configuration-cache --max-workers=4 -Dorg.gradle.jvmargs=-Xmx1536m${CDIR:+ -Popenrune.central.includeBuild=$CDIR}"
       mkdir -p ~/.openrune/caches && cp -an /dl/. ~/.openrune/caches/ 2>/dev/null || true
       s=/store/s-$CK   # every output of the cache step: api/generated is compiled, the gamevals are read at boot
       if [ -d $s ]; then cp -a $s/. .; else
