@@ -69,12 +69,11 @@ up() {
   docker rm -f "server-$slug" "http-$slug" >/dev/null 2>&1 || true
   docker run -d --name "server-$slug" --cpus=4 --memory=4g -p "$game:43594" --tmpfs /app/.data/postgres:uid=1000,gid=1000,mode=0700 \
     -v "$state/key/game.key:/app/.data/game.key:ro" -v "$state/key/client.key:/app/.data/client.key:ro" "or:$T" >/dev/null
-  docker run --rm --entrypoint cat osrs-rsps-test:241 /app/protocol/jav_config.ws.template \
-    | sed -E "s#https?://[A-Za-z0-9.-]*(jagex|runescape)\.com[^[:space:]]*#http://127.0.0.1:$http/#g" > "$state/jav_config.ws.template"
-  docker run -d --name "http-$slug" -p "$http:8080" -v "$sidecar_data:/data:ro" -v "$state/jav_config.ws.template:/app/protocol/jav_config.ws.template:ro" \
+  docker run -d --name "http-$slug" -p "$http:8080" -v "$sidecar_data:/data:ro" -v "$self/server/jav_config.ws.template:/app/protocol/jav_config.ws.template:ro" \
     -e WORLD_HOST=127.0.0.1 -e HTTP_PUBLIC_PORT="$http" -e WORLD_ID=255 -e SAVE_DIR=/tmp/saves -e JAV_CONFIG_TEMPLATE=/app/protocol/jav_config.ws.template \
     -e LOCAL_AUTH=false -e PROOF_OF_WORK=false -e VALIDATE_CRCS=false osrs-rsps-test:241 >/dev/null
   ready "server-$slug"
+  python3 "$self/server/javcheck.py" "http://127.0.0.1:$http/jav_config.ws" || { down; return 1; }   # no client is pointed at a foreign host
   modulus=$(openssl rsa -in "$state/key/game.key" -noout -modulus | cut -d= -f2 | tr A-F a-f)
   clients=()
   for i in $(seq 1 "$n"); do
@@ -131,6 +130,7 @@ EOF
   if ready osrs-openrune "$since"; then
     python3 -c 'import json,sys;json.dump({"tree":sys.argv[1],"commit":sys.argv[2],"heads":sys.argv[3].split(),"names":sys.argv[4].split(),"rollback":sys.argv[5]},open(sys.argv[6],"w"))' \
       "$T" "$arg" "${HEADS:-}" "${NAMES:-}" "rollback-${prev:0:12}" "$state/tree.json"; echo "live: $T"
+    for c in osrs-openrune-http osrs-openrune-http-desktop; do python3 "$self/server/javcheck.py" "http://127.0.0.1:$(docker port "$c" 8080 | head -1 | cut -d: -f2)/jav_config.ws" || return 6; done
   else
     docker tag "osrs-openrune:rollback-${prev:0:12}" "$live_image"; (cd "$compose_dir" && docker compose --env-file switch.env up -d --no-deps openrune) >/dev/null
     echo "deploy of $T failed: rolled back to ${prev:0:12}"; return 1

@@ -155,5 +155,13 @@ class Measure(unittest.TestCase):
         shutil.rmtree(root)
 
 
+class JavConfig(unittest.TestCase):
+    def test_template_names_local_hosts_only(s):
+        import javcheck
+        t = (HERE / "jav_config.ws.template").read_text(encoding="utf-8").replace("{{HTTP_BASE}}", "http://127.0.0.1:8080").replace("{{WORLD_HOST}}", "10.0.2.2")
+        s.assertEqual(javcheck.foreign(t), [])
+        s.assertEqual(javcheck.foreign('x=["https://legal.jagex.com/docs"T] param=19=1-a.apps.googleusercontent.com'), ["1-a.apps.googleusercontent.com", "legal.jagex.com"])
+
+
 if __name__ == "__main__":
     unittest.main()
