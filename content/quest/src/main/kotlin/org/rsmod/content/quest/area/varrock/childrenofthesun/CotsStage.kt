@@ -6,6 +6,7 @@ import org.rsmod.api.player.dialogue.Dialogue
 internal object CotsStage {
     const val NotStarted = 0
     const val Started = 2
+    const val Delegation = 4
     const val Tailing = 6
     const val Eavesdropping = 8
     const val ReportToTobyn = 10

@@ -28,8 +28,9 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
         "quest_childrenofthesun",
         "varp.vmq1_primary",
         rewards { extra("Access to Varlamore") },
-        ItemRewardDisplay(RewardModel),
+        ItemRewardDisplay(RewardModel, zoom = 400),
         questVarbit = "varbit.vmq1",
+        completeJingle = "jingle.mastermindless",
     ) {
 
     @Inject
@@ -65,6 +66,9 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
         onPlayerTimer(TailTimer) { tailTick() }
         onPlayerLogin {
             tails.stop(player)
+            if (stage(player) == CotsStage.Eavesdropping) {
+                VarPlayerIntMapSetter.set(player, "varbit.vmq1", CotsStage.ReportToTobyn)
+            }
             syncGuards(player)
         }
         onPlayerLogout { tails.stop(player) }
@@ -90,7 +94,7 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
                 "I have marked <red>${markedCount(access.player)}</red> of the " +
                     "<red>$BanditCount</red> bandits so far."
             ) {
-                visibleWhen { stage(access.player) in CotsStage.Marking..CotsStage.MarkedAll }
+                visibleWhen { stage(access.player) == CotsStage.Marking }
             }
         }
 
@@ -122,15 +126,17 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
     }
 
     fun syncGuards(player: Player) {
-        val marking = stage(player) in CotsStage.Marking..CotsStage.MarkedAll
+        val stage = stage(player)
         for (guard in 1..CotsNpc.GuardCount) {
             val varbit = CotsNpc.guardVarbit(guard)
             val current = player.vars[varbit]
             val wanted =
-                when {
-                    !marking -> GuardHidden
-                    current == GuardHidden -> GuardUnmarked
-                    else -> current
+                when (stage) {
+                    CotsStage.ReportToTobyn -> GuardShown
+                    CotsStage.Marking -> if (current == GuardMarked) current else GuardUnmarked
+                    CotsStage.MarkedAll ->
+                        if (guard <= CotsNpc.BanditGuards) GuardHidden else GuardShown
+                    else -> GuardHidden
                 }
             if (current != wanted) {
                 VarPlayerIntMapSetter.set(player, varbit, wanted)
@@ -148,7 +154,7 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
         }
 
     private suspend fun ProtectedAccess.markGuard(guard: Int) {
-        if (stage(player) !in CotsStage.Marking..CotsStage.MarkedAll) {
+        if (stage(player) != CotsStage.Marking) {
             return
         }
         if (markedCount(player) >= CotsNpc.BanditGuards) {
@@ -157,20 +163,14 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
         }
         VarPlayerIntMapSetter.set(player, CotsNpc.guardVarbit(guard), GuardMarked)
         mes("You mark the guard.")
-        if (markedCount(player) == CotsNpc.BanditGuards && markedCorrectly(player)) {
-            setStage(CotsStage.MarkedAll)
-        }
     }
 
     private fun ProtectedAccess.unmarkGuard(guard: Int) {
-        if (stage(player) !in CotsStage.Marking..CotsStage.MarkedAll) {
+        if (stage(player) != CotsStage.Marking) {
             return
         }
         VarPlayerIntMapSetter.set(player, CotsNpc.guardVarbit(guard), GuardUnmarked)
         mes("You unmark the guard.")
-        if (stage(player) == CotsStage.MarkedAll) {
-            setStage(CotsStage.Marking)
-        }
     }
 
     internal suspend fun ProtectedAccess.tailTick() {
@@ -217,6 +217,7 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
                 )
                 delegationTopics()
             }
+            CotsStage.Delegation -> delegationScene()
             CotsStage.Tailing -> {
                 noah(
                     quiz,
@@ -230,23 +231,22 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
 
     private suspend fun Dialogue.beforeQuest() {
         if (!player.metAlina) {
-            noah(quiz, "So they're from the west?")
+            noah(confused, "So they're from the west?")
             alina(
                 happy,
                 "Yes! They call it Varlamore, the Shining Kingdom! It's meant to be one of the " +
                     "most beautiful places in the world!",
             )
-            chatPlayer(quiz, "What are you talking about?")
-            player.metAlina = true
+            chatPlayer(confused, "What are you talking about?")
             alina(happy, "Oh, hello! Are you here to see the delegation?")
-            chatPlayer(quiz, "Delegation?")
+            chatPlayer(confused, "Delegation?")
             noah(confused, "See! It's not just me who doesn't know what's happening.")
             alina(
                 happy,
                 "The delegation from Varlamore, of course! After all these years, they're " +
                     "finally opening up the kingdom for travel and trade! Isn't it exciting?",
             )
-            noah(bored, "Why would I be excited about a place I never even knew existed?")
+            noah(confused, "Why would I be excited about a place I never even knew existed?")
         }
         alina(
             happy,
@@ -254,22 +254,23 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
                 "first outsiders to step foot there? Think of the adventure!",
         )
         noah(
-            worried,
+            confused,
             "Adventure? Sounds dangerous. I'll be staying right here, thank you very much!",
         )
-        alina(angry, "Bah! Boring! What about you, stranger?")
+        player.metAlina = true
+        alina(happy, "Bah! Boring! What about you, stranger?")
         if (!startQuestPrompt(quest)) {
             chatPlayer(neutral, "I'm not sure. Doesn't really sound like my kind of thing.")
             alina(neutral, "Well... suit yourself, I guess.")
             return
         }
+        quest.setQuestStage(access, CotsStage.Started)
         chatPlayer(happy, "Well I'm actually something of an adventurer myself.")
         alina(
-            laugh,
+            happy,
             "That's the spirit! I bet you'll want to be one of the first to head over to " +
                 "Varlamore!",
         )
-        quest.setQuestStage(access, CotsStage.Started)
         delegationTopics()
     }
 
@@ -358,7 +359,12 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
         chatPlayer(quiz, "When will this delegation arrive?")
         alina(happy, "Well it should be any time now!")
         noah(confused, "Hang on... what's going on over there?")
-        alina(shocked, "Wait! That's them! They're here!")
+        alina(happy, "Wait! That's them! They're here!")
+        delegationScene()
+    }
+
+    private suspend fun Dialogue.delegationScene() {
+        quest.setQuestStage(access, CotsStage.Delegation)
         scenes.delegation(access)
         quest.setQuestStage(access, CotsStage.Tailing)
         tails.start(access)
@@ -369,8 +375,8 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
             CotsStage.Tailing,
             CotsStage.Eavesdropping -> tobyn(neutral, "Move along, citizen.")
             CotsStage.ReportToTobyn -> reportBandits()
-            CotsStage.Marking,
-            CotsStage.MarkedAll -> markingStage()
+            CotsStage.Marking -> markingStage()
+            CotsStage.MarkedAll -> escort()
             CotsStage.OnRoof,
             CotsStage.Interrogating,
             CotsStage.Interrogated,
@@ -389,27 +395,27 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
 
     private suspend fun Dialogue.reportBandits() {
         tobyn(neutral, "Move along, citizen.")
-        chatPlayer(shocked, "Wait! I have some information that you need to hear.")
+        chatPlayer(neutral, "Wait! I have some information that you need to hear.")
         tobyn(quiz, "What is it?")
         chatPlayer(
-            worried,
+            neutral,
             "There are some bandits disguising themselves as guards! I think they're planning " +
                 "to attack the delegation from Varlamore!",
         )
         tobyn(confused, "Surely you can't be serious?")
         chatPlayer(
-            worried,
+            neutral,
             "It's true! One of them infiltrated your guards and stole some uniforms. He came " +
                 "right through here earlier with them.",
         )
         tobyn(
-            quiz,
+            confused,
             "The one with the large bag? I thought I didn't recognise him, but then it's so " +
                 "hard to keep up. We get through guards so quickly around here for some reason...",
         )
         chatPlayer(quiz, "So what do we do? Should we warn the delegation?")
         tobyn(
-            neutral,
+            quiz,
             "And risk a panic? No. Better we deal with this now while they're safe in the " +
                 "palace. Do you know how many bandits there are?",
         )
@@ -429,8 +435,8 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
             neutral,
             "Return to me once you've found all four and we'll take them all at the same time.",
         )
-        chatPlayer(neutral, "Alright, I'll get to it.")
         access.setStage(CotsStage.Marking)
+        chatPlayer(neutral, "Alright, I'll get to it.")
     }
 
     private suspend fun Dialogue.markingStage() {
@@ -449,7 +455,7 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
             chatPlayer(neutral, "Alright, I'll be back soon.")
             return
         }
-        chatPlayer(happy, "Alright, I've pointed out all the bandits.")
+        chatPlayer(neutral, "Alright, I've pointed out all the bandits.")
         if (!markedCorrectly(player)) {
             tobyn(
                 confused,
@@ -458,10 +464,15 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
             )
             return
         }
-        tobyn(happy, "Good work. I'll signal my guards to bring them in...")
-        mesbox("Sergeant Tobyn signals to his guards and the bandits are quickly arrested.")
+        tobyn(neutral, "Good work. I'll signal my guards to bring them in...")
+        fadedMesbox("Sergeant Tobyn signals to his guards and the bandits are quickly arrested.")
+        access.setStage(CotsStage.MarkedAll)
+        escort()
+    }
+
+    private suspend fun Dialogue.escort() {
         tobyn(
-            happy,
+            neutral,
             "That could have ended up quite nasty if not for you. Once again, good work.",
         )
         chatPlayer(quiz, "So what happens now?")
@@ -471,7 +482,7 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
                 "information out of them.",
         )
         tobyn(
-            quiz,
+            confused,
             "Speaking of which... given it was you who found them in the first place, you might " +
                 "be able to offer some support. Would you be willing to help?",
         )
@@ -481,16 +492,17 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
             "Come with me. We'll use the cell on the palace roof for the interrogations. It's " +
                 "nice and out of the way.",
         )
-        mesbox("Sergeant Tobyn escorts you to the palace roof.")
-        access.setStage(CotsStage.OnRoof)
-        scenes.toRoof(access)
+        scenes.toRoof(access) {
+            mesbox("Sergeant Tobyn escorts you to the palace roof.")
+            access.setStage(CotsStage.OnRoof)
+        }
     }
 
     private suspend fun Dialogue.roofConversation() {
         val name = player.displayName
         when (stage(player)) {
             CotsStage.OnRoof -> {
-                itzla(neutral, "Ah, nilsal, sergeant.")
+                itzla(happy, "Ah, nilsal, sergeant.")
                 tobyn(
                     shocked,
                     "Prince Itzla! I... I'm sorry, but I wasn't expecting you here.",
@@ -501,24 +513,24 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
                         "there'd been a bit of a commotion. I thought I'd come see what the fuss " +
                         "was all about. You don't mind, do you?",
                 )
-                tobyn(worried, "Well no, it's just...")
+                tobyn(shocked, "Well no, it's just...")
                 itzla(happy, "Wonderful! And you! Who are you?")
-                chatPlayer(neutral, "Hello there. I'm $name.")
+                chatPlayer(happy, "Hello there. I'm $name.")
                 itzla(
                     happy,
-                    "$name? Kuaini! Pleased to meet you. Crown Prince Itzla Arkan, heir to the " +
+                    "$name? Kuani! Pleased to meet you. Crown Prince Itzla Arkan, heir to the " +
                         "Sun Throne, at your service.",
                 )
-                itzla(quiz, "Tell me, $name, are you the one who caught these would-be assassins?")
-                chatPlayer(neutral, "That's right.")
+                itzla(happy, "Tell me, $name, are you the one who caught these would-be assassins?")
+                chatPlayer(happy, "That's right.")
                 itzla(
                     happy,
                     "Well then, why don't you and I ask this one a few little questions. You " +
                         "don't mind, do you, sergeant?",
                 )
-                tobyn(worried, "Not at all, but...")
-                itzla(laugh, "Excellent! Let's get started then.")
+                tobyn(confused, "Not at all, but...")
                 access.setStage(CotsStage.Interrogating)
+                itzla(happy, "Excellent! Let's get started then.")
                 interrogate()
             }
             CotsStage.Interrogating -> interrogate()
@@ -536,17 +548,17 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
     private suspend fun Dialogue.afterInterrogation() {
         val name = player.displayName
         itzla(happy, "I think we got what we needed there.")
-        tobyn(quiz, "You're sure he told you everything?")
+        tobyn(confused, "You're sure he told you everything?")
         itzla(
-            laugh,
+            happy,
             "Oh yes. The fear of being cooked will do that to a person. All total rubbish of " +
                 "course! Imagine burning someone alive! We're much more civilised over in " +
                 "Varlamore.",
         )
-        itzla(happy, "We just cut out their heart while it's still beating instead.")
+        itzla(neutral, "We just cut out their heart while it's still beating instead.")
         chatPlayer(confused, "I can't tell if you're joking or not...")
         itzla(
-            neutral,
+            happy,
             "Anyway, sounds like there'll be some work to do when we get back home. An " +
                 "assassination attempt on the Teokan of Ralos... Concerning stuff. First up " +
                 "though, I'd better get back to the politics!",
@@ -558,13 +570,13 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
                 "come and go as you please!",
         )
         itzla(
-            quiz,
+            happy,
             "Now, it's entirely up to you of course, but given we have you to thank for " +
                 "stopping this plot, I'd be very keen if you'd join me in Varlamore to continue " +
                 "the investigation.",
         )
         itzla(
-            neutral,
+            happy,
             "No need to decide now, but if you do wish to accept my offer, just speak to " +
                 "Regulus Cento outside the eastern gates of this city.",
         )
@@ -572,24 +584,33 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
             happy,
             "Now, they'll be missing me downstairs. Timoiva, and may the sun light your way!",
         )
+        fadedMesbox("Itzla departs.")
         access.setStage(CotsStage.ItzlaLeft)
-        mesbox("Itzla departs.")
         finale()
     }
 
+    private suspend fun Dialogue.fadedMesbox(text: String) {
+        scenes.fadeOut(access)
+        mesbox(text)
+        scenes.fadeIn(access)
+    }
+
     private suspend fun Dialogue.finale() {
-        tobyn(neutral, "Well, that was interesting...")
+        tobyn(confused, "Well, that was interesting...")
         chatPlayer(
             quiz,
             "Not every day the heir to a far-off land comes and interrogates one of your " +
                 "prisoners?",
         )
         tobyn(
-            laugh,
+            confused,
             "Oddly enough, no. This will be an interesting report to write. And on that note, " +
                 "I'd best get to it. All the best, adventurer. Thank you for your help.",
         )
-        quest.completeQuest(access)
+        quest.completeQuest(access) {
+            VarPlayerIntMapSetter.set(player, "varbit.vmq1_questcomplete_type", 2)
+            VarPlayerIntMapSetter.set(player, "varbit.vmq2_first_travel", 1)
+        }
     }
 
     private suspend fun Dialogue.afterQuest() {
@@ -602,8 +623,8 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
         chatPlayer(neutral, "Not yet.")
         tobyn(
             neutral,
-            "Prince Itzla said one of his people would meet you just outside the eastern gates. " +
-                "It might be worth heading over there.",
+            "Prince Itzla said that one of his people would meet you just outside the eastern " +
+                "gates. Might be worth heading over there.",
         )
         chatPlayer(happy, "I might just do that. Thanks!")
     }
@@ -611,7 +632,7 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
     private class JournalStep(val from: Int, val until: Int, val text: String)
 
     private companion object {
-        private const val RewardModel = "obj.sunfirerune"
+        private const val RewardModel = "obj.cooked_chicken"
 
         private const val BanditCount = CotsNpc.BanditGuards
 
@@ -620,12 +641,13 @@ internal constructor(private val scenes: CotsScenes, private val tails: CotsTail
         private const val GuardHidden = 0
         private const val GuardUnmarked = 1
         private const val GuardMarked = 2
+        private const val GuardShown = 3
 
         private val JournalSteps =
             listOf(
                 JournalStep(
                     CotsStage.Started,
-                    CotsStage.Started,
+                    CotsStage.Delegation,
                     "I should talk to <red>Alina</red> or <red>Noah</red> in <red>Varrock " +
                         "Square</red> and ask when the <red>delegation</red> arrives.",
                 ),
