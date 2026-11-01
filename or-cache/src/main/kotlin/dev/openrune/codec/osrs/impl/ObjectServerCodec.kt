@@ -68,9 +68,9 @@ class ObjectServerCodec(
         actions = obj.actions
 
         val customData = custom?.get(id)
+        desc = customData?.desc?.takeIf { it.isNotEmpty() } ?: examines[obj.id] ?: ""
 
         if (customData != null) {
-            desc = customData.desc.takeIf { it.isNotEmpty() } ?: examines[obj.id] ?: ""
             contentGroup = customData.contentGroup
         }
     }

@@ -169,6 +169,7 @@ class NpcServerCodec(
         paramsRaw = obj.params?.toMutableMap() ?: mutableMapOf()
 
         val customData = custom?.get(id)
+        examine = customData?.examine?.takeIf { it.isNotEmpty() } ?: examines[obj.id] ?: ""
 
         if (customData != null) {
             customData.paramsRaw?.forEach { (paramId, value) -> paramsRaw?.set(paramId, value) }
@@ -184,7 +185,6 @@ class NpcServerCodec(
             defaultMode = customData.defaultMode
             blockWalk = customData.blockWalk
             respawnRate = customData.respawnRate
-            examine = customData.examine.takeIf { it.isNotEmpty() } ?: examines[obj.id] ?: ""
             maxRange = customData.maxRange
             wanderRange = customData.wanderRange
             attackRange = customData.attackRange
