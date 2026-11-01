@@ -49,6 +49,7 @@ import net.rsprot.protocol.game.incoming.social.IgnoreListDel
 import net.rsprot.protocol.message.codec.incoming.GameMessageConsumerRepositoryBuilder
 import net.rsprot.protocol.message.codec.incoming.provider.DefaultGameMessageConsumerRepositoryProvider
 import org.rsmod.api.net.rsprot.handlers.ClanChannelFullRequestHandler
+import org.rsmod.api.net.rsprot.handlers.ClanMessagePublicHandler
 import org.rsmod.api.net.rsprot.handlers.ClanSettingsFullRequestHandler
 import org.rsmod.api.net.rsprot.handlers.ClickWorldMapHandler
 import org.rsmod.api.net.rsprot.handlers.ClientCheatHandler
@@ -67,7 +68,6 @@ import org.rsmod.api.net.rsprot.handlers.IgnoreListDeleteHandler
 import org.rsmod.api.net.rsprot.handlers.InputEventHandler
 import org.rsmod.api.net.rsprot.handlers.MapBuildCompleteHandler
 import org.rsmod.api.net.rsprot.handlers.MessagePrivateHandler
-import org.rsmod.api.net.rsprot.handlers.MessagePublicHandler
 import org.rsmod.api.net.rsprot.handlers.MoveGameClickHandler
 import org.rsmod.api.net.rsprot.handlers.MoveMinimapClickHandler
 import org.rsmod.api.net.rsprot.handlers.OpLoc6Handler
@@ -108,7 +108,6 @@ constructor(
     private val opNpc6: OpNpc6Handler,
     private val opPlayer: OpPlayerHandler,
     private val opPlayerT: OpPlayerTHandler,
-    private val messagePublic: MessagePublicHandler,
     private val messagePrivate: MessagePrivateHandler,
     private val friendListAdd: FriendListAddHandler,
     private val friendListDelete: FriendListDeleteHandler,
@@ -134,6 +133,7 @@ constructor(
     private val scriptTriggerHandler: IfScriptTriggerHandler,
     private val clanChannelFullRequest: ClanChannelFullRequestHandler,
     private val clanSettingsFullRequest: ClanSettingsFullRequestHandler,
+    private val clanMessagePublic: ClanMessagePublicHandler,
     private val eventBus: EventBus,
 ) {
     fun get(): DefaultGameMessageConsumerRepositoryProvider<Player> {
@@ -151,7 +151,7 @@ constructor(
         builder.addListener(OpNpc6::class.java, opNpc6)
         builder.addListener(OpPlayer::class.java, opPlayer)
         builder.addListener(OpPlayerT::class.java, opPlayerT)
-        builder.addListener(MessagePublic::class.java, messagePublic)
+        builder.addListener(MessagePublic::class.java, clanMessagePublic)
         builder.addListener(MessagePrivate::class.java, messagePrivate)
         builder.addListener(FriendListAdd::class.java, friendListAdd)
         builder.addListener(FriendListDel::class.java, friendListDelete)
