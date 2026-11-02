@@ -3,6 +3,7 @@ package org.rsmod.content.interfaces.gameframe.script
 import dev.openrune.ServerCacheManager
 import dev.openrune.definition.type.widget.IfEvent
 import jakarta.inject.Inject
+import org.rsmod.api.net.clan.Clans
 import org.rsmod.api.net.friendchat.FRIEND_CHAT_CHANGES_TIMER
 import org.rsmod.api.net.friendchat.FRIEND_CHAT_ENTER_OPTION
 import org.rsmod.api.net.friendchat.FRIEND_CHAT_KICK_OPTION
@@ -28,6 +29,7 @@ import org.rsmod.plugin.scripts.PluginScript
 import org.rsmod.plugin.scripts.ScriptContext
 
 private const val CHANNEL_NAME_MAX_LENGTH = 12
+private const val CLAN_TAB = 1
 
 private val RANK_EVENTS =
     arrayOf(
@@ -52,7 +54,11 @@ private val CHANNEL_TABS =
 
 class ChatChannelScript
 @Inject
-constructor(private val friendChats: FriendChats, private val eventBus: EventBus) : PluginScript() {
+constructor(
+    private val friendChats: FriendChats,
+    private val clans: Clans,
+    private val eventBus: EventBus,
+) : PluginScript() {
     private var Player.channelTab by intVarBit("varbit.side_channels_tab_selected")
 
     override fun ScriptContext.startup() {
@@ -96,7 +102,9 @@ constructor(private val friendChats: FriendChats, private val eventBus: EventBus
     }
 
     private fun Player.openChannelTab(tab: Int) {
-        val interf = CHANNEL_TABS.getOrNull(tab) ?: return
+        val interf =
+            if (tab == CLAN_TAB && clans.isFounding(this)) "interface.clans_creation_sidepanel"
+            else CHANNEL_TABS.getOrNull(tab) ?: return
         ifOpenOverlay(interf, "component.side_channels:contents", eventBus)
     }
 

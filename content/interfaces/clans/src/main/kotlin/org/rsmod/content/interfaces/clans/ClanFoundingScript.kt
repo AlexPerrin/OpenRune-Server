@@ -148,6 +148,7 @@ class ClanFoundingScript @Inject constructor(private val clans: Clans, private v
     private suspend fun Dialogue.formClan() {
         if (player in foundings || foundings.values.any { player in it.founders }) {
             chatNpc(neutral, "You are already forming a clan. Use the side panel to finish it.")
+            openPanel(player)
             return
         }
         if (player.vars["varp.playtime"] < FOUNDER_PLAYTIME) {
@@ -173,6 +174,7 @@ class ClanFoundingScript @Inject constructor(private val clans: Clans, private v
     }
 
     private fun openPanel(player: Player) {
+        clans.setFounding(player, true)
         VarPlayerIntMapSetter.set(player, "varbit.side_channels_tab_selected", CLAN_TAB)
         player.ifOpenOverlay("interface.clans_creation_sidepanel", "component.side_channels:contents", eventBus)
     }
@@ -286,6 +288,7 @@ class ClanFoundingScript @Inject constructor(private val clans: Clans, private v
     }
 
     private fun closePanel(player: Player) {
+        clans.setFounding(player, false)
         if (player.ui.containsOverlay("interface.clans_creation_sidepanel")) {
             player.ifOpenOverlay("interface.clans_sidepanel", "component.side_channels:contents", eventBus)
         }

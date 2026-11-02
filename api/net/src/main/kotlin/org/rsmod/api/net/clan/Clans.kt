@@ -58,6 +58,7 @@ constructor(
     private val clanOf = HashMap<Player, Clan>()
     private val sessions = HashSet<Player>()
     private val founderInvites = HashMap<Player, Player>()
+    private val founding = HashSet<Player>()
     private var messageCounter = 0
 
     init {
@@ -73,6 +74,12 @@ constructor(
         clan.online.firstOrNull { it.characterId == characterId }
 
     public fun isLoggedIn(player: Player): Boolean = player in sessions
+
+    public fun isFounding(player: Player): Boolean = player in founding
+
+    public fun setFounding(player: Player, founder: Boolean) {
+        if (founder) founding += player else founding -= player
+    }
 
     public fun inviteFounder(invitee: Player, leader: Player) {
         founderInvites[invitee] = leader
@@ -154,6 +161,7 @@ constructor(
         sessions -= player
         founderInvites.remove(player)
         founderInvites.values.removeIf { it == player }
+        founding -= player
         val clan = clanOf.remove(player) ?: return
         leaveChannel(player, clan, explicit = false)
         clan.online -= player
