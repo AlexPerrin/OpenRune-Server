@@ -4,12 +4,14 @@ import dev.openrune.ServerCacheManager
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import jakarta.inject.Inject
+import org.rsmod.api.player.hook.PlayerPostTickHook
 import org.rsmod.api.player.midiJingle
 import org.rsmod.api.player.midiSong
 import org.rsmod.api.player.output.ChatType
 import org.rsmod.api.player.output.mes
 import org.rsmod.api.player.output.runClientScript
 import org.rsmod.api.player.protect.ProtectedAccess
+import org.rsmod.api.player.stat.statBase
 import org.rsmod.api.player.vars.VarPlayerIntMapSetter
 import org.rsmod.api.repo.world.WorldRepository
 import org.rsmod.api.script.advanced.onAdvanceCombat
@@ -27,7 +29,7 @@ import org.rsmod.plugin.scripts.ScriptContext
 public class LevelUpScript
 @Inject
 constructor(private val worldRepo: WorldRepository, private val worldQueues: WorldQueueList) :
-    PluginScript() {
+    PluginScript(), PlayerPostTickHook {
     private val unlocks by lazy { SkillUnlocks.load() }
     private val guideUnlocks by lazy { LevelUpUnlocks.load() }
 
@@ -45,6 +47,31 @@ constructor(private val worldRepo: WorldRepository, private val worldQueues: Wor
         onIfOverlayButton(STATS_STONE) { VarPlayerIntMapSetter.set(player, FLASHSIDE_VARBIT, 0) }
     }
 
+    override fun onPostTick(player: Player) {
+        val queues = player.engineQueueList.iterator() ?: return
+        while (queues.hasNext()) {
+            val advance = queues.next().args as? StatAdvance ?: continue
+            player.guideList(advance)
+        }
+        queues.cleanUp()
+    }
+
+    private fun Player.guideList(advance: StatAdvance) {
+        val stat = LevelUpStat.of(advance.stat) ?: return
+        val level = statBase(advance.stat.internalName)
+        // UNVERIFIED: the guide list setting turning off the list, flash and hint (guess)
+        if (vars[GUIDE_LIST_DISABLED_VARBIT] != 0) {
+            return
+        }
+        if (guideUnlocks.between(stat.guide, advance.previousLevel, level).isEmpty()) {
+            return
+        }
+        if (vars[stat.listVarbit] == 0) {
+            VarPlayerIntMapSetter.set(this, stat.listVarbit, advance.previousLevel + 1)
+        }
+        VarPlayerIntMapSetter.set(this, FLASHSIDE_VARBIT, FLASHSIDE_STATS)
+    }
+
     private suspend fun ProtectedAccess.advanceStat(advance: StatAdvance) {
         val type = advance.stat
         val stat = LevelUpStat.of(type) ?: return
@@ -55,7 +82,7 @@ constructor(private val worldRepo: WorldRepository, private val worldQueues: Wor
 
         val guideUnlocked = guideUnlocks.between(stat.guide, advance.previousLevel, level)
         if (guideUnlocked.isNotEmpty()) {
-            skillGuidePrompt(stat, advance.previousLevel, guideUnlocked, guideList)
+            skillGuidePrompt(stat, guideUnlocked, guideList)
         }
         mes(LevelUpText.message(stat.label, level, maxed = level >= type.maxLevel))
         fireworks(fireworksSpotanim(level, type.maxLevel))
@@ -72,27 +99,22 @@ constructor(private val worldRepo: WorldRepository, private val worldQueues: Wor
 
     private fun ProtectedAccess.skillGuidePrompt(
         stat: LevelUpStat,
-        previousLevel: Int,
         unlocked: List<Int>,
         guideList: Boolean,
     ) {
-        // UNVERIFIED: the guide list setting turning off the list, flash and hint (guess)
-        if (guideList) {
-            if (player.vars[stat.listVarbit] == 0) {
-                vars[stat.listVarbit] = previousLevel + 1
-            }
-            vars[FLASHSIDE_VARBIT] = FLASHSIDE_STATS
-        }
-        val chatboxList = vars[CHATBOX_LIST_VARBIT] == 1
         val player = player
-        worldQueues.add(GUIDE_PROMPT_DELAY) {
-            if (!player.isSlotAssigned) {
-                return@add
-            }
-            if (!chatboxList) {
-                if (guideList) {
-                    player.mes(LevelUpText.guideUnlocks(stat.guide, stat.label), ChatType.LevelUpMessage)
+        if (vars[CHATBOX_LIST_VARBIT] == 0) {
+            if (guideList) {
+                worldQueues.add(GUIDE_PROMPT_DELAY) {
+                    if (player.isSlotAssigned) {
+                        player.mes(LevelUpText.guideUnlocks(stat.guide, stat.label), ChatType.LevelUpMessage)
+                    }
                 }
+            }
+            return
+        }
+        worldQueues.add(CHATBOX_LIST_DELAY) {
+            if (!player.isSlotAssigned) {
                 return@add
             }
             player.chatboxList(stat.guide, unlocked)
@@ -179,6 +201,7 @@ constructor(private val worldRepo: WorldRepository, private val worldQueues: Wor
         const val CHATBOX_LIST_SCRIPT = "clientscript.[clientscript,script7781]"
         const val CHATBOX_LIST_SLOTS = 4
         const val CHATBOX_LIST_SHOWN = 3
-        const val GUIDE_PROMPT_DELAY = 2
+        const val GUIDE_PROMPT_DELAY = 1
+        const val CHATBOX_LIST_DELAY = 2
     }
 }
