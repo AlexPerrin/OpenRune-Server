@@ -80,7 +80,8 @@ gate_sha() {  # a child of TCOMMIT whose workflows move the ephemeral ports off 
     y=$(game_data "$y")
     GIT_INDEX_FILE=$idx git -C "$repo" update-index --cacheinfo "100644,$(printf '%s\n' "$y" | git -C "$repo" hash-object -w --stdin),$f"
   done
-  git -C "$repo" commit-tree "$(GIT_INDEX_FILE=$idx git -C "$repo" write-tree)" -p "$TCOMMIT" -m "gate: $TCOMMIT${CENTRAL:+ with Central ${ccommit:-}}"
+  d=$(git -C "$repo" show -s --format=%cI "$TCOMMIT")   # dated as T: the same T and workflows push the same sha, whose green runs answer gate-ci again with no new run
+  GIT_AUTHOR_DATE=$d GIT_COMMITTER_DATE=$d git -C "$repo" commit-tree "$(GIT_INDEX_FILE=$idx git -C "$repo" write-tree)" -p "$TCOMMIT" -m "gate: $TCOMMIT${CENTRAL:+ with Central ${ccommit:-}}"
 }
 gate_ci() {  # pushes T (gate_sha) to gate/<slug>; the newest run of each workflow at that sha concludes green, or the row fails;
   # a run failed at a step the head does not touch is the source's, not the head's: re-run once that source answers; held (exit 75: hd records no result) after 3 attempts
