@@ -12,8 +12,10 @@
 #                     workflows first move the runner's ephemeral ports above the game port 43594 (an outgoing socket on it
 #                     fails the boot's bind), and with CENTRAL build that Central in, as build does (the change's head unchanged)
 #                     and whose CI restores the game data from the fork release asset game-data-<game.example.yml blob12>
-#                     (seeded once from or:<T>) on an actions/cache miss, never openrs2; a run failed at a step the head does not
-#                     touch is re-run once its source answers, and after 3 attempts the row exits 75: held, no result
+#                     (seeded once from or:<T>) on an actions/cache miss, never openrs2 (no asset fails that step, the runner's);
+#                     each step is timed alone (the job's timeout-minutes on every step), so a timeout names the step that ran
+#                     out; a run failed at a step the head does not touch is re-run once its source answers, and after 3
+#                     attempts the row exits 75: held, no result
 . "$(dirname "$0")/../build/build.sh"   # verb slug arg self(tools/build) repo root state dev copy atomic record tree central build
 projects() { local f d; for f; do d=$(dirname "$f"); while [ "$d" != . ] && [ ! -f "$copy/$d/build.gradle.kts" ]; do d=$(dirname "$d"); done; [ "$d" = . ] || { [ "${d##*/}" = pack ] && d=${d%/pack}/$(basename "${d%/pack}")-pack; echo ":${d//\//:}"; }; done | sort -u; }   # the Gradle projects holding these files: settings.gradle.kts names a pack directory <parent>-pack
 projdir() { local d=${1#:}; d=${d//://}; [ "${d##*/}" = "$(basename "$(dirname "$d")")-pack" ] && d=$(dirname "$d")/pack; echo "$d"; }   # a project's directory
@@ -37,11 +39,10 @@ gradle_check() {  # gradle_check test|spotless [MODULE...]: spotless's JGit cann
   git -C "$copy" update-index -q --refresh || true; cp "$(git -C "$copy" rev-parse --absolute-git-dir)/index" "$g/index"
   echo "gitdir: $g" > "$state/$kind.gitfile"; mkdir -p "$out"
   for d in "${mods[@]}"; do rm -rf "$copy/$(projdir "$d")/build/test-results/test"; done   # the report is this run's
-  docker run --rm -v "gradle-$slug:/gradle" -v or-dl:/dl eclipse-temurin:21 chown 1000:1000 /gradle /dl   # creates or reuses the slug's volumes: one docker makes is root's, the run is 1000 (spotless runs on a slug never built)
+  docker run --rm -v "gradle-$slug:/gradle" eclipse-temurin:21 chown 1000:1000 /gradle   # creates or reuses the slug's volume: one docker makes is root's, the run is 1000 (spotless runs on a slug never built)
   central; docker run --rm --name "$kind-$slug" --cpus=4 --memory=5g -u 1000:1000 -e HOME=/gradle/home -e GRADLE_USER_HOME=/gradle -e CDIR="$cdir" \
-    -v "gradle-$slug:/gradle" -v or-dl:/dl "${cvols[@]}" -v "$repo/.git:$repo/.git:ro" -v "$g:$g:ro" -v "$copy:$copy" -v "$state/$kind.gitfile:$copy/.git:ro" -w "$copy" \
-    eclipse-temurin:21 bash -c 'oc=$(getent passwd "$(id -u)" | cut -d: -f6)/.openrune/caches; mkdir -p $oc && cp -an /dl/. $oc/ 2>/dev/null || true
-      ./gradlew --console=plain --build-cache --no-configuration-cache --max-workers=4 -Dorg.gradle.jvmargs=-Xmx1536m${CDIR:+ --init-script /central.init.gradle} --continue "$@"' _ \
+    -v "gradle-$slug:/gradle" "${cvols[@]}" -v "$repo/.git:$repo/.git:ro" -v "$g:$g:ro" -v "$copy:$copy" -v "$state/$kind.gitfile:$copy/.git:ro" -w "$copy" \
+    eclipse-temurin:21 bash -c './gradlew --console=plain --build-cache --no-configuration-cache --max-workers=4 -Dorg.gradle.jvmargs=-Xmx1536m${CDIR:+ --init-script /central.init.gradle} --continue "$@"' _ \
     $([ "$kind" = test ] && printf '%s:test ' "${mods[@]}") $(printf '%s:spotlessCheck ' "${mods[@]}") > "$out/$kind.log" 2>&1 && ok=true || ok=false
   for d in "${mods[@]}"; do cat "$copy/$(projdir "$d")"/build/test-results/test/*.xml 2>/dev/null | grep -o '<testsuite name="[^"]*" tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' || true; done >> "$out/$kind.log"
   record "$ok" "$kind" < "$out/$kind.log"; grep -E -A1 '^<testsuite|went wrong|violations|FAILED|BUILD' "$out/$kind.log" | grep -v '^--$' || true; [ "$ok" = true ]
@@ -98,30 +99,34 @@ gate_ci() {  # pushes T (gate_sha) to gate/<slug>; the newest run of each workfl
     sleep 30   # the next read is conditional: while no run changes GitHub answers 304, which costs no quota
   done; echo "CI and Formatting green at $sha (T $TCOMMIT)"
 }
-game_data() {  # workflow $1 with a step restoring the game data from the fork release asset game-data-<k> on an actions/cache miss, so the gate never downloads openrs2's cache
+game_data() {  # workflow $1 with a step restoring the game data from the fork release asset game-data-<k> on an actions/cache miss, so the gate never downloads openrs2's cache;
+  # and the job's timeout on each step, so a slow download never times out in a step that reads the head (cannon's run 41366859771 timed out in 'Compile and run tests')
   K=$(git -C "$repo" rev-parse -q --verify "$TCOMMIT:game.example.yml" | cut -c1-12 || true) python3 -c '
-import os, sys
+import os, re, sys
 y, k = sys.argv[1], os.environ["K"]
+def timed(y):
+    m = re.search(r"^    timeout-minutes: (\d+)\n", y, re.M)
+    return re.sub(r"^(      - name: .*\n)", rf"\g<1>        timeout-minutes: {m.group(1)}\n", y.replace(m.group(0), "", 1), flags=re.M) if m else y
 gen = "      - name: Generate cache and gameval sources\n"
 if not k or "id: gamecache" not in y or gen not in y:
-    print(y); sys.exit()
+    print(timed(y)); sys.exit()
 step = ("      - name: Game data of the gate (tools/gate/gate.sh gate-ci)\n        id: gamedata\n        if: steps.gamecache.outputs.cache-hit != \x27true\x27\n"
-        "        continue-on-error: true\n        env:\n          GH_TOKEN: ${{ github.token }}\n"
+        "        env:\n          GH_TOKEN: ${{ github.token }}\n"
         f"        run: mkdir -p .data && gh release download game-data -R \"$GITHUB_REPOSITORY\" -p game-data-{k}.tar.gz -O - | tar -xz -C .data\n\n")
 y = y.replace(gen, step + gen, 1)
 y = y.replace("if: steps.gamecache.outputs.cache-hit != \x27true\x27\n        run: ./gradlew :or-cache:freshCache",
               "if: steps.gamecache.outputs.cache-hit != \x27true\x27 && steps.gamedata.outcome != \x27success\x27\n        run: ./gradlew :or-cache:freshCache")
 y = y.replace("if: steps.gamecache.outputs.cache-hit == \x27true\x27\n", "if: steps.gamecache.outputs.cache-hit == \x27true\x27 || steps.gamedata.outcome == \x27success\x27\n")
-print(y)' "$1"
+print(timed(y))' "$1"
 }
 seed() {  # the fork release asset game-data-<k> (k: game.example.yml's blob, which names the revision and so openrs2's cache id) from the image of T, once per k: CI reads it on an actions/cache miss
   local k a f; k=$(git -C "$repo" rev-parse -q --verify "$TCOMMIT:game.example.yml" | cut -c1-12) && [ -n "$k" ] || return 0; a=game-data-$k.tar.gz; f=$state/$a
   gh release view game-data -R "$R" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "$a" && return 0
-  docker image inspect "or:${T:-}" >/dev/null 2>&1 || { echo "no or:${T:-} to seed $a from: CI downloads the cache from openrs2"; return 0; }
+  docker image inspect "or:${T:-}" >/dev/null 2>&1 || { echo "no or:${T:-} to seed $a from: CI waits on it"; return 0; }
   docker run --rm --entrypoint tar "or:$T" -cz -C /app/.data cache/LIVE gamevals-binary/gamevals.dat gamevals-binary/gamevals_generated.dat > "$f.tmp" || { rm -f "$f.tmp"; echo "seeding $a failed"; return 0; }
   mv -f "$f.tmp" "$f"
   gh release view game-data -R "$R" >/dev/null 2>&1 || gh release create game-data -R "$R" --prerelease --title "game data" --notes "The harness gate's game data, one asset per game.example.yml" || true
-  gh release upload game-data "$f" -R "$R" --clobber || echo "seeding $a failed: CI downloads the cache from openrs2"; rm -f "$f"
+  gh release upload game-data "$f" -R "$R" || echo "seeding $a failed or another gate's upload stands"; rm -f "$f"
 }
 failed_step() {  # the first step of run $1 that failed or was stopped (a cancel, ci.yml's timeout) (one read per such run)
   until gh api "repos/$R/actions/runs/$1/jobs" -q '[.jobs[].steps[] | select(.conclusion == "failure" or .conclusion == "cancelled") | .name][0] // ""'; do sleep 30; done
@@ -133,8 +138,10 @@ infra() {  # step $1 reads nothing the head changes: the runner's setup, the cac
       ! git -C "$repo" diff --name-only "$BASE...$HEAD" | grep -qE 'or-cache/|/pack/|gamevals|raw-cache|game\.example\.yml' ;;
     *) return 1 ;; esac
 }
-answers() {  # blocks until the source step $1 reads answers: GitHub for the runner's own steps (it answered this read), openrs2 for the cache's
-  case $1 in "Generate cache"*) until curl -sfI -o /dev/null https://archive.openrs2.org/; do sleep 30; done ;; esac
+answers() {  # blocks until the source step $1 reads answers: GitHub for the runner's own steps (it answered this read), the release asset for the game data's, openrs2 for the cache's
+  case $1 in "Generate cache"*) until curl -sfI -o /dev/null https://archive.openrs2.org/; do sleep 30; done ;;
+    "Game data of the gate"*) local k; k=$(git -C "$repo" rev-parse -q --verify "$TCOMMIT:game.example.yml" | cut -c1-12 || true); [ -n "$k" ] || return 0
+      until gh release view game-data -R "$R" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "game-data-$k.tar.gz"; do seed; sleep 30; done ;; esac
 }
 read_runs() {  # $runs: "<workflow> <conclusion>/<status> <id> <attempt>" of each run at sha, newest first, read with If-None-Match the last ETag (one read
   # for both workflows; a 304 leaves $runs and costs no quota). A quota refusal holds the row until GitHub's reset, never fails it.

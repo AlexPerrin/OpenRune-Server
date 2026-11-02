@@ -83,7 +83,7 @@ class NoPowerShell(unittest.TestCase):
 
 class CacheStore(unittest.TestCase):
     def test_a_store_hit_restores_every_output_of_the_cache_step(s):  # a hit without api/generated fails :api:music:compileKotlin
-        line = next(l for l in SRC.splitlines() if "cp -a --parents" in l)
+        line = next(l for l in SRC.splitlines() if "cp -a --parents" in l and "$s.tmp/" in l)
         for out in (".data/cache ", ".data/gamevals ", ".data/gamevals-binary ", "api/generated "):
             s.assertIn(out, line)
 
@@ -178,11 +178,14 @@ esac\n'''); (root / "bin/docker").chmod(0o755)
 
 
 class CacheDownload(unittest.TestCase):
-    def test_the_download_is_kept_from_the_jvms_home(s):  # the cache tool writes to user.home (the passwd home), so ~ with HOME set kept nothing: every new cache input downloaded 213 MB
-        g = SRC
-        s.assertNotIn("~/.openrune", g)
-        s.assertEqual(g.count('oc=$(getent passwd "$(id -u)" | cut -d: -f6)/.openrune/caches'), 2)
-        s.assertIn('for z in $oc/*/*/*-disk.zip', g)
+    def test_the_revision_is_downloaded_once_and_every_tree_repacks_it(s):  # 13 builds and deploys downloaded openrs2's 213 MB in a day: the store was keyed by the pack inputs, the /dl copy never filled
+        b = (HERE.parent / "build/build.sh").read_text()
+        s.assertIn('gk=$(git -C "$repo" rev-parse -q --verify "$tc:game.example.yml" | cut -c1-12', b)   # the gate's release asset key
+        c = b.split("s=/store/s-$CK d=/store/g-$GK")[1].split("generateRsa")[0]
+        s.assertLess(c.index("cp -a $d/. ."), c.index(":or-cache:freshCache"))          # a stored revision is restored, never downloaded
+        s.assertLess(c.index(":or-cache:freshCache"), c.index("mv $d.tmp $d"))            # a download is stored whole
+        s.assertIn("$g :or-cache:mergePluginGamevals :or-cache:buildCache", c)            # both repack this tree
+        s.assertNotIn("/dl", SRC)
 
 
 class ShipFailure(unittest.TestCase):
@@ -757,11 +760,15 @@ class GateCi(Repo):
         s.assertEqual(r.returncode, 1); s.assertIn("CI failure/completed at 'Generate cache and gameval sources'", r.stdout)
         s.assertFalse([c for c in calls if c.startswith("run rerun")])
 
+    def test_a_run_stopped_in_the_game_data_step_waits_on_the_asset_then_re_runs(s):  # 10 gates re-uploaded the asset at once: goblin's CI 41371460666 found none
+        r, calls, _ = s.gate([s.FAILED(1, "cancelled"), s.FAILED(1, "cancelled"), s.RUNS("success")], step="Game data of the gate (tools/gate/gate.sh gate-ci)")
+        s.assertEqual(r.returncode, 0, r.stdout + r.stderr); s.assertEqual(len([c for c in calls if c.startswith("run rerun 7")]), 1)
+
     def test_a_third_attempt_failed_outside_the_head_holds_with_no_result(s):
         r, calls, _ = s.gate([s.FAILED(3)], step="Set up Gradle")
         s.assertEqual(r.returncode, 75, r.stdout + r.stderr); s.assertIn("no result", r.stdout)
 
-    CI = ("jobs:\n  b:\n    steps:\n      - name: Set up Gradle\n        uses: gradle/actions/setup-gradle@v6\n\n      - name: Cache game data\n        id: gamecache\n        uses: actions/cache@v6\n\n"
+    CI = ("jobs:\n  b:\n    timeout-minutes: 30\n    steps:\n      - name: Set up Gradle\n        uses: gradle/actions/setup-gradle@v6\n\n      - name: Cache game data\n        id: gamecache\n        uses: actions/cache@v6\n\n"
           "      - name: Generate cache and gameval sources\n        if: steps.gamecache.outputs.cache-hit != 'true'\n        run: ./gradlew :or-cache:freshCache :or-cache:mergePluginGamevals\n\n"
           "      - name: Rebuild sources from cached game data\n        if: steps.gamecache.outputs.cache-hit == 'true'\n        run: ./gradlew :or-cache:buildCache\n")
 
@@ -780,6 +787,11 @@ class GateCi(Repo):
         s.assertLess(y.index(f"-p game-data-{k}.tar.gz"), y.index("Generate cache and gameval sources"))
         s.assertIn("cache-hit != 'true' && steps.gamedata.outcome != 'success'\n        run: ./gradlew :or-cache:freshCache", y)   # openrs2 only when neither holds it
         s.assertIn("cache-hit == 'true' || steps.gamedata.outcome == 'success'", y)
+        s.assertNotIn("continue-on-error", y)                                        # no asset fails the runner's step: openrs2 is never downloaded
+        s.assertNotIn("--clobber", calls)                                            # concurrent gates: the first upload stands, never replaced under a CI reading it
+        job, steps = y.split("    steps:\n")
+        s.assertNotIn("timeout-minutes", job)                                        # each step timed alone: a slow download times out in its own step
+        s.assertEqual(steps.count("        timeout-minutes: 30\n"), steps.count("      - name: "))
         (bin / "assets").write_text(f"game-data-{k}.tar.gz\n"); (bin / "calls").unlink(); gate()
         s.assertNotIn("release upload", (bin / "calls").read_text())                 # seeded once per game.example.yml
         for d in (fork, bin, root): shutil.rmtree(d)

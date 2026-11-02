@@ -41,19 +41,22 @@ build_locked() {
     cp -a "$repo/.m2-rsprot" "$copy/"
   fi
   ck=$(git -C "$copy" ls-tree -r "$tc" | grep -E 'or-cache/|/pack/|gamevals|raw-cache' | sha1sum | cut -c1-12)   # the cache's inputs
-  central; vols=(-v "gradle-$slug:/gradle" -v or-dl:/dl -v or-cache-store:/store "${cvols[@]}")
-  docker run --rm "${vols[@]}" eclipse-temurin:21 chown 1000:1000 /gradle /dl /store   # docker makes a new volume root's; the build runs as 1000
-  docker run --rm --name "build-$slug" --cpus=4 --memory=5g -u 1000:1000 -e HOME=/gradle/home -e GRADLE_USER_HOME=/gradle -e CK="$ck" -e CDIR="$cdir" \
+  gk=$(git -C "$repo" rev-parse -q --verify "$tc:game.example.yml" | cut -c1-12 || true)   # the game data's: the revision (game.example.yml), as the gate's release asset
+  central; vols=(-v "gradle-$slug:/gradle" -v or-cache-store:/store "${cvols[@]}")
+  docker run --rm "${vols[@]}" eclipse-temurin:21 chown 1000:1000 /gradle /store   # docker makes a new volume root's; the build runs as 1000
+  docker run --rm --name "build-$slug" --cpus=4 --memory=5g -u 1000:1000 -e HOME=/gradle/home -e GRADLE_USER_HOME=/gradle -e CK="$ck" -e GK="$gk" -e CDIR="$cdir" \
     "${vols[@]}" -v "$repo/.git:$repo/.git:ro" -v "$copy:$copy" -w "$copy" \
     eclipse-temurin:21 bash -c '
       set -e; mkdir -p "$HOME"; g="./gradlew --console=plain --build-cache --no-configuration-cache --max-workers=4 -Dorg.gradle.jvmargs=-Xmx1536m${CDIR:+ --init-script /central.init.gradle}"
-      oc=$(getent passwd "$(id -u)" | cut -d: -f6)/.openrune/caches   # the cache tool downloads to user.home, the passwd home, not $HOME
-      mkdir -p $oc && cp -an /dl/. $oc/ 2>/dev/null || true
-      s=/store/s-$CK   # every output of the cache step: api/generated is compiled, the gamevals are read at boot
+      s=/store/s-$CK d=/store/g-$GK   # s: every output of the cache step (api/generated is compiled, the gamevals are read at boot); d: the game data of the revision
       if [ -d $s ]; then cp -a $s/. .; else
-        $g :or-cache:freshCache :or-cache:mergePluginGamevals :or-cache:buildCache
+        if [ -n "$GK" ] && [ -d $d ]; then cp -a $d/. .   # the revision downloaded once: every tree repacks it, as CI on a cache hit
+        else
+          $g :or-cache:freshCache
+          [ -z "$GK" ] || { rm -rf $d.tmp && mkdir -p $d.tmp && cp -a --parents .data/cache .data/gamevals-binary/gamevals.dat .data/gamevals-binary/gamevals_generated.dat $d.tmp/ && mv $d.tmp $d; }   # whole or not at all
+        fi
+        $g :or-cache:mergePluginGamevals :or-cache:buildCache
         rm -rf $s.tmp && mkdir -p $s.tmp && cp -a --parents .data/cache .data/gamevals .data/gamevals-binary api/generated $s.tmp/ && mv $s.tmp $s
-        for z in $oc/*/*/*-disk.zip; do [ -e "$z" ] || continue; d=/dl/${z#$oc/}; [ -e "$d" ] || { mkdir -p "${d%/*}"; cp "$z" "$d.$$" && mv "$d.$$" "$d"; }; done   # the download by cache version (oldschool/<rev>/<id>-disk.zip), whole or not at all
       fi
       $g generateRsa :server:app:installDist -x test' > "$log" 2>&1 || { record false build < "$log"; echo "build failed: $log"; return 1; }
   st=$copy/.image; rm -rf "$st"; mkdir -p "$st/data"
