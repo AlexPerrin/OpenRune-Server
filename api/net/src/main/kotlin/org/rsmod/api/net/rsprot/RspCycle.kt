@@ -71,6 +71,7 @@ class RspCycle(
     fun init(player: Player) {
         player.updateCoords()
         player.queueRebuildLogin()
+        infos.worldEntityInfo.updateRenderDistance(0)
     }
 
     override fun forceSceneRebuild() {
@@ -123,6 +124,7 @@ class RspCycle(
         }
 
         session.queue(rootPackets.activeWorld)
+        infos.worldEntityInfo.updateRenderDistance(WORLD_ENTITY_RENDER_DISTANCE)
     }
 
     override fun release() {
@@ -508,5 +510,6 @@ class RspCycle(
     private companion object {
         private const val ZONE_SIZE = 8
         private const val DEFAULT_NPC_ZONE_SEARCH_RADIUS = 3
+        private const val WORLD_ENTITY_RENDER_DISTANCE = 31
     }
 }
