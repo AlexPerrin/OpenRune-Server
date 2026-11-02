@@ -482,11 +482,18 @@ class DesktopInstance(unittest.TestCase):
         err = p.communicate(timeout=60)[1]
         s.assertEqual(p.returncode, 1); s.assertIn("could not bind 7780", err); s.assertIn("BindException: Address already in use", err); s.assertNotIn("at x", err)
 
-    def test_a_launch_wsl_interop_failed_fails_up_with_its_error(s):  # sweep-51 P3-b: server-clan-channels' desktop6 logged only the interop error
-        (s.t / "desk/jdk/bin/java.exe").write_text('#!/bin/bash\necho "<3>WSL (1 - ) ERROR: UtilAcceptVsock:273: accept4 failed 110" >&2; exit 1\n')
-        p = s.sh("a", "desktop_start", stderr=subprocess.PIPE)
-        err = p.communicate(timeout=60)[1]
-        s.assertEqual(p.returncode, 1); s.assertIn("desktop 1 exited: ", err); s.assertIn("UtilAcceptVsock:273: accept4 failed 110", err)
+    def test_a_launch_wsl_interop_ended_is_launched_again_once_the_interop_answers(s):  # sweep-51 P3-b, sweep-53 P3-c: desktop logs holding only the interop error each failed a whole up
+        java = s.t / "desk/jdk/bin/java.exe"; jps = s.t / "desk/jdk/bin/jps.exe"
+        java.write_text(java.read_text().replace("#!/bin/bash\n", f'#!/bin/bash\n[ -e {s.t}/vsock ] && {{ rm {s.t}/vsock; touch {s.t}/jps-fails; echo "900 OsrsTestLauncher -Dosrstest.marker=osrs-test-run1" > {s.t}/win/900.jvm; echo "<3>WSL (1 - ) ERROR: UtilAcceptVsock:273: accept4 failed 110" >&2; exit 1; }}; ', 1))
+        jps.write_text(jps.read_text().replace("#!/bin/bash\n", f'#!/bin/bash\n[ -e {s.t}/jps-fails ] && {{ rm {s.t}/jps-fails; exit 1; }}; ', 1))   # the interop answers on the second ask
+        (s.t / "vsock").write_text("")
+        p = s.sh("a", "account() { echo h1; }; desktop_start; echo $inst $dt"); out = p.communicate(timeout=60)[0].split()   # the launch's own lines in its log: the interop error alone
+        s.assertEqual((p.returncode, out), (0, ["desktop1", "7780"])); s.assertFalse((s.t / "jps-fails").exists())
+        s.assertEqual(s.killed(), ["900"])   # a JVM the ended launch left is stopped before the next
+        s.assertEqual(len(list(s.t.glob("win/*.jvm"))), 1)
+        java.write_text('#!/bin/bash\necho "<3>WSL (1 - ) ERROR: UtilAcceptVsock:273: accept4 failed 110" >&2; echo "Error: Could not find or load main class OsrsTestLauncher"; exit 1\n')
+        p = s.sh("b", "account() { echo h1; }; desktop_start", stderr=subprocess.PIPE); err = p.communicate(timeout=60)[1]
+        s.assertEqual(p.returncode, 1); s.assertIn("desktop 2 exited: ", err); s.assertIn("Could not find or load main class", err)   # any other cause fails up
 
     def test_the_desktop_takes_jav_config_from_openrune_endpoint_alone(s):  # the user's word: one variable points every Jagex endpoint at our server
         java = s.t / "desk/jdk/bin/java.exe"
