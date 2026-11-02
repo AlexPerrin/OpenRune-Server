@@ -13,6 +13,8 @@ import net.rsprot.protocol.api.AbstractNetworkServiceFactory
 import net.rsprot.protocol.api.GameConnectionHandler
 import net.rsprot.protocol.api.bootstrap.BootstrapBuilder
 import net.rsprot.protocol.api.handlers.ExceptionHandlers
+import net.rsprot.protocol.api.handlers.idlestate.DefaultIdleStateHandlerSupplier
+import net.rsprot.protocol.api.handlers.idlestate.IdleStateHandlerSuppliers
 import net.rsprot.protocol.api.js5.Js5GroupProvider
 import net.rsprot.protocol.api.suppliers.NpcInfoSupplier
 import net.rsprot.protocol.api.suppliers.WorldEntityInfoSupplier
@@ -61,6 +63,10 @@ constructor(
         val huffman: HuffmanCodec =
             HuffmanCodec.create(Unpooled.wrappedBuffer(CacheJs5GroupProvider.huffmanData))
         return DefaultHuffmanCodecProvider(huffman)
+    }
+
+    override fun getIdleStateHandlerSuppliers(): IdleStateHandlerSuppliers {
+        return IdleStateHandlerSuppliers(js5Supplier = DefaultIdleStateHandlerSupplier(0))
     }
 
     override fun getJs5GroupProvider(): Js5GroupProvider {
