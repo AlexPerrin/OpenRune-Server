@@ -1,5 +1,5 @@
 """The contract's script rows against a throwaway git repo: python3 -m unittest tools/server/test_tools.py"""
-import json, os, re, shutil, subprocess, sys, tempfile, threading, unittest
+import json, os, re, shutil, subprocess, sys, tempfile, threading, time, unittest
 from unittest import mock
 from pathlib import Path
 SUITE_TMP = tempfile.TemporaryDirectory(prefix="tools-suite-", ignore_cleanup_errors=True)   # every temp dir of these tests and of each process they
@@ -88,6 +88,20 @@ class CacheStore(unittest.TestCase):
         line = next(l for l in SRC.splitlines() if "cp -a --parents" in l and "$s.tmp/" in l)
         for out in (".data/cache ", ".data/gamevals ", ".data/gamevals-binary ", "api/generated "):
             s.assertIn(out, line)
+
+
+class GateSha(unittest.TestCase):
+    def test_the_same_t_pushes_the_same_sha(s):  # osrs-harness sweep-85: each gate's commit-tree had a new date, so an unchanged T re-ran fork CI
+        d = tempfile.mkdtemp(); repo = f"{d}/r"; os.makedirs(f"{repo}/.github/workflows")
+        for f in ("ci", "format"):
+            Path(f"{repo}/.github/workflows/{f}.yml").write_text("steps:\n      - uses: gradle/actions/setup-gradle@v4\n")
+        git(d, "init", "-q", repo); git(repo, "add", "-A"); git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "t")
+        fn = SRC.split("\ngate_sha() {")[1].split("\n}\ngame_data()")[0]
+        sh = f"game_data() {{ cat <<< \"$1\"; }}\ngate_sha() {{{fn}\n}}\ngate_sha"
+        env = {**os.environ, "repo": repo, "state": d, "TCOMMIT": git(repo, "rev-parse", "HEAD"), "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+        run = lambda: subprocess.run(["bash", "-c", sh], capture_output=True, text=True, env={**env, "GIT_COMMITTER_DATE": str(time.time_ns())[:10] + " +0000"})
+        a = run(); time.sleep(1.1); b = run()
+        s.assertEqual(a.returncode, 0, a.stderr); s.assertRegex(a.stdout.strip(), r"^[0-9a-f]{40}$"); s.assertEqual(a.stdout, b.stdout)
 
 
 class Central(unittest.TestCase):
