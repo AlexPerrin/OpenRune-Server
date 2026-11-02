@@ -1,5 +1,5 @@
 """The contract's script rows against a throwaway git repo: python3 -m unittest tools/server/test_tools.py"""
-import json, os, shutil, subprocess, sys, tempfile, threading, unittest
+import json, os, re, shutil, subprocess, sys, tempfile, threading, unittest
 from unittest import mock
 from pathlib import Path
 SUITE_TMP = tempfile.TemporaryDirectory(prefix="tools-suite-", ignore_cleanup_errors=True)   # every temp dir of these tests and of each process they
@@ -334,6 +334,7 @@ class DesktopInstance(unittest.TestCase):
         exe(t / "sys32/taskkill.exe", f'echo "$4" >> {t}/killed; [ -e {t}/win/$4.dir ] && chmod u+w "$(cat {t}/win/$4.dir)/held"; rm -f {t}/win/$4.*\n')
         exe(t / "sys32/netsh.exe", 'printf "Start Port    End Port\\r\\n----------    --------\\r\\n     50000       50059     *\\r\\n"\n')
         exe(t / "sys32/robocopy.exe", 'cp -r "$1" "${2//\\\\//}"; exit 1\n')   # 1: files copied
+        exe(t / "bin/ps", f'cat {t}/ps 2>/dev/null; true\n')   # the host's processes: none but those a test writes
         exe(t / "bin/wslpath", 'sleep 0.5; echo "$2"\n')   # widens the window between picking an instance and claiming it
         d = t / "desk"; (d / "home/.rsprox").mkdir(parents=True); (d / "home/.rlcustom/profiles2").mkdir(parents=True); (d / "jdk/bin").mkdir(parents=True)
         (d / "home/.rlcustom/settings.properties").write_text("a=1\n"); (d / "home/.rlcustom/profiles2/p.properties").write_text("openrunedevtools.port=7780\n")
@@ -376,10 +377,20 @@ class DesktopInstance(unittest.TestCase):
         s.assertEqual(len(list(s.t.glob("desk/rsprox/owner-*.jar"))), 1)   # the owner check's jar in the template, the same for every up
         s.assertEqual(sorted(o[0] for o in owners), ["s0", "s0", "s1", "s1", "s2", "s2"]); s.assertEqual(len({o[1] for o in owners}), 6)   # each claim its own: a process that started on one never acts on the next
 
+    def test_a_session_bridge_older_than_serve_leaves_the_endpoint_open(s):  # endpoint-owner-2: the orchestrator's bridge, run without serve.py, sends no token: every desktop refused its runs
+        (s.t / "ps").write_text("10 1 /usr/bin/claude\n11 10 python3 /h/mcp/serve.py osrs-devtools-desktop\n12 11 python3 /h/mcp/devtools_bridge.py desktop http://127.0.0.1:7780/mcp\n"
+                                "13 10 python3 /h/mcp/devtools_bridge.py mobile /c/tools/devtools-mcp.sh\n")
+        p = s.sh("a", "desktop_start"); p.communicate(timeout=60)
+        (s.t / "ps").write_text((s.t / "ps").read_text() + "20 1 /usr/bin/claude\n21 20 python3 /h/mcp/devtools_bridge.py desktop http://127.0.0.1:7780/mcp\n")
+        p = s.sh("b", "desktop_start", stderr=subprocess.PIPE); err = p.communicate(timeout=60)[1]
+        opts = sorted((f.read_text() for f in s.t.glob("win/*.opts")), key=lambda o: "-Dosrstest.devtools=" not in o)
+        s.assertIn("-Dosrstest.devtools=7780:tk", opts[0]); s.assertNotIn("-Dosrstest.devtools=", opts[1])   # served bridges send the token; a bridge of no serve.py: any caller
+        s.assertIn("the desktop bridges 21 predate mcp/serve.py", err)
+
     def test_one_up_restart_or_down_of_a_slug_at_a_time(s):  # sweep-42: three overlapping ups and downs of server-clan-channels-4 left a login on an instance it no longer owned
         lock = SRC[SRC.index("case $verb in up|restart|down) ["):]; lock = lock[:lock.index("\n", lock.index("exec flock"))]
         f = s.t / "track.sh"; f.write_text(f"set -euo pipefail\nverb=$1; slug=a; state={s.t}/state\n{lock}\n"
-                                           f"echo \"start $$\" >> {s.t}/log; sleep 1; echo \"end $$\" >> {s.t}/log; setsid sleep 30 < /dev/null > /dev/null 2>&1 &\n")
+                                           f"echo \"start $$\" >> {s.t}/log; sleep 1; echo \"end $$\" >> {s.t}/log; setsid sleep 30 < /dev/null > /dev/null 2>&1 & echo $! >> {s.t}/started\n")
         ps = [subprocess.Popen(["bash", str(f), "up"], stderr=subprocess.PIPE, text=True)]
         while not (s.t / "log").exists(): pass   # the up holds the lock before the down asks for it
         ps.append(subprocess.Popen(["bash", str(f), "down"], stderr=subprocess.PIPE, text=True))
@@ -388,7 +399,7 @@ class DesktopInstance(unittest.TestCase):
         s.assertEqual([w for w, _ in log], ["start", "end", "start", "end"]); s.assertEqual(log[0][1], log[1][1])   # the second waited for the first
         s.assertIn("waits for the running up, restart or down of a", "".join(errs))
         s.assertEqual(subprocess.run(["flock", "-n", str(s.t / "state/desktops.lock"), "true"]).returncode, 0)   # a desktop or keeper it started holds no lock
-        subprocess.run(["pkill", "-f", f"^sleep 30$"], capture_output=True)
+        subprocess.run(["kill", *(s.t / "started").read_text().split()], capture_output=True)   # the sleeps it started, never another's
 
     def test_a_failed_windows_listing_is_asked_again_and_the_launcher_logs(s):  # a loaded host: netstat.exe through WSL interop failed or hung, up waited forever
         (s.t / "interop-fails").write_text("")
@@ -484,6 +495,12 @@ class DesktopInstance(unittest.TestCase):
 
 
 @unittest.skipUnless(shutil.which("javac") and shutil.which("jar"), "no JDK")
+class OwnProcesses(unittest.TestCase):
+    def test_no_tools_test_stops_processes_by_a_pattern(s):  # hunter-feat-pr-20: a test stopping every "sleep 30" by its pattern stopped a gate's CI wait
+        kill = re.compile(r"\b(p" + r"kill|kill" + r"all)\b")
+        s.assertEqual([str(f) for f in HERE.parent.glob("**/test_*.py") if kill.search(f.read_text())], [])
+
+
 class DevtoolsOwner(unittest.TestCase):
     def test_the_endpoint_answers_only_its_ups_token(s):  # sweep-43: a run's helper with a default port drove another run's desktop on 7780
         import socket, urllib.error, urllib.request

@@ -79,6 +79,7 @@ skip_base() { awk '{lo[NR] = $1; hi[NR] = $2} END {for (b = 0; 43751 + b <= 6553
 # a Windows process a run started through WSL interop outlives the run's Linux processes: each is recorded, its Windows pid
 # and image, under the run's systemd slice (osrs-harness R5: hd ends them with the run); its down drops the record
 winpid() { local sl; sl=$(grep -o 'hd-[^/]*\.slice' /proc/self/cgroup) || return 0; mkdir -p "$root/state/winpids/$sl" && echo "$2" > "$root/state/winpids/$sl/$1"; }
+legacy() { ps -eo pid=,ppid=,args= | awk '{p = $1; pp[p] = $2; $1 = $2 = ""; a[p] = $0} END {for (p in a) if (a[p] ~ /devtools_bridge\.py [^ ]+ http/ && a[pp[p]] !~ /mcp\/serve\.py/) print p}'; }   # pids of the desktop bridges no mcp/serve.py runs: a session started before serve.py, whose bridge never reloads and sends no token
 marked() { "$desk/jdk/bin/jps.exe" -v | tr -d '\r' | awk -v m="-Dosrstest.marker=osrs-test-run$1" '{for (f = 3; f <= NF; f++) if ($f == m) {print $1, $2; next}}'; }   # "<Windows PID> <main class>" of instance N's JVMs: only desktop_start sets the marker
 # The desktops: each up creates its own instances. DESKTOP_DIR is the template (JDK, RSProx and its launcher, a staged
 # home); instance N is the dir DESKTOP_DIR/run/N, claimed by its mkdir and naming its up's slug in run/N/owner, with its
@@ -115,8 +116,11 @@ desktop_start() {  # sets inst dt (desktopN, its devtools port)
     && "$desk/jdk/bin/jar.exe" cfm "$t\\rsprox\\$o.$$\\o.jar" "$t\\rsprox\\$o.$$\\m" -C "$t\\rsprox\\$o.$$\\c" . \
     && mv -f "$desk/rsprox/$o.$$/o.jar" "$desk/rsprox/$o.jar"; rm -rf "$desk/rsprox/$o.$$"; }   # a concurrent up may have placed the same jar first
   [ -f "$desk/rsprox/$o.jar" ] || { echo "no devtools owner check $desk/rsprox/$o.jar" >&2; return 1; }
-  # every JVM of the instance: the devtools endpoint on $dp answers only a request carrying this up's token (server/DevtoolsOwner.java)
-  jo=" -javaagent:$t\\rsprox\\$o.jar -Dcom.sun.net.httpserver.HttpServerProvider=DevtoolsOwner --add-exports=jdk.httpserver/sun.net.httpserver=ALL-UNNAMED -Dosrstest.devtools=$dp:$devtoken"
+  # every JVM of the instance: the devtools endpoint on $dp answers only a request carrying this up's token (server/DevtoolsOwner.java),
+  # unless a live session's bridge predates serve.py: its runs send no token, so the endpoint answers any caller until the next up
+  jo=" -javaagent:$t\\rsprox\\$o.jar -Dcom.sun.net.httpserver.HttpServerProvider=DevtoolsOwner --add-exports=jdk.httpserver/sun.net.httpserver=ALL-UNNAMED"
+  p=$(legacy | tr '\n' ' ')
+  if [ -z "$p" ]; then jo+=" -Dosrstest.devtools=$dp:$devtoken"; else echo "desktop$i on $dp answers any caller: the desktop bridges ${p% } predate mcp/serve.py and send no token" >&2; fi
   jx=JAVA_TOOL_OPTIONS:OPENRUNE_ENDPOINT
   if [ -n "${tok:-}" ]; then  # the client's Jagex session variables; the JDK's CAs plus the issuer's certificate (RSProx fetches RuneLite over public https)
     jx+=:JX_SESSION_ID:JX_CHARACTER_ID:JX_DISPLAY_NAME; cp "$desk/jdk/lib/security/cacerts" "$d/home/token-trust.p12"; cp "$state/token/tls.pem" "$d/home/token-tls.pem"
