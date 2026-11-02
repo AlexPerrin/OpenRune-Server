@@ -2,7 +2,7 @@
 # tools/gate/gate.sh <verb> <slug> [arg]: the server track's gate and every verb a contract row runs (tools/track.sh dispatches
 # them here); the build is tools/build/build.sh's, sourced. hd keys a gate by the build key and the hash of tools/gate/ and the
 # files the contract's rows name. Env from hd: SLUG HEAD T (the build key) G (the gate key) TCOMMIT BASE CLONE EVIDENCE CENTRAL HD_ROOT. Verbs:
-#   test [MODULE...]  build, then each module's tests (and integration tests, from src/integration) and spotlessCheck on the build copy (no module: those holding a file
+#   test [MODULE...]  build, then each module's tests (and integration tests, where it applies integration-test-suite) and spotlessCheck on the build copy (no module: those holding a file
 #                     the change's tree changes from origin/main); log evidence/<slug>/test.log, result state/<slug>/test.json
 #   spotless          spotlessCheck alone on those modules at TCOMMIT (a contract row; no TCOMMIT: the working copy's T), no build;
 #                     log evidence/<slug>/spotless.log, result state/<slug>/spotless.json
@@ -43,7 +43,7 @@ gradle_check() {  # gradle_check test|spotless [MODULE...]: spotless's JGit cann
   git -C "$copy" update-index -q --refresh || true; cp "$(git -C "$copy" rev-parse --absolute-git-dir)/index" "$g/index"
   echo "gitdir: $g" > "$state/$kind.gitfile"; mkdir -p "$out"
   local tasks=(); for d in "${mods[@]}"; do rm -rf "$copy/$(projdir "$d")"/build/test-results/{test,integration}   # the report is this run's
-    if [ "$kind" = test ]; then tasks+=("$d:test"); if [ -d "$copy/$(projdir "$d")/src/integration" ]; then tasks+=("$d:integration"); fi; fi   # upstream CI runs integration too
+    if [ "$kind" = test ]; then tasks+=("$d:test"); if grep -qs '"integration-test-suite"' "$copy/$(projdir "$d")/build.gradle.kts"; then tasks+=("$d:integration"); fi; fi   # upstream CI runs integration too, where the plugin registers it (a src/integration alone registers nothing)
     tasks+=("$d:spotlessCheck"); done
   docker run --rm -v "gradle-$slug:/gradle" eclipse-temurin:21 chown 1000:1000 /gradle   # creates or reuses the slug's volume: one docker makes is root's, the run is 1000 (spotless runs on a slug never built)
   : > "$out/$kind.log"; central; box "$out/$kind.log" --rm --name "$kind-$slug" -u 1000:1000 -e HOME=/gradle/home -e GRADLE_USER_HOME=/gradle -e CDIR="$cdir" \
