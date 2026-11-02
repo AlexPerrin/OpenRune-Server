@@ -119,7 +119,7 @@ restart the live server (`osrs-openrune*`); push any ref but yours; open or edit
 `C:\Users\Alex\.runelite`; stop a process you did not start; use the DB tool for writes.
 
 ## Seed rows
-Rows the contract starts from (a row tagged `upstream` judges the upstream PR and seeds only a change that opens one; `check:` rows run with SLUG, HEAD, T, BASE, CLONE, BUILD, EVIDENCE in the env).
+Rows the contract starts from (a row tagged `upstream` judges the upstream PR and seeds only a change that opens one; `check:` rows run with SLUG, HEAD, T, TCOMMIT, BASE, CLONE, BUILD, EVIDENCE in the env).
 - claims | every PR claim, id, file, test name and ticked box is true of the exact head | judge: pr-text
 - rsprox | timings, steps and messages checked against RSProx recordings tick by tick before the wiki | judge: accuracy
 - no-deferral | no Not-done list, no unticked item, no open ask; every reported defect fixed in this PR | judge: pr-text | upstream

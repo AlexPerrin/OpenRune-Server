@@ -10,7 +10,7 @@
 set -euo pipefail
 verb=$1; slug=${2:-${SLUG:-}}; arg=${3:-}   # a contract row passes no slug: hd exports SLUG
 self=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)   # tools/build (also when gate.sh sources it)
-repo=${CLONE:-$HOME/src/OpenRune-Server}
+repo=$(dirname "$(git -C "${CLONE:-$HOME/src/OpenRune-Server}" rev-parse --path-format=absolute --git-common-dir)")   # the main checkout, also when CLONE names a worktree of it (a brief's Clone)
 root=${HD_ROOT:-$HOME/osrs-harness}
 [ -f "$root/harness/changes/$slug.md" ] || [ -f "$root/harness/goals/$slug.md" ] || case $slug in live|integration) ;; *) echo "no change or goal \"$slug\": tools/track.sh <verb> <slug> [arg]" >&2; exit 2 ;; esac
 state=$root/state/$slug; mkdir -p "$state"
@@ -29,7 +29,8 @@ hosted() {  # hosted <log> <command...>: the command, its output appended to log
 box() { local log=$1; shift; hosted "$log" python3 "$root/hd.py" room docker run --init "${size[@]}" "$@"; }   # box <log> <docker run args>: one container in the host's room; --init: a stop's SIGTERM, proxied by docker run, ends it
 
 tree() {  # TCOMMIT and T: the pass gives them; a dev's build snapshots the working copy and asks hd
-  if [ -n "$arg" ]; then tc=$arg; T=${T:-$(git -C "$repo" rev-parse "$tc^{tree}")}; return; fi
+  tc=${arg:-${TCOMMIT:-}}   # the pass's TCOMMIT, as an argument or in the env (a row's)
+  if [ -n "$tc" ]; then git -C "$repo" rev-parse -q --verify "$tc^{commit}" >/dev/null || { echo "$tc is not a commit: TCOMMIT is the commit of T" >&2; exit 2; }; T=${T:-$(git -C "$repo" rev-parse "$tc^{tree}")}; return; fi
   [ -d "$dev" ] || git -C "$repo" worktree add -q "$dev" -B "dev/$slug" "$(git -C "$repo" rev-parse -q --verify "fork/dev/$slug" || echo origin/main)"
   idx=$(git -C "$dev" rev-parse --git-path snapshot-index); rm -f "$idx"   # from HEAD: add -A alone drops tracked files under ignored paths
   GIT_INDEX_FILE=$idx git -C "$dev" read-tree HEAD && GIT_INDEX_FILE=$idx git -C "$dev" add -A . && snap=$(git -C "$dev" commit-tree "$(GIT_INDEX_FILE=$idx git -C "$dev" write-tree)" -p HEAD -m snapshot)

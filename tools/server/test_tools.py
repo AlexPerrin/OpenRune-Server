@@ -1056,6 +1056,17 @@ class Snapshot(Repo):
         s.assertIn("generated/build.gradle.kts", files); s.assertIn("new.kt", files)
         shutil.rmtree(root)
 
+    def test_tree_is_the_rows_tcommit_and_any_checkout_of_the_clone_names_it(s):  # server-cache-clientscript-name-hash-10: spotless with CLONE the brief's Clone (the dev worktree) failed on 'dev/<slug> is already used'; a T passed as TCOMMIT failed late
+        git(s.repo, "worktree", "add", "-q", "-b", "dev/s1", ".worktrees/s1")
+        root = tempfile.mkdtemp(); s.addCleanup(shutil.rmtree, root); change(root, "s1")
+        (Path(root) / "hd.py").write_text("import sys\nprint(sys.argv[3], 'snap-tree', '')\n")
+        head, t = git(s.repo, "rev-parse", "HEAD"), git(s.repo, "rev-parse", "HEAD^{tree}")
+        tree = lambda clone, *a, **e: subprocess.run(["bash", str(HERE.parent / "track.sh"), "tree", "s1", *a], capture_output=True, text=True, env={**os.environ, "CLONE": clone, "HD_ROOT": root, "T": "", "TCOMMIT": "", **e})
+        for clone in (s.repo, f"{s.repo}/.worktrees/s1"):
+            r = tree(clone); s.assertEqual((r.returncode, r.stdout.split()[1:]), (0, ["snap-tree"]), r.stderr)   # no TCOMMIT: the dev's working copy
+            r = tree(clone, TCOMMIT=head); s.assertEqual(r.stdout.split(), [head, t], r.stderr)   # a row's env
+        r = tree(s.repo, t); s.assertEqual(r.returncode, 2); s.assertIn("not a commit", r.stderr)
+
 
 class GateCi(Repo):
     WF = "jobs:\n  b:\n    steps:\n      - uses: actions/checkout@v7\n      - name: Set up Gradle\n        uses: gradle/actions/setup-gradle@v6\n      - run: ./gradlew test\n"

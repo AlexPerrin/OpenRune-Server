@@ -31,7 +31,7 @@
 set -euo pipefail
 verb=$1; slug=${2:-${SLUG:-}}; arg=${3:-}   # a contract row passes no slug: hd exports SLUG
 self=$(cd "$(dirname "$0")" && pwd)
-repo=${CLONE:-$HOME/src/OpenRune-Server}
+repo=$(dirname "$(git -C "${CLONE:-$HOME/src/OpenRune-Server}" rev-parse --path-format=absolute --git-common-dir)")   # the main checkout, also when CLONE names a worktree of it (a brief's Clone)
 root=${HD_ROOT:-$HOME/osrs-harness}
 [ -f "$root/harness/changes/$slug.md" ] || [ -f "$root/harness/goals/$slug.md" ] || case $slug in live|integration) ;; *) echo "no change or goal \"$slug\": tools/track.sh <verb> <slug> [arg]" >&2; exit 2 ;; esac
 # a run reads its own copy of tools/, one per content in state/tools/<hash>/tools (exported: TOOLS_ROOT, its parent, where hd
