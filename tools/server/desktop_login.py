@@ -2,9 +2,11 @@
 """desktop_login.py <devtools port> [keep <server container>] <user> <password> | <devtools port> [keep <server container>] token | <devtools port> logout: logs a desktop
 client in, by its login form or (token) by the token login its Jagex session variables start (prints LOGGED_IN or
 FAILED: <reason>; LOGGED_IN only once the inventory widget shows container 93), or out through the logout tab's button (prints LOGIN_SCREEN) through its devtools endpoint; keep: logs it in again after each logout, until the desktop is gone. Keys only:
-the login screen's place on the canvas changes with the window, so no point on it is clicked.
+the login screen's place on the canvas changes with the window, so no point on it is clicked. It acts only on the instance
+that owns the port when it starts (DESKTOP_DIR/run/<port - 7779>/owner, its up's slug and claim): no call is sent once that
+instance changes hands, and keep ends then.
 """
-import contextlib, fcntl, json, subprocess, sys, tempfile, time, urllib.error, urllib.request
+import contextlib, fcntl, json, os, subprocess, sys, tempfile, time, urllib.error, urllib.request
 
 LOGOUT_BUTTON = 11927560  # component.logout:logout
 INVENTORY_ITEMS = 9764864  # component.inventory:items, one dynamic child per slot of container 93
@@ -15,10 +17,27 @@ class Refused(Exception):
     """The endpoint answered with an error (an unknown key; get_client_state 'Cancelled' while the client starts)."""
 
 
+class Gone(Exception):
+    """The instance this process started on no longer owns the port (its down removed it; another up may claim it)."""
+
+
+claim = None  # the owner file's text when the process started (main sets it): every call first checks it is unchanged
+
+
+def owner(port):  # the text of the owner file of the instance on that devtools port, None when no up owns one
+    try:
+        with open(f"{os.environ.get('DESKTOP_DIR', '/mnt/c/osrs-test')}/run/{int(port) - 7779}/owner") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
 def call(port, name, **args):
     req = urllib.request.Request(f"http://127.0.0.1:{port}/mcp", json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
                                  "params": {"name": name, "arguments": args}}).encode(), {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"})
     while True:
+        if claim is not None and owner(port) != claim:
+            raise Gone(f"the instance on {port} changed hands")
         try:
             with urllib.request.urlopen(req, timeout=30) as r:
                 body = r.read().decode()
@@ -165,18 +184,21 @@ def locked(port):  # one action at a time on a desktop: up, restart and keep eac
 
 if __name__ == "__main__":
     port, a = sys.argv[1], sys.argv[2:]
+    claim = owner(port)
+    if claim is None:
+        print(f"FAILED: no desktop instance owns port {port}"); sys.exit(1)
     k = a[0] == "keep"; c, a = (a[1], a[2:]) if k else (None, a)
     act = (lambda: logout(port)) if a[0] == "logout" else (lambda: token(port)) if a[0] == "token" else (lambda: login(port, a[0], a[1]))
     if k:
         try:
             keep(port, act, server_ready(c))
-        except (OSError, Refused) as e:
+        except (OSError, Refused, Gone) as e:
             print(f"keep: devtools endpoint on {port} gone: {e}")
         sys.exit(0)
     try:
         with locked(port):
             r = act()
-    except (OSError, Refused) as e:
+    except (OSError, Refused, Gone) as e:
         r = f"FAILED: devtools endpoint on {port}: {e}"
     print(r)
     sys.exit(0 if r in ("LOGGED_IN", "LOGIN_SCREEN") else 1)

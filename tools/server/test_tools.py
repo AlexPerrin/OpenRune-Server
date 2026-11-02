@@ -367,7 +367,20 @@ class DesktopInstance(unittest.TestCase):
             n, port = g[len("desktop"):].split(":")
             s.assertEqual((s.t / f"desk/run/{n}/home/.rlcustom/profiles2/p.properties").read_text(), f"openrunedevtools.port={port}\n")
             s.assertTrue((s.t / f"desk/run/{n}/home/.rlcustom/sideloaded-plugins/OpenRune-Developer-Tools.jar").exists())
-        s.assertEqual(sorted((s.t / "desk/run" / g[len("desktop"):].split(":")[0] / "owner").read_text().strip() for g in got), ["s0", "s0", "s1", "s1", "s2", "s2"])
+        owners = [(s.t / "desk/run" / g[len("desktop"):].split(":")[0] / "owner").read_text().split() for g in got]
+        s.assertEqual(sorted(o[0] for o in owners), ["s0", "s0", "s1", "s1", "s2", "s2"]); s.assertEqual(len({o[1] for o in owners}), 6)   # each claim its own: a process that started on one never acts on the next
+
+    def test_one_up_restart_or_down_of_a_slug_at_a_time(s):  # sweep-42: three overlapping ups and downs of server-clan-channels-4 left a login on an instance it no longer owned
+        lock = SRC[SRC.index("case $verb in up|restart|down) ["):]; lock = lock[:lock.index("\n", lock.index("exec flock"))]
+        f = s.t / "track.sh"; f.write_text(f"set -euo pipefail\nverb=$1; slug=a; state={s.t}/state\n{lock}\n"
+                                           f"echo \"start $$\" >> {s.t}/log; sleep 1; echo \"end $$\" >> {s.t}/log; setsid sleep 30 < /dev/null > /dev/null 2>&1 &\n")
+        ps = [subprocess.Popen(["bash", str(f), v], stderr=subprocess.PIPE, text=True) for v in ("up", "down")]
+        errs = [p.communicate(timeout=60)[1] for p in ps]
+        log = [l.split() for l in (s.t / "log").read_text().splitlines()]
+        s.assertEqual([w for w, _ in log], ["start", "end", "start", "end"]); s.assertEqual(log[0][1], log[1][1])   # the second waited for the first
+        s.assertIn("waits for the running up, restart or down of a", "".join(errs))
+        s.assertEqual(subprocess.run(["flock", "-n", str(s.t / "state/desktops.lock"), "true"]).returncode, 0)   # a desktop or keeper it started holds no lock
+        subprocess.run(["pkill", "-f", f"^sleep 30$"], capture_output=True)
 
     def test_a_failed_windows_listing_is_asked_again_and_the_launcher_logs(s):  # a loaded host: netstat.exe through WSL interop failed or hung, up waited forever
         (s.t / "interop-fails").write_text("")
@@ -572,6 +585,27 @@ class DesktopLogin(unittest.TestCase):
         s.assertLess(restart.index('" logout'), restart.index("offline")); s.assertLess(restart.index("offline"), restart.index('docker restart "server-$slug"'))
         s.assertLess(restart.index('docker restart "server-$slug"'), restart.index("keep \""))
         s.assertIn("with locked(port):", (HERE / "desktop_login.py").read_text().split("def keep")[1])   # restart's login and keep's take turns
+
+    def test_acts_only_while_its_instance_owns_the_port(s):  # sweep-42: a login or keeper left by an earlier up drove the desktop another run's up then claimed on its port
+        import desktop_login as d, io
+        t = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, t); (t / "run/1").mkdir(parents=True); o = t / "run/1/owner"; o.write_text("a 1-1\n")
+        s.addCleanup(os.environ.pop, "DESKTOP_DIR", None); os.environ["DESKTOP_DIR"] = str(t)
+        s.addCleanup(setattr, d.urllib.request, "urlopen", d.urllib.request.urlopen); s.addCleanup(setattr, d.time, "sleep", d.time.sleep); s.addCleanup(setattr, d, "claim", None)
+        sent = []
+        def urlopen(req, timeout):
+            sent.append(json.loads(req.data)["params"]["name"])
+            return io.BytesIO(json.dumps({"result": {"content": [{"type": "text", "text": '{"gameState": "LOGGED_IN"}'}]}}).encode())
+        d.urllib.request.urlopen, d.time.sleep = urlopen, lambda _: o.write_text("a 2-2\n")   # while keep waits for a logout, down removes the instance and this slug's next up claims it
+        d.claim = d.owner(7780)
+        s.assertEqual(json.loads(d.call(7780, "get_client_state"))["gameState"], "LOGGED_IN")
+        with s.assertRaises(d.Gone):
+            d.keep(7780, lambda: "LOGGED_IN", lambda since: True)
+        s.assertEqual(sent, ["get_client_state"] * 3)   # the call, keep's two reads before its wait slept; nothing once the claim changed
+        o.unlink()
+        with s.assertRaises(d.Gone):
+            d.call(7780, "press_key", key="ENTER")
+        r = subprocess.run(["python3", str(HERE / "desktop_login.py"), "7780", "logout"], capture_output=True, text=True, env={**os.environ, "DESKTOP_DIR": str(t)})
+        s.assertEqual((r.returncode, r.stdout), (1, "FAILED: no desktop instance owns port 7780\n"))   # no instance: it sends nothing
 
     def test_logout_uses_the_logout_button_not_a_command(s):  # the server has no ::drop; relog hung on it
         d, sent = s.fake(["LOGGED_IN", "LOGIN_SCREEN"])

@@ -83,7 +83,9 @@ The desktops are Windows programs run from bash through WSL interop by absolute 
 `WINDOWS_SYSTEM32` (default `/mnt/c/Windows/System32`: netstat.exe, netsh.exe, taskkill.exe, robocopy.exe) and `DESKTOP_DIR`
 (default `/mnt/c/osrs-test`: the template, its JDK, RSProx launcher and staged home; jps.exe locates JVMs). Each up
 creates the desktops it needs: instance N is `DESKTOP_DIR/run/N`, claimed by its mkdir (the first N whose devtools port
-7779+N no program holds), naming the up's slug in `run/N/owner`, with its own home copied from the template's. Its launcher is
+7779+N no program holds), naming the up's slug and its claim in `run/N/owner`, with its own home copied from the template's.
+`desktop_login.py` (up's and restart's logins, the keeper) acts only on the instance whose owner file holds the text it started with: it sends no call once that instance changes hands, and a keeper ends then.
+One up, restart or down of a slug runs at a time (`state/<slug>/desktops.lock`): a second waits for the first, so none acts on desktops another is starting or removing. Its launcher is
 `tools/server/OsrsTestLauncher.java`, compiled once per source into `DESKTOP_DIR/rsprox/launcher-<sha>`; RSProx's ports
 (jav_config 43600+skip, proxy 43701+skip) are moved past every range Windows refuses a bind on (WSL's mirrored
 reservation of the Linux ephemeral range, which moves each boot, and Windows' excluded port ranges), and a launcher whose

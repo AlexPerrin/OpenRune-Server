@@ -8,7 +8,7 @@
 #                     a fresh database, or with RESUME=1 the accounts as the change's last down saved them; the realm as live
 #                     (dev_mode off, xp at 1x), every account a member at rank 0, or with STAFF=N the Nth desktop's an administrator;
 #                     idle logout off (live keeps it); each desktop logged in again after any logout until down (keep); a failed
-#                     up takes down what it started
+#                     up takes down what it started; one up, restart or down of a slug at a time (a second waits)
 #   up token          up 1, the desktop's login a token login (auth type 7) for its account: token-<slug> (server/issuer.py) is the
 #                     issuer of compact signed tokens whose secret game.yml's token-login block holds and jav_config param 11
 #                     names (https: the client takes no other)
@@ -95,7 +95,7 @@ desktop_start() {  # sets inst dt (desktopN, its devtools port)
     grep -qx "$dp" <<< "$busy" || ! mkdir "$d" 2>/dev/null || break; d=   # mkdir is the claim: no two ups get one N
   done
   [ -n "$d" ] || { echo "no free desktop instance" >&2; return 1; }
-  echo "$slug" > "$d/owner"; w=$(wslpath -w "$d")
+  echo "$slug $$-$(date +%s%N)" > "$d/owner"; w=$(wslpath -w "$d")   # the slug and this claim: desktop_login.py acts only while the text it started with is there
   until [ -f "$d/home/.rlcustom/settings.properties" ]; do   # a WSL interop error can end robocopy before it copied (below 8): copied again until the home is there
     "$sys32/robocopy.exe" "$(wslpath -w "$desk/home")" "$w\\home" /E /MT:16 /NFL /NDL /NJH /NJS /NP /XD screenshots logs > /dev/null || [ $? -lt 8 ] || { echo "robocopy of the desktop home into $d failed" >&2; return 1; }   # robocopy: below 8 is success
   done
@@ -129,7 +129,7 @@ desktop_start() {  # sets inst dt (desktopN, its devtools port)
 desktops_remove() {  # stops every JVM carrying the marker of an instance this slug owns, then removes the instance, its owner last (a failed down re-runs)
   local o d i p; need "$sys32/taskkill.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/jps.exe" DESKTOP_DIR
   for o in "$desk"/run/*/owner; do
-    [ -f "$o" ] && [ "$(cat "$o")" = "$slug" ] || continue; d=${o%/owner}; i=${d##*/}
+    [ -f "$o" ] && [ "$(cut -d' ' -f1 "$o")" = "$slug" ] || continue; d=${o%/owner}; i=${d##*/}
     # jps can list a live JVM as "process information unavailable": a file it still holds keeps the loop stopping marked JVMs
     until [ -z "$(marked "$i")" ] && find "$d" -mindepth 1 -maxdepth 1 ! -name owner -exec rm -rf {} + 2>/dev/null; do
       for p in $(marked "$i" | cut -d' ' -f1); do "$sys32/taskkill.exe" /F /T /PID "$p" > /dev/null 2>&1 || true; rm -f "$root"/state/winpids/*/"$p"; done; sleep 1
@@ -274,6 +274,9 @@ transcribe() {  # a fresh RSProx home: one filter set, active, naming every Prop
   [ $fail = 1 ] || rm -rf "$h"; return $fail
 }
 
+case $verb in up|restart|down) [ "${DESKTOPS_LOCK:-}" = "$slug" ] || {   # one up, restart or down of a slug at a time: none acts on desktops another is starting or removing
+    flock -n "$state/desktops.lock" true || echo "$verb $slug waits for the running up, restart or down of $slug" >&2
+    DESKTOPS_LOCK=$slug exec flock -o "$state/desktops.lock" bash "$0" "$@"; } ;; esac   # -o: no desktop or keeper it starts holds the lock
 case $verb in up|restart|down|ship|measure|log|recordings) "$verb" ;; token) token "$arg" ;;
   transcribe) transcribe "${@:3}" ;;
   *) echo "verbs: build up restart down test spotless gate gate-ci ci-step tree ship measure log recordings transcribe token" >&2; exit 2 ;; esac
