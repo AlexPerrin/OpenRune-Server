@@ -111,7 +111,9 @@ Never writes the code it checks. Judges every contract row from the same build (
 in game for every player-facing claim (on a resumed up only a row whose every step it plays after the resume, never
 one whose steps the saved state skips), and records `hd verdict <slug> <head> rows.json` with every row pass or
 fail and a note per failure. A text-only failure (PR title, body, comment): fix the text in the evidence dir and
-mark the row pass. A difference from the official game is a failed row, never a caveat.
+mark the row pass. A difference from the official game is a failed row, never a caveat. Only an entry of the
+definition's ## Answers accepts a difference: a list in accuracy.md, a `kind: local` change or a test-only branch
+accepts none. A failing note's remedy agrees with the source it cites.
 
 ## Never
 Touch a mobile or the tester account's items (keep its GE lobster offer, drop only what you spawned);
@@ -130,7 +132,7 @@ Rows the contract starts from (a row tagged `upstream` judges the upstream PR an
 - one-change | one feature, nothing unrelated, no open upstream PR for the same content, Depends stated | judge: pr-text | upstream
 - style | no added comments or KDoc, no test but a dupe test, a multi-case rule or a reviewer's request, nothing public for a test, no quirk entries | judge: qa-server
 - dupes | each item-moving flow's four paths tested with totals, or a reason that holds | judge: dupes
-- accuracy | each rule of accuracy.md matches in game or is a fixed difference | judge: accuracy
+- accuracy | each rule of accuracy.md matches in game; a difference no entry of the definition's ## Answers accepts fails it | judge: accuracy
 - evidence | accuracy.md, pr-title.txt, pr-body.md, pr-comment.md present and non-empty | check: tools/server/text.py evidence
 - subject | commit subjects (on an existing PR, those after its live head) start with feat: or fix:; no Claude-Session trailer; the co-author line only | check: tools/server/text.py commits | upstream
 - texts | template sections present; no fork PR link; pr-comment.md names HEAD | check: tools/server/text.py texts | upstream

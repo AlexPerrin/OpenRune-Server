@@ -23,4 +23,7 @@ only, never commit or quote them.
 1. Re-read each source; never trust the spec's quotes.
 2. Compare the branch against the recordings tick by tick, from the same build (`tools/track.sh up`).
 3. A divergence is fixed, never a caveat or a quirk entry; one the server cannot fix is `hd ask`, once.
+   Only an entry of the definition's ## Answers accepts one: a list in accuracy.md, a `kind: local` change or a
+   test-only branch accepts none, and an unaccepted one fails the `accuracy` row.
 4. Record per rule: matches, diverges (evidence), guess. A late find is also a contract miss: add the row.
+5. A remedy you prescribe agrees with the source you cite for it (a fix the cited recording contradicts is no remedy).
