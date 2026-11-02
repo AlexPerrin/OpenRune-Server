@@ -13,8 +13,8 @@
 #                     fails the boot's bind), and with CENTRAL build that Central in, as build does (the change's head unchanged)
 #                     and whose CI restores the game data from the fork release asset game-data-<game.example.yml blob12>
 #                     (seeded once from or:<T>) on an actions/cache miss, never openrs2 (no asset fails that step, the runner's),
-#                     unless the head changes the cache pipeline (or-cache/): then neither restores and the CI runs :or-cache:freshCache,
-#                     the head's step; a head changing only packs or gamevals packs them on the restored revision (the head's step);
+#                     unless the head changes the revision (game.example.yml): then neither restores and the CI runs :or-cache:freshCache,
+#                     the head's step; every other head packs on the restored revision (its cache inputs': the head's step);
 #                     each step is timed alone (the job's timeout-minutes on every step), so a timeout names the step that ran
 #                     out; a run failed at a step the head does not touch is re-run once its source answers, and after 3
 #                     attempts the row exits 75: held, no result
@@ -105,7 +105,7 @@ gate_ci() {  # pushes T (gate_sha) to gate/<slug>; the newest run of each workfl
 }
 game_data() {  # workflow $1 with a step restoring the game data from the fork release asset game-data-<k> on an actions/cache miss, so the gate never downloads openrs2's cache;
   # and the job's timeout on each step, so a slow download never times out in a step that reads the head (cannon's run 41366859771 timed out in 'Compile and run tests')
-  # a head changing the cache pipeline runs freshCache: no actions/cache restore, no asset (infra() calls that step the head's); openrs2's revision is no other head's input
+  # a head changing the revision runs freshCache: no actions/cache restore, no asset (infra() calls that step the head's); openrs2's revision is no other head's input
   local fresh=; if fresh_input; then fresh=1; fi
   FRESH=$fresh K=$(git -C "$repo" rev-parse -q --verify "$TCOMMIT:game.example.yml" | cut -c1-12 || true) python3 -c '
 import os, re, sys
@@ -141,7 +141,7 @@ failed_step() {  # the first step of run $1 that failed or was stopped (a cancel
 }
 infra() {  # step $1 reads nothing the head changes: the runner's setup, the cache's download and generation when the head changes no cache input
   case $1 in "Set up job"|"Checkout repository"|"Set up JDK"*|"Set up Gradle"|"Cache game data"|*"(tools/gate/gate.sh gate-ci)"|"Post "*|"Complete job") return 0 ;;
-    "Generate cache and gameval sources") ! fresh_input ;;   # it runs on a head's own pipeline alone, or on a restore's miss
+    "Generate cache and gameval sources") ! fresh_input ;;   # it runs on a head's own revision alone
     "Rebuild sources from cached game data") ! cache_input ;;
     *) return 1 ;; esac
 }
@@ -149,18 +149,23 @@ cache_input() {  # the head changes a cache input (or BASE...HEAD is unknown): t
   [ -n "${BASE:-}" ] && [ -n "${HEAD:-}" ] || return 0
   grep -qE 'or-cache/|/pack/|gamevals|raw-cache|game\.example\.yml' <<< "$(git -C "$repo" diff --name-only "$BASE...$HEAD")"   # not a pipe: grep -q ending first would fail git under pipefail
 }
-fresh_input() {  # the head changes the cache pipeline itself (or BASE...HEAD is unknown): its fresh install is the head's to run
+fresh_input() {  # the head changes the revision (or BASE...HEAD is unknown): its download is the head's to run
   [ -n "${BASE:-}" ] && [ -n "${HEAD:-}" ] || return 0
-  grep -q '^or-cache/' <<< "$(git -C "$repo" diff --name-only "$BASE...$HEAD")"
+  grep -qx 'game.example.yml' <<< "$(git -C "$repo" diff --name-only "$BASE...$HEAD")"
 }
 ci_step() {  # one classifier of a failed CI step for gate-ci and the carry
   infra "$arg" || exit 1
   R=$(git -C "$repo" remote get-url fork 2>/dev/null | sed -E 's#.*github.com[:/]##; s#\.git$##' || true); answers "$arg"
 }
 answers() {  # blocks until the source step $1 reads answers: GitHub for the runner's own steps (it answered this read), the release asset for the game data's, openrs2 for the cache's
-  case $1 in "Generate cache"*) until curl -sfI -o /dev/null https://archive.openrs2.org/; do sleep 30; done ;;
+  case $1 in "Generate cache"*) until openrs2; do sleep 30; done ;;
     "Game data of the gate"*) local k; k=$(git -C "$repo" rev-parse -q --verify "$TCOMMIT:game.example.yml" | cut -c1-12 || true); [ -n "$k" ] || return 0
       until gh release view game-data -R "$R" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "game-data-$k.tar.gz"; do seed; sleep 30; done ;; esac
+}
+openrs2() {  # openrs2 serves the revision's cache: its newest live cache of game.example.yml's revision yields bytes (an outage answers its index 200, the zip 500 or empty)
+  local rev id; rev=$(git -C "$repo" show "$TCOMMIT:game.example.yml" 2>/dev/null | sed -nE 's/^revision: *([0-9]+).*/\1/p' | head -1)
+  id=$(curl -sf https://archive.openrs2.org/caches.json | python3 -c 'import json,sys; r=int(sys.argv[1]); c=[x for x in json.load(sys.stdin) if x.get("game")=="oldschool" and x.get("environment")=="live" and any(b.get("major")==r for b in x.get("builds") or [])]; print(max(c, key=lambda x: x["timestamp"])["id"] if c else "")' "${rev:-0}" 2>/dev/null) && [ -n "$id" ] || return 1
+  [ "$({ curl -sf "https://archive.openrs2.org/caches/runescape/$id/disk.zip" || true; } | head -c 4096 | wc -c)" = 4096 ]
 }
 read_runs() {  # $runs: "<workflow> <conclusion>/<status> <id> <attempt>" of each run at sha, newest first, read with If-None-Match the last ETag (one read
   # for both workflows; a 304 leaves $runs and costs no quota). A quota refusal holds the row until GitHub's reset, never fails it.

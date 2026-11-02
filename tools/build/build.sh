@@ -55,6 +55,12 @@ build_locked() {
   gk=$(git -C "$repo" rev-parse -q --verify "$tc:game.example.yml" | cut -c1-12 || true)   # the game data's: the revision (game.example.yml), as the gate's release asset
   central; vols=(-v "gradle-$slug:/gradle" -v or-cache-store:/store "${cvols[@]}")
   docker run --rm "${vols[@]}" eclipse-temurin:21 chown 1000:1000 /gradle /store   # docker makes a new volume root's; the build runs as 1000
+  gd=$state/.game-data-$gk.tgz; rm -f "$gd"   # the revision missing from the store: the gate's release asset of it (seeded from an image), so a build needs openrs2 only for a revision no image holds yet
+  if [ -n "$gk" ] && ! docker run --rm -v or-cache-store:/store eclipse-temurin:21 sh -c "[ -d /store/s-$ck ] || [ -d /store/g-$gk ]" >/dev/null 2>&1; then
+    R=$(git -C "$repo" remote get-url fork 2>/dev/null | sed -E 's#.*github.com[:/]##; s#\.git$##' || true)
+    [ -z "$R" ] || gh release download game-data -R "$R" -p "game-data-$gk.tar.gz" -O "$gd" >/dev/null 2>&1 || rm -f "$gd"
+  fi
+  [ -s "$gd" ] && vols+=(-v "$gd:/game-data.tgz:ro")
   docker rm -f "build-$slug" >/dev/null 2>&1 || true   # a killed build's container, still running: the slug's build lock is held, it is no one else's
   trap 'docker rm -f "build-$slug" >/dev/null 2>&1 || true' EXIT; trap 'exit 143' TERM INT   # a stopped build's container ends with it
   box "$log" --rm --name "build-$slug" -u 1000:1000 -e HOME=/gradle/home -e GRADLE_USER_HOME=/gradle -e CK="$ck" -e GK="$gk" -e CDIR="$cdir" \
@@ -63,6 +69,7 @@ build_locked() {
       set -e; mkdir -p "$HOME"; g="./gradlew --console=plain --build-cache --no-configuration-cache --max-workers=4 -Dorg.gradle.jvmargs=-Xmx1536m${CDIR:+ --init-script /central.init.gradle}"
       s=/store/s-$CK d=/store/g-$GK   # s: every output of the cache step (api/generated is compiled, the gamevals are read at boot); d: the game data of the revision
       if [ -d $s ]; then cp -a $s/. .; else
+        [ -z "$GK" ] || [ -d $d ] || [ ! -s /game-data.tgz ] || { rm -rf $d.tmp && mkdir -p $d.tmp/.data && tar -xzf /game-data.tgz -C $d.tmp/.data && mv $d.tmp $d; }   # the asset: the revision stored, never openrs2
         if [ -n "$GK" ] && [ -d $d ]; then cp -a $d/. .   # the revision downloaded once: every tree repacks it, as CI on a cache hit
         else
           $g :or-cache:freshCache
@@ -73,6 +80,7 @@ build_locked() {
       fi
       $g generateRsa :server:app:installDist -x test' || { record false build < "$log"; echo "build failed: $log"; return 1; }
   trap - EXIT TERM INT   # past its container: a gate sourcing this never removes a later build's
+  rm -f "$gd"
   st=$copy/.image; rm -rf "$st"; mkdir -p "$st/data"
   cp -a "$copy/server/app/build/install/app" "$st/server"; cp "$copy/game.yml" "$st/"
   cp -a "$copy/.data/." "$st/data/"; rm -rf "$st/data/client.key" "$st/data/game.key" "$st/data/postgres"

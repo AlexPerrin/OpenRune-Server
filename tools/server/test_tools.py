@@ -218,7 +218,9 @@ class CacheDownload(unittest.TestCase):
         s.assertIn('gk=$(git -C "$repo" rev-parse -q --verify "$tc:game.example.yml" | cut -c1-12', b)   # the gate's release asset key
         c = b.split("s=/store/s-$CK d=/store/g-$GK")[1].split("generateRsa")[0]
         s.assertLess(c.index("cp -a $d/. ."), c.index(":or-cache:freshCache"))          # a stored revision is restored, never downloaded
-        s.assertLess(c.index(":or-cache:freshCache"), c.index("mv $d.tmp $d"))            # a download is stored whole
+        s.assertLess(c.index(":or-cache:freshCache"), c.rindex("mv $d.tmp $d"))           # a download is stored whole
+        s.assertLess(c.index("tar -xzf /game-data.tgz"), c.index("cp -a $d/. ."))          # sweep-28: a revision missing from the store comes from the gate's asset, never openrs2 first
+        s.assertIn('gh release download game-data -R "$R" -p "game-data-$gk.tar.gz"', b)
         s.assertIn("$g :or-cache:mergePluginGamevals :or-cache:buildCache", c)            # both repack this tree
         s.assertNotIn("/dl", SRC)
 
@@ -860,13 +862,13 @@ class GateCi(Repo):
         s.assertEqual(r.returncode, 0, r.stdout + r.stderr); s.assertEqual(len([c for c in calls if c.startswith("run rerun 7")]), 1)
 
     def test_a_cache_step_failure_is_the_heads_when_the_head_changes_its_input(s):
-        base = git(s.repo, "rev-parse", "HEAD"); s.write("or-cache/x", "y"); head = s.commit("touches the cache")
+        base = git(s.repo, "rev-parse", "HEAD"); s.write("game.example.yml", "revision: 242\n"); head = s.commit("moves the revision")
         r, calls, _ = s.gate([s.FAILED(1)], step="Generate cache and gameval sources", env={"BASE": base, "HEAD": head})
         s.assertEqual(r.returncode, 1); s.assertIn("CI failure/completed at 'Generate cache and gameval sources'", r.stdout)
         s.assertFalse([c for c in calls if c.startswith("run rerun")])
 
     def test_the_carry_asks_the_same_classifier_of_a_failed_upstream_step(s):  # PR 448's freshCache failed upstream; hd's carry judged every failure the head's
-        base = git(s.repo, "rev-parse", "HEAD"); s.write("or-cache/x", "y"); head = s.commit("touches the cache")
+        base = git(s.repo, "rev-parse", "HEAD"); s.write("game.example.yml", "revision: 242\n"); head = s.commit("moves the revision")
         root = tempfile.mkdtemp(); change(root, "s1")
         step = lambda st: subprocess.run(["bash", str(HERE.parent / "track.sh"), "ci-step", "s1", st], capture_output=True, text=True,
                                          env={**os.environ, **s.env, "HD_ROOT": root, "BASE": base, "HEAD": head}).returncode
@@ -909,9 +911,9 @@ class GateCi(Repo):
         s.assertNotIn("release upload", (bin / "calls").read_text())                 # seeded once per game.example.yml
         for d in (fork, bin, root): shutil.rmtree(d)
 
-    def test_a_head_changing_a_cache_input_runs_fresh_cache(s):  # 8c6d9679e (or-cache/CacheTools.kt) passed the gate on restored data and failed upstream in freshCache
+    def test_a_head_changing_the_revision_runs_fresh_cache(s):  # its download is the head's: no image holds that revision yet
         s.write(".github/workflows/ci.yml", s.CI); s.write(".github/workflows/format.yml", s.WF); s.write("game.example.yml", "revision: 241\n"); b = s.commit("ci")
-        s.write("or-cache/CacheTools.kt", "x\n"); t = s.commit("cache")
+        s.write("game.example.yml", "revision: 242\n"); t = s.commit("revision")
         fork = tempfile.mkdtemp(); git(fork, "init", "-q", "--bare"); git(s.repo, "remote", "add", "fork", fork)
         bin = Path(tempfile.mkdtemp()); s.fake_gh(bin, s.GREEN); root = tempfile.mkdtemp(); change(root, "s1")
         r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "gate-ci"], capture_output=True, text=True,
@@ -925,7 +927,7 @@ class GateCi(Repo):
 
     def test_a_head_changing_a_pack_packs_on_the_restored_revision(s):  # an openrs2 outage (run 41380358897) failed six correct pack and gameval heads in freshCache
         s.write(".github/workflows/ci.yml", s.CI); s.write(".github/workflows/format.yml", s.WF); s.write("game.example.yml", "revision: 241\n"); b = s.commit("ci")
-        s.write("content/x/pack/a.toml", "x\n"); s.write("gamevals.toml", "x\n"); t = s.commit("pack")
+        s.write("content/x/pack/a.toml", "x\n"); s.write("gamevals.toml", "x\n"); s.write("or-cache/CacheTools.kt", "x\n"); t = s.commit("pack")
         k = git(s.repo, "rev-parse", f"{t}:game.example.yml")[:12]
         fork = tempfile.mkdtemp(); git(fork, "init", "-q", "--bare"); git(s.repo, "remote", "add", "fork", fork)
         bin = Path(tempfile.mkdtemp()); s.fake_gh(bin, s.GREEN); root = tempfile.mkdtemp(); change(root, "s1")
