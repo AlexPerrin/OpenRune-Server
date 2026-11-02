@@ -7,6 +7,9 @@
 // it carries "Authorization: Bearer <token>", the token of the up that started the instance (its state/<slug>/up.json);
 // any other request to that port gets 401. The devtools plugin binds 127.0.0.1, which every local process reaches: the
 // token is what makes the endpoint answer its owner alone. Requests to any other port pass unchanged.
+// The plugin interrupts the active tool on every tools/call (it assumes one caller), and the owner has two (the run and its
+// keeper, desktop_login.py keep): the owner's tools/call requests run one at a time, in arrival order, so no call preempts
+// another; a notification (notifications/cancelled) passes at once, so a caller's cancel still reaches its call.
 
 import com.sun.net.httpserver.Filter;
 import com.sun.net.httpserver.HttpContext;
@@ -15,11 +18,14 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpsServer;
 import com.sun.net.httpserver.spi.HttpServerProvider;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.concurrent.Executor;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.regex.Pattern;
 
 public final class DevtoolsOwner extends HttpServerProvider
 {
@@ -43,16 +49,38 @@ public final class DevtoolsOwner extends HttpServerProvider
 		return jdk.createHttpsServer(addr, backlog);
 	}
 
+	static final ReentrantLock ONE = new ReentrantLock(true);
+	static final Pattern CALL = Pattern.compile("\"method\"\\s*:\\s*\"tools/call\"");
+
 	static final Filter GATE = new Filter()
 	{
 		@Override
 		public void doFilter(HttpExchange x, Chain chain) throws IOException
 		{
 			String auth = String.valueOf(x.getRequestHeaders().getFirst("Authorization"));
-			if (OWNER.length < 2 || x.getLocalAddress().getPort() != Integer.parseInt(OWNER[0])
-				|| MessageDigest.isEqual(("Bearer " + OWNER[1]).getBytes(StandardCharsets.UTF_8), auth.getBytes(StandardCharsets.UTF_8)))
+			if (OWNER.length < 2 || x.getLocalAddress().getPort() != Integer.parseInt(OWNER[0]))
 			{
 				chain.doFilter(x);
+				return;
+			}
+			if (MessageDigest.isEqual(("Bearer " + OWNER[1]).getBytes(StandardCharsets.UTF_8), auth.getBytes(StandardCharsets.UTF_8)))
+			{
+				byte[] body = x.getRequestBody().readAllBytes();
+				x.setStreams(new ByteArrayInputStream(body), null);
+				if (!CALL.matcher(new String(body, StandardCharsets.UTF_8)).find())
+				{
+					chain.doFilter(x);
+					return;
+				}
+				ONE.lock();
+				try
+				{
+					chain.doFilter(x);
+				}
+				finally
+				{
+					ONE.unlock();
+				}
 				return;
 			}
 			x.getRequestBody().readAllBytes();

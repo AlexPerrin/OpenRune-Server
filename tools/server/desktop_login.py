@@ -18,6 +18,18 @@ class Refused(Exception):
     """The endpoint answered with an error (an unknown key; get_client_state 'Cancelled' while the client starts)."""
 
 
+class Cancelled(Refused):
+    """The endpoint interrupted the call ('Cancelled': a caller's notifications/cancelled interrupts whichever call is active): it is there."""
+
+
+def whole(f):  # f() again from its start while one of its calls is cancelled: a cancelled step may have half run (a type_chat half typed)
+    while True:
+        try:
+            return f()
+        except Cancelled:
+            pass
+
+
 class Gone(Exception):
     """The instance this process started on no longer owns the port (its down removed it; another up may claim it)."""
 
@@ -60,7 +72,7 @@ def call(port, name, **args):
     msg = json.loads(line); out = msg.get("result", {})
     text = "".join(c.get("text", "") for c in out.get("content", []) if c.get("type") == "text") or json.dumps(out)
     if "error" in msg or out.get("isError"):  # a refused call (an unknown key) must not pass as done
-        raise Refused(f"{name}: {msg.get('error') or text}")
+        raise (Cancelled if text == "Cancelled" else Refused)(f"{name}: {msg.get('error') or text}")
     return text
 
 
@@ -177,15 +189,16 @@ def keep(port, act, ready):
     for LOGGED_IN, then for LOGIN_SCREEN, then logs in. A failed login is tried again once the server is ready after it
     (ready(since): a server that was down or restarting), and never while the same server refuses it; a login made by
     another waits for the next logout. A failed login that left the client logged in (no inventory) is logged out first:
-    it is tried again at once, the second time like any failure. Ends when the endpoint is gone (the desktop stopped)."""
+    it is tried again at once, the second time like any failure. A cancelled call starts the login again (whole): the endpoint
+    answered. Ends when the endpoint is gone (the desktop stopped)."""
     while True:
         wait(port, ("LOGGED_IN",)); wait(port, ("LOGIN_SCREEN",))
         again = True
         while True:
             since = time.time()
             with locked(port):
-                r = act()
-                out = r != "LOGGED_IN" and state(port).get("gameState") == "LOGGED_IN" and logout(port)
+                r = whole(act)
+                out = r != "LOGGED_IN" and state(port).get("gameState") == "LOGGED_IN" and whole(lambda: logout(port))
             print(r, flush=True)
             if out:
                 print(f"keep: logged in without the inventory, logged out ({out}): {'logs in again' if again else 'waits for the server to be ready again'}", flush=True)
@@ -227,7 +240,7 @@ if __name__ == "__main__":
         sys.exit(0)
     try:
         with locked(port):
-            r = act()
+            r = whole(act)
     except (OSError, Refused, Gone) as e:
         r = f"FAILED: devtools endpoint on {port}: {e}"
     print(r)

@@ -510,6 +510,36 @@ public class Plug { public static void main(String[] a) throws Exception {   // 
                 return e.code
         s.assertEqual([code(ports[0]), code(ports[0], "Bearer other"), code(ports[0], "Bearer tk"), code(ports[1])], [401, 401, 200, 200])   # another port is the JDK's own
 
+    def test_the_owners_calls_run_one_at_a_time_and_a_notification_passes(s):  # sweep-47 P0-a: the plugin interrupts the active tool on every tools/call, so the keeper's state reads cancelled a run's walk_to
+        import socket, threading, urllib.request
+        t = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, t, True); (t / "c").mkdir(); (t / "app").mkdir()
+        (t / "Plug.java").write_text("""import com.sun.net.httpserver.HttpServer; import java.net.*; import java.util.concurrent.*; import java.util.concurrent.atomic.*; import java.util.concurrent.locks.ReentrantLock;
+public class Plug { public static void main(String[] a) throws Exception {   // a call waits for the notification; the notification waits for two calls in the handler, or one in it and one queued at the owner's lock
+  ReentrantLock one = (ReentrantLock) Class.forName("DevtoolsOwner").getDeclaredField("ONE").get(null); AtomicInteger active = new AtomicInteger(); CountDownLatch go = new CountDownLatch(1);
+  HttpServer s = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), Integer.parseInt(a[0])), 0); s.setExecutor(Executors.newFixedThreadPool(4));
+  s.createContext("/mcp", x -> { String b = new String(x.getRequestBody().readAllBytes()); int n;
+    try { if (b.contains("tools/call")) { n = active.incrementAndGet(); go.await(); active.decrementAndGet(); }
+          else { while (active.get() < 2 && !(active.get() == 1 && one.getQueueLength() > 0)) Thread.onSpinWait(); n = active.get(); go.countDown(); } }
+    catch (InterruptedException e) { n = -1; }
+    byte[] r = String.valueOf(n).getBytes(); x.sendResponseHeaders(200, r.length); x.getResponseBody().write(r); x.close(); }); s.start();
+  System.out.println("up"); System.out.flush(); Thread.sleep(60000); System.exit(0); } }""")
+        subprocess.run(["javac", "-nowarn", "--add-exports", "jdk.httpserver/sun.net.httpserver=ALL-UNNAMED", "-d", str(t / "c"), str(HERE / "DevtoolsOwner.java")], check=True)
+        subprocess.run(["javac", "-d", str(t / "app"), str(t / "Plug.java")], check=True)
+        (t / "m").write_text("Premain-Class: DevtoolsOwner\n"); subprocess.run(["jar", "cfm", str(t / "o.jar"), str(t / "m"), "-C", str(t / "c"), "."], check=True)
+        with socket.socket() as k: k.bind(("127.0.0.1", 0)); port = k.getsockname()[1]
+        opts = f"-javaagent:{t / 'o.jar'} -Dcom.sun.net.httpserver.HttpServerProvider=DevtoolsOwner --add-exports=jdk.httpserver/sun.net.httpserver=ALL-UNNAMED -Dosrstest.devtools={port}:tk"
+        p = subprocess.Popen(["java", "-cp", str(t / "app"), "Plug", str(port)], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, env={**os.environ, "JAVA_TOOL_OPTIONS": opts})
+        s.addCleanup(p.stdout.close); s.addCleanup(p.wait); s.addCleanup(p.kill); s.assertEqual(p.stdout.readline().strip(), "up")
+        def send(body, out, i):
+            with urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{port}/mcp", json.dumps(body).encode(), {"Authorization": "Bearer tk"}), timeout=30) as r:
+                out[i] = int(r.read())
+        out = [None] * 3
+        calls = [threading.Thread(target=send, args=({"jsonrpc": "2.0", "id": i, "method": "tools/call", "params": {"name": "walk_to"}}, out, i)) for i in (0, 1)]
+        for c in calls: c.start()
+        send({"jsonrpc": "2.0", "method": "notifications/cancelled"}, out, 2)   # answered while a call holds the lock
+        for c in calls: c.join()
+        s.assertEqual(out, [1, 1, 1])   # each call ran alone in the handler
+
     def test_a_login_sends_the_token_of_the_up_owning_the_port(s):
         import desktop_login as d
         t = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, t); (t / "run/2").mkdir(parents=True); (t / "state/a").mkdir(parents=True)
@@ -605,6 +635,19 @@ class DesktopLogin(unittest.TestCase):
         s.assertEqual(d.token(1), "FAILED: back at the login screen: the server refused the token")
         d, _ = s.fake(["LOGIN_SCREEN"])   # the form's Enter started no attempt
         s.assertTrue(d.login(1, "u", "p").startswith("FAILED: Enter started no login"))
+
+    def test_a_cancelled_call_starts_the_login_again_not_gone(s):  # sweep-47 P0-a: keep read a run's cancel of its type_chat as the endpoint gone and stopped
+        d, sent = s.fake(["LOGIN_SCREEN"] * 4 + ["LOGGING_IN", "LOGGED_IN"])
+        fake, cut = d.call, [True]
+        def call(port, name, **a):
+            if name == "type_chat" and cut and cut.pop():
+                raise d.Cancelled("type_chat: Cancelled")
+            return fake(port, name, **a)
+        d.call = call
+        s.assertEqual(d.whole(lambda: d.login(1, "u", "p")), "LOGGED_IN")
+        s.assertEqual([a["text"] for n, a in sent if n == "type_chat"], ["u", "p"])   # the cancelled user field typed again, then the password
+        s.assertEqual(sum(n == "press_key" and a["key"] == "ESCAPE" for n, a in sent), 2)   # the login from its start
+        s.assertTrue(issubclass(d.Cancelled, d.Refused))
 
     def test_keep_logs_a_logged_out_desktop_in_again(s):  # genie-review-355-cickwdoqbbpt88aaaabeelmng-1: 20+ min at the login screen after an idle logout
         import desktop_login as d
