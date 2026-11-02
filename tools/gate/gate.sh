@@ -11,6 +11,9 @@
 #                     sha's runs, free while unchanged; a GitHub quota refusal holds until its reset) at a child of TCOMMIT whose
 #                     workflows first move the runner's ephemeral ports above the game port 43594 (an outgoing socket on it
 #                     fails the boot's bind), and with CENTRAL build that Central in, as build does (the change's head unchanged)
+#                     and whose CI restores the game data from the fork release asset game-data-<game.example.yml blob12>
+#                     (seeded once from or:<T>) on an actions/cache miss, never openrs2; a run failed at a step the head does not
+#                     touch is re-run once its source answers, and after 3 attempts the row exits 75: held, no result
 . "$(dirname "$0")/../build/build.sh"   # verb slug arg self(tools/build) repo root state dev copy atomic record tree central build
 projects() { local f d; for f; do d=$(dirname "$f"); while [ "$d" != . ] && [ ! -f "$copy/$d/build.gradle.kts" ]; do d=$(dirname "$d"); done; [ "$d" = . ] || { [ "${d##*/}" = pack ] && d=${d%/pack}/$(basename "${d%/pack}")-pack; echo ":${d//\//:}"; }; done | sort -u; }   # the Gradle projects holding these files: settings.gradle.kts names a pack directory <parent>-pack
 projdir() { local d=${1#:}; d=${d//://}; [ "${d##*/}" = "$(basename "$(dirname "$d")")-pack" ] && d=$(dirname "$d")/pack; echo "$d"; }   # a project's directory
@@ -45,8 +48,9 @@ gradle_check() {  # gradle_check test|spotless [MODULE...]: spotless's JGit cann
 }
 gate() {
   tc=$arg; build; git -C "$copy" reset -q --hard "$tc" && git -C "$copy" clean -fdq
-  if out=$(HD_ROOT=$root python3 "$root/hd.py" rows "$slug" "$tc" "$copy" 2>&1); then ok=true; else ok=false; fi
-  T=${G:-$T}; record "$ok" gate <<< "$out"
+  out=$(HD_ROOT=$root python3 "$root/hd.py" rows "$slug" "$tc" "$copy" 2>&1) && rc=0 || rc=$?
+  [ $rc != 75 ] || { echo "$out"; exit 75; }   # a row held (its source down): no result, hd starts the gate again
+  T=${G:-$T}; record "$([ $rc = 0 ] && echo true || echo false)" gate <<< "$out"
 }
 gate_sha() {  # a child of TCOMMIT whose workflows move the ephemeral ports off the game port, and with CENTRAL hold that Central tree at .central/ built in
   set -e   # a command substitution does not inherit it
@@ -66,26 +70,73 @@ gate_sha() {  # a child of TCOMMIT whose workflows move the ephemeral ports off 
   fi
   for f in ci format; do f=.github/workflows/$f.yml
     y=$(git -C "$repo" show "$TCOMMIT:$f" | awk -v step="$step" '{print} /uses: gradle\/actions\/setup-gradle@/{print step; n++} END{exit n!=1}') || { echo "$f: no single setup-gradle step to follow" >&2; return 1; }
+    y=$(game_data "$y")
     GIT_INDEX_FILE=$idx git -C "$repo" update-index --cacheinfo "100644,$(printf '%s\n' "$y" | git -C "$repo" hash-object -w --stdin),$f"
   done
   git -C "$repo" commit-tree "$(GIT_INDEX_FILE=$idx git -C "$repo" write-tree)" -p "$TCOMMIT" -m "gate: $TCOMMIT${CENTRAL:+ with Central ${ccommit:-}}"
 }
-gate_ci() {  # pushes T (gate_sha) to gate/<slug>; the newest run of each workflow at that sha concludes green, or the row fails
+gate_ci() {  # pushes T (gate_sha) to gate/<slug>; the newest run of each workflow at that sha concludes green, or the row fails;
+  # a run failed at a step the head does not touch is the source's, not the head's: re-run once that source answers; held (exit 75: hd records no result) after 3 attempts
+  R=$(git -C "$repo" remote get-url fork | sed -E 's#.*github.com[:/]##; s#\.git$##'); seed
   sha=$(gate_sha); git -C "$repo" push -q --force fork "$sha:refs/heads/gate/$slug"
-  R=$(git -C "$repo" remote get-url fork | sed -E 's#.*github.com[:/]##; s#\.git$##')
-  q="repos/$R/actions/runs?branch=gate/$slug&head_sha=$sha&per_page=100" etag= runs= ran=
+  q="repos/$R/actions/runs?branch=gate/$slug&head_sha=$sha&per_page=100" etag= runs= ran= rr=
   while :; do
     read_runs || return 1; ok=0
     for wf in CI Formatting; do
-      st=$(grep -m1 "^$wf " <<< "$runs" | cut -d' ' -f2 || true)   # newest first
-      case $st in success/*) ok=$((ok + 1)) ;; */completed) echo "$wf $st on gate/$slug at $sha (T $TCOMMIT)"; return 1 ;;
+      read -r _ st id att <<< "$(grep -m1 "^$wf " <<< "$runs" || true)"   # newest first
+      case $st in success/*) ok=$((ok + 1)) ;;
+        failure/completed) case " $rr " in *" $id.$att "*) continue ;; esac   # its re-run asked for: GitHub has not yet shown it
+          f=$(failed_step "$id")
+          if ! infra "$f"; then echo "$wf $st at '$f' on gate/$slug at $sha (T $TCOMMIT)"; return 1; fi
+          [ "$att" -lt 3 ] || { echo "$wf failed at '$f' in $att attempts on gate/$slug at $sha, a step the head does not touch: no result"; exit 75; }
+          echo "$wf failed at '$f', a step the head does not touch: re-run once its source answers"; answers "$f"
+          if gh run rerun "$id" --failed -R "$R"; then rr="$rr $id.$att"; fi ;;
+        */completed) echo "$wf $st on gate/$slug at $sha (T $TCOMMIT)"; return 1 ;;
         "") case " $ran " in *" $wf "*) ;; *) if gh workflow run "$wf" -R "$R" --ref "gate/$slug"; then ran="$ran $wf"; fi ;; esac ;; esac
     done
     [ $ok = 2 ] && break
     sleep 30   # the next read is conditional: while no run changes GitHub answers 304, which costs no quota
   done; echo "CI and Formatting green at $sha (T $TCOMMIT)"
 }
-read_runs() {  # $runs: "<workflow> <conclusion>/<status>" of each run at sha, newest first, read with If-None-Match the last ETag (one read
+game_data() {  # workflow $1 with a step restoring the game data from the fork release asset game-data-<k> on an actions/cache miss, so the gate never downloads openrs2's cache
+  K=$(git -C "$repo" rev-parse -q --verify "$TCOMMIT:game.example.yml" | cut -c1-12 || true) python3 -c '
+import os, sys
+y, k = sys.argv[1], os.environ["K"]
+gen = "      - name: Generate cache and gameval sources\n"
+if not k or "id: gamecache" not in y or gen not in y:
+    print(y); sys.exit()
+step = ("      - name: Game data of the gate (tools/gate/gate.sh gate-ci)\n        id: gamedata\n        if: steps.gamecache.outputs.cache-hit != \x27true\x27\n"
+        "        continue-on-error: true\n        env:\n          GH_TOKEN: ${{ github.token }}\n"
+        f"        run: mkdir -p .data && gh release download game-data -R \"$GITHUB_REPOSITORY\" -p game-data-{k}.tar.gz -O - | tar -xz -C .data\n\n")
+y = y.replace(gen, step + gen, 1)
+y = y.replace("if: steps.gamecache.outputs.cache-hit != \x27true\x27\n        run: ./gradlew :or-cache:freshCache",
+              "if: steps.gamecache.outputs.cache-hit != \x27true\x27 && steps.gamedata.outcome != \x27success\x27\n        run: ./gradlew :or-cache:freshCache")
+y = y.replace("if: steps.gamecache.outputs.cache-hit == \x27true\x27\n", "if: steps.gamecache.outputs.cache-hit == \x27true\x27 || steps.gamedata.outcome == \x27success\x27\n")
+print(y)' "$1"
+}
+seed() {  # the fork release asset game-data-<k> (k: game.example.yml's blob, which names the revision and so openrs2's cache id) from the image of T, once per k: CI reads it on an actions/cache miss
+  local k a f; k=$(git -C "$repo" rev-parse -q --verify "$TCOMMIT:game.example.yml" | cut -c1-12) && [ -n "$k" ] || return 0; a=game-data-$k.tar.gz; f=$state/$a
+  gh release view game-data -R "$R" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "$a" && return 0
+  docker image inspect "or:${T:-}" >/dev/null 2>&1 || { echo "no or:${T:-} to seed $a from: CI downloads the cache from openrs2"; return 0; }
+  docker run --rm --entrypoint tar "or:$T" -cz -C /app/.data cache/LIVE gamevals-binary/gamevals.dat gamevals-binary/gamevals_generated.dat > "$f.tmp" || { rm -f "$f.tmp"; echo "seeding $a failed"; return 0; }
+  mv -f "$f.tmp" "$f"
+  gh release view game-data -R "$R" >/dev/null 2>&1 || gh release create game-data -R "$R" --prerelease --title "game data" --notes "The harness gate's game data, one asset per game.example.yml" || true
+  gh release upload game-data "$f" -R "$R" --clobber || echo "seeding $a failed: CI downloads the cache from openrs2"; rm -f "$f"
+}
+failed_step() {  # the first failed step of run $1 (one read per failed run)
+  until gh api "repos/$R/actions/runs/$1/jobs" -q '[.jobs[].steps[] | select(.conclusion == "failure") | .name][0] // ""'; do sleep 30; done
+}
+infra() {  # step $1 reads nothing the head changes: the runner's setup, the cache's download and generation when the head changes no cache input
+  case $1 in "Set up job"|"Checkout repository"|"Set up JDK"*|"Set up Gradle"|"Cache game data"|*"(tools/gate/gate.sh gate-ci)"|"Post "*|"Complete job") return 0 ;;
+    "Generate cache and gameval sources"|"Rebuild sources from cached game data")
+      [ -n "${BASE:-}" ] && [ -n "${HEAD:-}" ] || return 1
+      ! git -C "$repo" diff --name-only "$BASE...$HEAD" | grep -qE 'or-cache/|/pack/|gamevals|raw-cache|game\.example\.yml' ;;
+    *) return 1 ;; esac
+}
+answers() {  # blocks until the source step $1 reads answers: GitHub for the runner's own steps (it answered this read), openrs2 for the cache's
+  case $1 in "Generate cache"*) until curl -sfI -o /dev/null https://archive.openrs2.org/; do sleep 30; done ;; esac
+}
+read_runs() {  # $runs: "<workflow> <conclusion>/<status> <id> <attempt>" of each run at sha, newest first, read with If-None-Match the last ETag (one read
   # for both workflows; a 304 leaves $runs and costs no quota). A quota refusal holds the row until GitHub's reset, never fails it.
   local code tag reset body s
   while :; do
@@ -99,7 +150,7 @@ if code in ("403", "429") and (k.get("x-ratelimit-remaining") == "0" or "rate li
 else:
     print(code, k.get("etag", "-"), 0)
     if code == "200":
-        for r in json.loads(b)["workflow_runs"]: print(r["name"].replace(" ", "_"), (r["conclusion"] or "") + "/" + r["status"])
+        for r in json.loads(b)["workflow_runs"]: print(r["name"].replace(" ", "_"), (r["conclusion"] or "") + "/" + r["status"], r.get("id", 0), r.get("run_attempt", 1))
 ')
     case $code in 200) etag=$tag runs=$body; return ;; 304) return ;;
       quota) echo "GitHub refused $q on quota: held until its reset $(date -ud "@$reset" +%TZ)"; s=$((reset - $(date +%s))); if [ $s -gt 0 ]; then sleep $s; fi ;;

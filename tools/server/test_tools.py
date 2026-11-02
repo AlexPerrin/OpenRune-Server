@@ -698,19 +698,19 @@ class GateCi(Repo):
     @staticmethod
     def fake_gh(bin, answers):  # `gh api` prints answers[n] at its n-th call (the last repeats), each call's args in bin/calls; sleep is free
         for i, a in enumerate(answers): (bin / f"a{i}").write_text(a)
-        (bin / "gh").write_text(f'#!/bin/sh\nd=$(dirname "$0"); echo "$*" >> "$d/calls"; [ "$1" = api ] || exit 0\n'
+        (bin / "gh").write_text(f'#!/bin/sh\nd=$(dirname "$0"); echo "$*" >> "$d/calls"; case "$1 $2" in "release view") cat "$d/assets" 2>/dev/null; exit 0 ;; esac; [ "$1" = api ] || exit 0\ncase "$2" in */jobs) cat "$d/step"; exit 0 ;; esac\n'
                                 f'n=$(grep -c "^api" "$d/calls"); [ $n -gt {len(answers)} ] && n={len(answers)}; cat "$d/a$((n-1))"; case $(head -1 "$d/a$((n-1))") in *" 200 "*) ;; *) exit 1 ;; esac\n')
         (bin / "sleep").write_text('#!/bin/sh\necho "$1" >> "$(dirname "$0")/sleeps"\n')
         for f in ("gh", "sleep"): (bin / f).chmod(0o755)
 
-    def gate(s, answers):  # gate-ci of s1 against a fake GitHub: (result, gh calls, sleeps)
+    def gate(s, answers, step="", env={}):  # gate-ci of s1 against a fake GitHub (step: a failed run's failed step): (result, gh calls, sleeps)
         for f in ("ci", "format"): s.write(f".github/workflows/{f}.yml", s.WF)
         t = s.commit("ci")
         fork = tempfile.mkdtemp(); git(fork, "init", "-q", "--bare"); git(s.repo, "remote", "add", "fork", fork)
-        bin = Path(tempfile.mkdtemp()); s.fake_gh(bin, answers)
+        bin = Path(tempfile.mkdtemp()); s.fake_gh(bin, answers); (bin / "step").write_text(step + "\n")
         root = tempfile.mkdtemp(); change(root, "s1")
         r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "gate-ci"], capture_output=True, text=True,
-                           env={**os.environ, **s.env, "HD_ROOT": root, "TCOMMIT": t, "PATH": f"{bin}:{os.environ['PATH']}"})
+                           env={**os.environ, **s.env, "HD_ROOT": root, "TCOMMIT": t, "PATH": f"{bin}:{os.environ['PATH']}", **env})
         out = [(bin / f).read_text().splitlines() if (bin / f).exists() else [] for f in ("calls", "sleeps")]
         for d in (fork, bin, root): shutil.rmtree(d)
         return r, *out
@@ -732,6 +732,47 @@ class GateCi(Repo):
         r, calls, _ = s.gate(['HTTP/2.0 200 OK\nEtag: "0"\n\n{"workflow_runs": []}', 'HTTP/2.0 304 Not Modified\n\n', s.RUNS("failure")])
         s.assertEqual(r.returncode, 1); s.assertIn("CI failure/completed", r.stdout)
         s.assertEqual(sorted(c.split()[2] for c in calls if c.startswith("workflow run")), ["CI", "Formatting"])
+
+    FAILED = staticmethod(lambda att: f'HTTP/2.0 200 OK\nEtag: W/"f{att}"\n\n' + json.dumps({"workflow_runs": [
+        {"name": "CI", "status": "completed", "conclusion": "failure", "id": 7, "run_attempt": att}, {"name": "Formatting", "status": "completed", "conclusion": "success", "id": 8}]}))
+
+    def test_a_run_failed_outside_the_head_is_re_run_not_the_heads_fail(s):  # GitHub's checkout failed, not the head: CI runs 41357682052, 41357793032
+        r, calls, _ = s.gate([s.FAILED(1), s.FAILED(1), s.RUNS("success")], step="Checkout repository")
+        s.assertEqual(r.returncode, 0, r.stdout + r.stderr); s.assertIn("a step the head does not touch: re-run", r.stdout)
+        s.assertEqual([c for c in calls if c.startswith("run rerun")], ["run rerun 7 --failed -R " + calls[0].split("repos/")[1].split("/actions")[0]])  # once per attempt
+
+    def test_a_cache_step_failure_is_the_heads_when_the_head_changes_its_input(s):
+        base = git(s.repo, "rev-parse", "HEAD"); s.write("or-cache/x", "y"); head = s.commit("touches the cache")
+        r, calls, _ = s.gate([s.FAILED(1)], step="Generate cache and gameval sources", env={"BASE": base, "HEAD": head})
+        s.assertEqual(r.returncode, 1); s.assertIn("CI failure/completed at 'Generate cache and gameval sources'", r.stdout)
+        s.assertFalse([c for c in calls if c.startswith("run rerun")])
+
+    def test_a_third_attempt_failed_outside_the_head_holds_with_no_result(s):
+        r, calls, _ = s.gate([s.FAILED(3)], step="Set up Gradle")
+        s.assertEqual(r.returncode, 75, r.stdout + r.stderr); s.assertIn("no result", r.stdout)
+
+    CI = ("jobs:\n  b:\n    steps:\n      - name: Set up Gradle\n        uses: gradle/actions/setup-gradle@v6\n\n      - name: Cache game data\n        id: gamecache\n        uses: actions/cache@v6\n\n"
+          "      - name: Generate cache and gameval sources\n        if: steps.gamecache.outputs.cache-hit != 'true'\n        run: ./gradlew :or-cache:freshCache :or-cache:mergePluginGamevals\n\n"
+          "      - name: Rebuild sources from cached game data\n        if: steps.gamecache.outputs.cache-hit == 'true'\n        run: ./gradlew :or-cache:buildCache\n")
+
+    def test_ci_reads_the_game_data_from_the_fork_release_seeded_once_from_the_image(s):  # openrs2 answered HTTP 500 on :or-cache:freshCache: a head's FAIL
+        s.write(".github/workflows/ci.yml", s.CI); s.write(".github/workflows/format.yml", s.WF); s.write("game.example.yml", "revision: 241\n"); t = s.commit("ci")
+        k = git(s.repo, "rev-parse", f"{t}:game.example.yml")[:12]
+        fork = tempfile.mkdtemp(); git(fork, "init", "-q", "--bare"); git(s.repo, "remote", "add", "fork", fork)
+        bin = Path(tempfile.mkdtemp()); s.fake_gh(bin, s.GREEN); root = tempfile.mkdtemp(); change(root, "s1")
+        (bin / "docker").write_text('#!/bin/sh\necho "$*" >> "$(dirname "$0")/docker.calls"; [ "$1" = run ] && echo tarball; exit 0\n'); (bin / "docker").chmod(0o755)
+        gate = lambda: subprocess.run(["bash", str(HERE.parent / "track.sh"), "gate-ci"], capture_output=True, text=True,
+                                      env={**os.environ, **s.env, "HD_ROOT": root, "TCOMMIT": t, "T": "tk", "PATH": f"{bin}:{os.environ['PATH']}"})
+        r = gate(); s.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        calls = (bin / "calls").read_text()
+        s.assertIn(f"release upload game-data {root}/state/s1/game-data-{k}.tar.gz", calls); s.assertIn("run --rm --entrypoint tar or:tk", (bin / "docker.calls").read_text())
+        y = git(fork, "show", "gate/s1:.github/workflows/ci.yml")
+        s.assertLess(y.index(f"-p game-data-{k}.tar.gz"), y.index("Generate cache and gameval sources"))
+        s.assertIn("cache-hit != 'true' && steps.gamedata.outcome != 'success'\n        run: ./gradlew :or-cache:freshCache", y)   # openrs2 only when neither holds it
+        s.assertIn("cache-hit == 'true' || steps.gamedata.outcome == 'success'", y)
+        (bin / "assets").write_text(f"game-data-{k}.tar.gz\n"); (bin / "calls").unlink(); gate()
+        s.assertNotIn("release upload", (bin / "calls").read_text())                 # seeded once per game.example.yml
+        for d in (fork, bin, root): shutil.rmtree(d)
 
     def test_a_row_without_a_slug_pushes_gate_of_the_env_slug(s):  # its CI moves the runner's ephemeral ports above 43594 before gradle: run 41312919759's boot bind failed
         for f in ("ci", "format"): s.write(f".github/workflows/{f}.yml", s.WF)
