@@ -19,6 +19,7 @@
 #                     and then the record (state/<slug>/up.json: up writes it before its first container; hd's repair reads its script and containers)
 #   ship TCOMMIT      the integration tree: build, the deploy image with the live stack's key pair (state/live/key, the modulus every APK carries)
 #                     and the issuer's secret, its key checked, boot check, deploy, or roll back; state/live/tree.json, the live stack's record, names the modulus
+#                     and the deploy key (KEY: the tree and the deploy tools' hash) hd deploys anew on
 #   measure GOAL      the content inventory's share of rows whose unit is in PASSES
 #   log <slug> PATTERN  the lines of the change's server container matching PATTERN (slug `live`: the live server)
 #   recordings <slug> REGEX  the RSProx transcripts holding a packet type or text (any case: CLANSETTINGS finds clansettings_delta)
@@ -280,8 +281,8 @@ EOF
   since=$(date -u +%FT%TZ)
   (cd "$compose_dir" && docker compose --env-file switch.env up -d --no-deps openrune http http-desktop issuer) >/dev/null
   if ready osrs-openrune "$since"; then
-    python3 -c 'import json,sys;print(json.dumps({"tree":sys.argv[1],"commit":sys.argv[2],"heads":sys.argv[3].split(),"names":sys.argv[4].split(),"rollback":sys.argv[5],"modulus":sys.argv[6]}))' \
-      "$T" "$arg" "${HEADS:-}" "${NAMES:-}" "rollback-${prev:0:12}" "$modulus" | atomic "$state/tree.json"; echo "live: $T"
+    python3 -c 'import json,sys;print(json.dumps({"tree":sys.argv[1],"commit":sys.argv[2],"heads":sys.argv[3].split(),"names":sys.argv[4].split(),"rollback":sys.argv[5],"modulus":sys.argv[6],"key":sys.argv[7]}))' \
+      "$T" "$arg" "${HEADS:-}" "${NAMES:-}" "rollback-${prev:0:12}" "$modulus" "${KEY:-$T}" | atomic "$state/tree.json"; echo "live: $T"
     for c in osrs-openrune-http osrs-openrune-http-desktop; do python3 "$self/server/javcheck.py" "http://127.0.0.1:$(docker port "$c" 8080 | head -1 | cut -d: -f2)/jav_config.ws" || return 6; done
   else
     docker tag "osrs-openrune:rollback-${prev:0:12}" "$live_image"; (cd "$compose_dir" && docker compose --env-file switch.env up -d --no-deps openrune) >/dev/null
