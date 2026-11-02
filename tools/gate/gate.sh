@@ -131,7 +131,7 @@ print(timed(y))' "$1"
 }
 seed() {  # the fork release asset game-data-<k> (k: game.example.yml's blob, which names the revision and so openrs2's cache id) from the image of T, once per k: CI reads it on an actions/cache miss
   local k a f; k=$(git -C "$repo" rev-parse -q --verify "$TCOMMIT:game.example.yml" | cut -c1-12) && [ -n "$k" ] || return 0; a=game-data-$k.tar.gz; f=$state/$a
-  gh release view game-data -R "$R" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "$a" && return 0
+  gh release view game-data -R "$R" --json assets -q '.assets[].name' 2>/dev/null | grep -x "$a" >/dev/null && return 0
   docker image inspect "or:${T:-}" >/dev/null 2>&1 || { echo "no or:${T:-} to seed $a from: CI waits on it"; return 0; }
   docker run --rm --entrypoint tar "or:$T" -cz -C /app/.data cache/LIVE gamevals-binary/gamevals.dat gamevals-binary/gamevals_generated.dat > "$f.tmp" || { rm -f "$f.tmp"; echo "seeding $a failed"; return 0; }
   mv -f "$f.tmp" "$f"
@@ -162,7 +162,7 @@ ci_step() {  # one classifier of a failed CI step for gate-ci and the carry
 answers() {  # blocks until the source step $1 reads answers: GitHub for the runner's own steps (it answered this read), the release asset for the game data's, openrs2 for the cache's
   case $1 in "Generate cache"*) until openrs2; do sleep 30; done ;;
     "Game data of the gate"*) local k; k=$(git -C "$repo" rev-parse -q --verify "$TCOMMIT:game.example.yml" | cut -c1-12 || true); [ -n "$k" ] || return 0
-      until gh release view game-data -R "$R" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "game-data-$k.tar.gz"; do seed; sleep 30; done ;; esac
+      until gh release view game-data -R "$R" --json assets -q '.assets[].name' 2>/dev/null | grep -x "game-data-$k.tar.gz" >/dev/null; do seed; sleep 30; done ;; esac
 }
 openrs2() {  # openrs2 serves the revision's cache: its newest live cache of game.example.yml's revision yields bytes (an outage answers its index 200, the zip 500 or empty)
   local rev id; rev=$(git -C "$repo" show "$TCOMMIT:game.example.yml" 2>/dev/null | sed -nE 's/^revision: *([0-9]+).*/\1/p' | head -1)

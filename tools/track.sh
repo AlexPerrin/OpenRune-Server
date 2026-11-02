@@ -58,7 +58,7 @@ modulus_of() { openssl rsa -noout -modulus 2>/dev/null | cut -d= -f2 | tr A-F a-
 ready() {  # ready <container> [since]: blocks until "Server ready in" or the container stops; fails at once on one not (re)started since
   local s; s=$(docker inspect -f '{{.State.StartedAt}}' "$1" 2>/dev/null | cut -c1-19)
   [ -z "${2:-}" ] || [[ ! "$s" < "${2:0:19}" ]] || { echo "$1 has run since $s, not started since $2"; return 1; }
-  while ! docker logs ${2:+--since "$2"} "$1" 2>&1 | grep -q "Server ready in"; do
+  while ! docker logs ${2:+--since "$2"} "$1" 2>&1 | grep "Server ready in" >/dev/null; do   # grep reads to the end: -q's early exit SIGPIPEs docker logs under pipefail
     [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = true ] || { echo "$1 is not running"; return 1; }; sleep 5
   done
 }
@@ -139,7 +139,7 @@ desktop_start() {  # sets inst dt (desktopN, its devtools port)
     jo+=" -Djavax.net.ssl.trustStore=$w\\home\\token-trust.p12 -Djavax.net.ssl.trustStorePassword=changeit"
   fi
   pid=
-  until tcp | grep -q "^$dp "; do   # the devtools endpoint answers, the desktop died, or its plugin could not bind the port (the client lives on without it)
+  until tcp | grep "^$dp " >/dev/null; do   # the devtools endpoint answers, the desktop died, or its plugin could not bind the port (the client lives on without it)
     if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
       ! grep -q 'UtilAcceptVsock' "$state/desktop$i.log" || grep -qv 'UtilAcceptVsock' "$state/desktop$i.log" && { echo "desktop $i exited: $(grep -m1 -E 'REFUSING|Exception' "$state/desktop$i.log" || tail -3 "$state/desktop$i.log")" >&2; return 1; }
       # WSL interop ended the launch before Windows ran it (its log holds that error alone): launched again once the interop answers, any JVM it left stopped first
@@ -246,7 +246,7 @@ restart() {  # the server container restarted with its game.yml and database; th
 down() {
   unkeep   # no keeper logs in a desktop down stops
   (desktops_remove) || true   # a missing program still lets the containers go
-  if [ "$(docker inspect -f '{{.State.Running}}' "server-$slug" 2>/dev/null)" = true ] && docker logs "server-$slug" 2>&1 | grep -q "Server ready in"; then offline; fi   # the server drops each disconnected character and saves it: RESUME starts there
+  if [ "$(docker inspect -f '{{.State.Running}}' "server-$slug" 2>/dev/null)" = true ] && docker logs "server-$slug" 2>&1 | grep "Server ready in" >/dev/null; then offline; fi   # the server drops each disconnected character and saves it: RESUME starts there
   cs=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["containers"])' "$state/up.json" 2>/dev/null) || cs="server-$slug http-$slug token-$slug"   # a stack up before its record named its containers: the names every up gives
   docker rm -f $cs >/dev/null 2>&1 || true
   left=$(docker ps -a --format '{{.Names}}') || { echo "down: docker does not answer: the record stays" >&2; return 1; }
