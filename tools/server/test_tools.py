@@ -17,6 +17,7 @@ def git(repo, *a, env=None):
 
 def change(root, slug):
     p = Path(root) / "harness/changes" / f"{slug}.md"; p.parent.mkdir(parents=True, exist_ok=True); p.write_text("")
+    (Path(root) / "hd.py").write_text("import os, sys\nassert sys.argv[1] == 'room'\nos.execvp(sys.argv[2], sys.argv[2:])\n")   # hd room: the host has room
 
 
 class Slug(unittest.TestCase):
@@ -139,6 +140,33 @@ class BuildAttempts(unittest.TestCase):
     def build(s):
         return subprocess.run(["bash", str(HERE.parent / "track.sh"), "build", "x", s.tc], capture_output=True, text=True,
                               env={**os.environ, "HD_ROOT": str(s.root), "CLONE": str(s.repo), "PATH": f"{s.root / 'bin'}:{os.environ['PATH']}", "CENTRAL": ""})
+
+    def test_a_host_fault_records_no_result_and_a_tree_failure_records_its_fail(s):  # osrs-harness sweep-18 N7: docker's 'cannot allocate memory' was recorded as the head's build FAIL
+        r = s.build(); b = json.loads((s.root / "state/x/build.json").read_text())
+        s.assertEqual((r.returncode, b["ok"]), (1, False)); s.assertIn("gradle: boom", b["detail"])   # the tree's own failure: ok:false
+        (s.root / "state/x/build.json").unlink()
+        for fault in ("docker: Error response from daemon: cannot allocate memory.", "write /x: no space left on device",
+                      'docker: Error response from daemon: Conflict. The container name "/build-x" is already in use by container 26ec02.'):
+            (s.root / "bin/docker").write_text(f'#!/bin/sh\necho "$*" >> {s.root}/calls\ncase "$*" in "image inspect"*) exit 1;; *"--name build-x"*) echo \'{fault}\' >&2; exit 125;; esac\n')
+            r = s.build()
+            s.assertEqual(r.returncode, 75, r.stdout + r.stderr); s.assertIn("the host's fault", r.stdout)
+            s.assertFalse((s.root / "state/x/build.json").exists())             # no result: the pass runs it again
+        calls = (s.root / "calls").read_text().splitlines()
+        s.assertLess(calls.index("rm -f build-x"), next(i for i, c in enumerate(calls) if "--name build-x" in c))   # a killed build's leftover container is removed first
+        s.assertIn("--cpus=4 --memory=5g", next(c for c in calls if "--name build-x" in c))
+
+    def test_a_stopped_build_removes_its_container(s):  # osrs-harness answer-4: a stopped deploy's build-integration ran on; the next two failed on its name
+        import signal, time
+        calls = s.root / "calls"
+        (s.root / "bin/docker").write_text(f'#!/bin/sh\necho "$*" >> {calls}\ncase "$*" in "image inspect"*) exit 1;; *"--name build-x"*) exec sleep 60;; esac\n')
+        p = subprocess.Popen(["bash", str(HERE.parent / "track.sh"), "build", "x", s.tc], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True,
+                             env={**os.environ, "HD_ROOT": str(s.root), "CLONE": str(s.repo), "PATH": f"{s.root / 'bin'}:{os.environ['PATH']}", "CENTRAL": ""})
+        while "--name build-x" not in (calls.read_text() if calls.exists() else ""):
+            time.sleep(0.05)
+        os.killpg(p.pid, signal.SIGTERM); p.communicate()                       # a stop: the scope's every process gets SIGTERM
+        c = calls.read_text().splitlines()
+        s.assertIn("--init", next(l for l in c if "--name build-x" in l))         # the container's init takes the SIGTERM docker run proxies
+        s.assertEqual(c[-1], "rm -f build-x")                                     # and the build removes its container as it ends
 
     def test_two_attempts_keep_two_logs_each_named_in_the_output(s):  # a deploy's retry overwrote the first attempt's log: its failure was gone
         outs = [s.build(), s.build()]
@@ -610,7 +638,7 @@ class TestVerb(Repo):
         s.write("mod/src/main/kotlin/A.kt", "fun a() { 1 }\n")
         tc = s.commit("feat: touch mod")
         copy = Path(s.repo) / ".worktrees/s1-build"; git(s.repo, "worktree", "add", "-q", "--detach", str(copy), tc)
-        root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, root); (root / "bin").mkdir(); (root / "st").mkdir()
+        root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, root); (root / "bin").mkdir(); (root / "st").mkdir(); change(root, "s1")
         # a fake docker: the container's view of the copy's git (as spotless reads it), the gradle tasks, a test report
         (root / "bin/docker").write_text(f"""#!/bin/bash
 case " $* " in *" chown "*) exit 0 ;; esac
@@ -624,7 +652,7 @@ mkdir -p {copy}/mod/build/test-results/test; echo '<testsuite name="ATest" tests
         fn = lambda name: f"{name}() {{" + src.split(f"\n{name}() {{")[1].split("\n}")[0] + "\n}"
         line = lambda pre: next(l for l in src.splitlines() if l.startswith(pre))
         script = "\n".join(["set -euo pipefail", f"slug=s1; repo={s.repo}; copy={copy}; state={root}/st; root={root}; T=t1; tc={tc}",
-                            line("atomic()"), line("record()"), line("projects()"), line("projdir()"), "build() { :; }", fn("central"), fn("gradle_check"), line("tests()"), "tests"])
+                            line("atomic()"), line("record()"), line("size="), line("fault="), line("ooms()"), fn("hosted"), line("box()"), line("projects()"), line("projdir()"), "build() { :; }", fn("central"), fn("gradle_check"), line("tests()"), "tests"])
         r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={**os.environ, "EVIDENCE": "", "PATH": f"{root}/bin:{os.environ['PATH']}"})
         s.assertEqual(r.returncode, 0, r.stderr + r.stdout)
         s.assertEqual((root / "tasks").read_text().split(), [":mod:test", ":mod:spotlessCheck"])
@@ -643,7 +671,7 @@ mkdir -p {copy}/mod/build/test-results/test; echo '<testsuite name="ATest" tests
         s.write("mod/src/main/kotlin/B.kt", "fun  b()  {}\nfun c() {}\n")
         tc = s.commit("feat: touch B")
         copy = Path(s.repo) / ".worktrees/s1-build"
-        root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, root); (root / "bin").mkdir(); (root / "st").mkdir()
+        root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, root); (root / "bin").mkdir(); (root / "st").mkdir(); change(root, "s1")
         # a fake gradle in docker: spotlessCheck of a module whose file holds the double space fails, as the ratchet does on a touched file;
         # the slug was never built: its volume is docker's new root-owned one until the verb chowns it to the run's user
         (root / "bin/docker").write_text(f"""#!/bin/bash
@@ -657,7 +685,7 @@ for t; do m=${{t#:}}; m=${{m%:spotlessCheck}}; ! grep -rq 'fun  ' {copy}/$m/src 
         fn = lambda name: f"{name}() {{" + src.split(f"\n{name}() {{")[1].split("\n}")[0] + "\n}"
         line = lambda pre: next(l for l in src.splitlines() if l.startswith(pre))
         script = "\n".join(["set -euo pipefail", f"slug=s1; repo={s.repo}; copy={copy}; state={root}/st; root={root}; T=t1",
-                            line("atomic()"), line("record()"), line("projects()"), line("projdir()"), "build() { echo build >&2; exit 9; }",
+                            line("atomic()"), line("record()"), line("size="), line("fault="), line("ooms()"), fn("hosted"), line("box()"), line("projects()"), line("projdir()"), "build() { echo build >&2; exit 9; }",
                             f"tree() {{ tc={tc}; }}", fn("central"), fn("gradle_check"), fn("spotless"), "spotless"])
         run = lambda: subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={**os.environ, "EVIDENCE": "", "PATH": f"{root}/bin:{os.environ['PATH']}"})
         r = run()

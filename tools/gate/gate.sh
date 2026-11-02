@@ -16,7 +16,7 @@
 #                     each step is timed alone (the job's timeout-minutes on every step), so a timeout names the step that ran
 #                     out; a run failed at a step the head does not touch is re-run once its source answers, and after 3
 #                     attempts the row exits 75: held, no result
-. "$(dirname "$0")/../build/build.sh"   # verb slug arg self(tools/build) repo root state dev copy atomic record tree central build
+. "$(dirname "$0")/../build/build.sh"   # verb slug arg self(tools/build) repo root state dev copy atomic record size hosted box tree central build
 projects() { local f d; for f; do d=$(dirname "$f"); while [ "$d" != . ] && [ ! -f "$copy/$d/build.gradle.kts" ]; do d=$(dirname "$d"); done; [ "$d" = . ] || { [ "${d##*/}" = pack ] && d=${d%/pack}/$(basename "${d%/pack}")-pack; echo ":${d//\//:}"; }; done | sort -u; }   # the Gradle projects holding these files: settings.gradle.kts names a pack directory <parent>-pack
 projdir() { local d=${1#:}; d=${d//://}; [ "${d##*/}" = "$(basename "$(dirname "$d")")-pack" ] && d=$(dirname "$d")/pack; echo "$d"; }   # a project's directory
 tests() { build; gradle_check test "$@"; }
@@ -40,10 +40,10 @@ gradle_check() {  # gradle_check test|spotless [MODULE...]: spotless's JGit cann
   echo "gitdir: $g" > "$state/$kind.gitfile"; mkdir -p "$out"
   for d in "${mods[@]}"; do rm -rf "$copy/$(projdir "$d")/build/test-results/test"; done   # the report is this run's
   docker run --rm -v "gradle-$slug:/gradle" eclipse-temurin:21 chown 1000:1000 /gradle   # creates or reuses the slug's volume: one docker makes is root's, the run is 1000 (spotless runs on a slug never built)
-  central; docker run --rm --name "$kind-$slug" --cpus=4 --memory=5g -u 1000:1000 -e HOME=/gradle/home -e GRADLE_USER_HOME=/gradle -e CDIR="$cdir" \
+  : > "$out/$kind.log"; central; box "$out/$kind.log" --rm --name "$kind-$slug" -u 1000:1000 -e HOME=/gradle/home -e GRADLE_USER_HOME=/gradle -e CDIR="$cdir" \
     -v "gradle-$slug:/gradle" "${cvols[@]}" -v "$repo/.git:$repo/.git:ro" -v "$g:$g:ro" -v "$copy:$copy" -v "$state/$kind.gitfile:$copy/.git:ro" -w "$copy" \
     eclipse-temurin:21 bash -c './gradlew --console=plain --build-cache --no-configuration-cache --max-workers=4 -Dorg.gradle.jvmargs=-Xmx1536m${CDIR:+ --init-script /central.init.gradle} --continue "$@"' _ \
-    $([ "$kind" = test ] && printf '%s:test ' "${mods[@]}") $(printf '%s:spotlessCheck ' "${mods[@]}") > "$out/$kind.log" 2>&1 && ok=true || ok=false
+    $([ "$kind" = test ] && printf '%s:test ' "${mods[@]}") $(printf '%s:spotlessCheck ' "${mods[@]}") && ok=true || ok=false
   for d in "${mods[@]}"; do cat "$copy/$(projdir "$d")"/build/test-results/test/*.xml 2>/dev/null | grep -o '<testsuite name="[^"]*" tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' || true; done >> "$out/$kind.log"
   record "$ok" "$kind" < "$out/$kind.log"; grep -E -A1 '^<testsuite|went wrong|violations|FAILED|BUILD' "$out/$kind.log" | grep -v '^--$' || true; [ "$ok" = true ]
 }
