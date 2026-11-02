@@ -380,7 +380,9 @@ class DesktopInstance(unittest.TestCase):
         lock = SRC[SRC.index("case $verb in up|restart|down) ["):]; lock = lock[:lock.index("\n", lock.index("exec flock"))]
         f = s.t / "track.sh"; f.write_text(f"set -euo pipefail\nverb=$1; slug=a; state={s.t}/state\n{lock}\n"
                                            f"echo \"start $$\" >> {s.t}/log; sleep 1; echo \"end $$\" >> {s.t}/log; setsid sleep 30 < /dev/null > /dev/null 2>&1 &\n")
-        ps = [subprocess.Popen(["bash", str(f), v], stderr=subprocess.PIPE, text=True) for v in ("up", "down")]
+        ps = [subprocess.Popen(["bash", str(f), "up"], stderr=subprocess.PIPE, text=True)]
+        while not (s.t / "log").exists(): pass   # the up holds the lock before the down asks for it
+        ps.append(subprocess.Popen(["bash", str(f), "down"], stderr=subprocess.PIPE, text=True))
         errs = [p.communicate(timeout=60)[1] for p in ps]
         log = [l.split() for l in (s.t / "log").read_text().splitlines()]
         s.assertEqual([w for w, _ in log], ["start", "end", "start", "end"]); s.assertEqual(log[0][1], log[1][1])   # the second waited for the first
