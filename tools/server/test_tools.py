@@ -923,6 +923,21 @@ class GateCi(Repo):
         s.assertIn("cache-hit != 'true'\n        run: ./gradlew :or-cache:freshCache", y)  # so freshCache runs, the step infra() calls the head's
         for d in (fork, bin, root): shutil.rmtree(d)
 
+    def test_a_head_changing_a_pack_packs_on_the_restored_revision(s):  # an openrs2 outage (run 41380358897) failed six correct pack and gameval heads in freshCache
+        s.write(".github/workflows/ci.yml", s.CI); s.write(".github/workflows/format.yml", s.WF); s.write("game.example.yml", "revision: 241\n"); b = s.commit("ci")
+        s.write("content/x/pack/a.toml", "x\n"); s.write("gamevals.toml", "x\n"); t = s.commit("pack")
+        k = git(s.repo, "rev-parse", f"{t}:game.example.yml")[:12]
+        fork = tempfile.mkdtemp(); git(fork, "init", "-q", "--bare"); git(s.repo, "remote", "add", "fork", fork)
+        bin = Path(tempfile.mkdtemp()); s.fake_gh(bin, s.GREEN); root = tempfile.mkdtemp(); change(root, "s1")
+        env = {**os.environ, **s.env, "HD_ROOT": root, "TCOMMIT": t, "BASE": b, "HEAD": t, "PATH": f"{bin}:{os.environ['PATH']}"}
+        r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "gate-ci"], capture_output=True, text=True, env=env)
+        s.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        y = git(fork, "show", "gate/s1:.github/workflows/ci.yml")
+        s.assertNotIn("if: false", y); s.assertIn(f"game-data-{k}.tar.gz", y)            # the revision restored: openrs2 is never the head's
+        step = lambda f: subprocess.run(["bash", str(HERE.parent / "track.sh"), "ci-step", "s1", f], capture_output=True, text=True, env={**env, "PATH": f"{bin}:/usr/bin:/bin"}).returncode
+        s.assertEqual(step("Rebuild sources from cached game data"), 1)                  # the packing is the head's
+        for d in (fork, bin, root): shutil.rmtree(d)
+
     def test_a_row_without_a_slug_pushes_gate_of_the_env_slug(s):  # its CI moves the runner's ephemeral ports above 43594 before gradle: run 41312919759's boot bind failed
         for f in ("ci", "format"): s.write(f".github/workflows/{f}.yml", s.WF)
         t = s.commit("ci")
