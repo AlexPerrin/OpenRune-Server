@@ -2,7 +2,7 @@
 """The server contract's script rows that read text. Exit 1 names every miss.
   text.py evidence   accuracy.md, pr-comment.md and, for a new PR (no $PR), pr-title.txt and pr-body.md present and non-empty in $EVIDENCE
   text.py commits    every commit $BASE..$HEAD not on an existing PR's head fork/$PUBLIC_BRANCH: subject feat:/fix:, no Claude-Session trailer, only a Co-Authored-By trailer
-  text.py texts      a new PR's pr-body.md has upstream's template sections (read live from origin/main), no fork PR link anywhere,
+  text.py texts      a new PR's pr-body.md has upstream's template sections (read live from origin/main), no fork PR link in any text the carry posts (each pr-reply-*.md too),
                      pr-comment.md names $HEAD unless it is a reply in a review thread (it quotes the finding: '> ')
   text.py dupes      a module whose main sources gain an item-moving call has a test source added or changed ($BASE...$HEAD,
                      on an existing PR fork/$PUBLIC_BRANCH...$HEAD)
@@ -57,7 +57,7 @@ def texts():
     for h in re.findall(r"^##+ *(.+?)\s*$", template, re.M) if not os.environ.get("PR") else []:
         if h.lower() not in body.lower():
             bad.append(f"pr-body.md lacks the template section '{h}'")
-    for n in ("pr-title.txt", "pr-body.md", "pr-comment.md"):
+    for n in ["pr-title.txt", "pr-body.md", "pr-comment.md"] + sorted(f for f in (os.listdir(E) if os.path.isdir(E) else []) if re.fullmatch(r"pr-reply-.+\.md", f)):  # every text the carry posts
         if FORK_LINK.search(text(n)):
             bad.append(f"{n} links a fork PR (it renders as a red Closed on upstream)")
     if HEAD[:9] not in text("pr-comment.md") and not text("pr-comment.md").startswith("> "):

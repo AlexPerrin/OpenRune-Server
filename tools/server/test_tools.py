@@ -938,6 +938,9 @@ class Text(Repo):
         s.assertEqual((rc, out.strip()), (0, "texts: ok"))
         (Path(ev) / "pr-body.md").write_text(""); (Path(ev) / "pr-comment.md").write_text("> why?\n\n@rev because.")   # a reply on an open PR
         s.assertEqual(s.row("text.py", "texts", EVIDENCE=ev, HEAD=head, PR="7")[0], 0)
+        (Path(ev) / "pr-reply-IC_1.md").write_text("> q\n\nsee fork PR #12")                                       # a reply the one comment carries
+        rc, out = s.row("text.py", "texts", EVIDENCE=ev, HEAD=head, PR="7"); s.assertEqual(rc, 1); s.assertIn("pr-reply-IC_1.md links a fork PR", out)
+        (Path(ev) / "pr-reply-IC_1.md").unlink()
         s.assertEqual(s.row("text.py", "evidence", EVIDENCE=ev, PR="7")[0], 0)
         s.assertEqual(s.row("text.py", "evidence", EVIDENCE=ev)[0], 1)
         s.write("mod/src/test/kotlin/ATest.kt", "class ATest\n")
