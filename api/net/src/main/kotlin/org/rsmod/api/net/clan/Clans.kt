@@ -391,19 +391,10 @@ constructor(
     }
 
     public fun findClan(name: String, onResult: (Clan?) -> Unit) {
-        val key = nameKey(name)
-        loaded.values.firstOrNull { nameKey(it.name) == key }?.let {
-            onResult(it)
-            return
-        }
         loadClan({ connection -> ClanStore.clanIdByName(connection, name) }, onResult)
     }
 
     public fun findClan(clanId: Int, onResult: (Clan?) -> Unit) {
-        loaded[clanId]?.let {
-            onResult(it)
-            return
-        }
         loadClan({ clanId }, onResult)
     }
 

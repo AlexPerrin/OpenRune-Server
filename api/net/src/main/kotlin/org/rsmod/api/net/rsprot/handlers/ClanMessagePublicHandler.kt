@@ -6,16 +6,17 @@ import org.rsmod.api.net.clan.Clans
 import org.rsmod.game.entity.Player
 
 private const val CLAN_CHAT_TYPE = 3
+private const val GUEST_CLAN_CHAT_TYPE = 4
 
 class ClanMessagePublicHandler
 @Inject
 constructor(private val clans: Clans, private val publicMessage: MessagePublicHandler) :
     MessageHandler<MessagePublic> {
     override fun handle(player: Player, message: MessagePublic) {
-        if (message.type != CLAN_CHAT_TYPE) {
-            publicMessage.handle(player, message)
-        } else {
-            clans.message(player, message.message, guest = message.clanType != 0)
+        when (message.type) {
+            CLAN_CHAT_TYPE -> if (message.clanType == 0) clans.message(player, message.message, guest = false)
+            GUEST_CLAN_CHAT_TYPE -> clans.message(player, message.message, guest = true)
+            else -> publicMessage.handle(player, message)
         }
     }
 }
