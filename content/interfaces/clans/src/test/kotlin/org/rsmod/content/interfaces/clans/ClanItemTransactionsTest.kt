@@ -60,8 +60,9 @@ class ClanItemTransactionsTest {
     @Test
     fun `the item takes the clan motif colour`() {
         val f = Fixture()
+        f.clan.intSettings[OUTFIT] = (RED + 1) shl 20
         assertTrue(f.take(ClanItem.Cloak))
-        assertEquals(1, f.player.inv.count(ClanItem.Cloak.objs[f.clan.motif()]))
+        assertEquals(1, f.player.inv.count(ClanItem.Cloak.objs[RED]))
         assertEquals(1, f.count(ClanItem.Cloak))
     }
 

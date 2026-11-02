@@ -43,6 +43,7 @@ public class Clan(
         const val TALK_RANK_KEY = -1
         const val KICK_RANK_KEY = -2
         const val ALLOW_UNAFFINED_KEY = -3
+        const val OWNER_ACTIVE_DAY_KEY = -4
         const val DEFAULT_TALK_RANK = ClanRank.GUEST
         const val DEFAULT_KICK_RANK = ClanRank.ADMINISTRATOR
     }

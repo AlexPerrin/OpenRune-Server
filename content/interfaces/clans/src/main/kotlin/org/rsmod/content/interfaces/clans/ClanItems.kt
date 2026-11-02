@@ -16,7 +16,7 @@ internal enum class ClanItem(val objs: List<String>) {
 private fun motifs(prefix: String): List<String> =
     listOf("black", "orange", "blue", "red", "green", "yellow", "lightblue", "pink").map { "${prefix}_$it" }
 
-internal fun Clan.motif(): Int = (((intSettings[OUTFIT_SETTING] ?: 0) shr 20 and 0x3FF) - 1).coerceIn(0, 7)
+private fun Clan.motif(): Int = (((intSettings[OUTFIT_SETTING] ?: 0) shr 20 and 0x3FF) - 1).coerceIn(0, 7)
 
 internal fun ProtectedAccess.takeClanItem(kind: ClanItem, clan: Clan): Boolean =
     invAdd(player.inv, kind.objs[clan.motif()]).success

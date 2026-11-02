@@ -161,6 +161,10 @@ constructor(
             }
             settingsDelta(clan, updates)
         }
+        if (member.rank == ClanRank.OWNER) {
+            clan.intSettings[Clan.OWNER_ACTIVE_DAY_KEY] = today
+            saveSetting(clan, Clan.OWNER_ACTIVE_DAY_KEY)
+        }
         applyResignation(clan)
         if (player.vars[CHANNEL_LEFT_VARBIT] == 0) {
             joinChannel(player, clan)
@@ -360,7 +364,7 @@ constructor(
 
     private fun applyResignation(clan: Clan) {
         val owner = clan.owner ?: return
-        val ownerActiveDay = clan.intSettings[OWNER_ACTIVE_DAY_SETTING] ?: runeDay()
+        val ownerActiveDay = clan.intSettings[Clan.OWNER_ACTIVE_DAY_KEY] ?: runeDay()
         val inactive = runeDay() - ownerActiveDay >= OWNER_INACTIVE_DAYS
         val resigned = clan.resignAt in 1..System.currentTimeMillis()
         if (!inactive && !resigned) {
@@ -369,6 +373,8 @@ constructor(
         val next = replacementOwner(clan) ?: return
         clan.resignAt = 0
         saveClan(clan)
+        clan.intSettings[Clan.OWNER_ACTIVE_DAY_KEY] = runeDay()
+        saveSetting(clan, Clan.OWNER_ACTIVE_DAY_KEY)
         setRank(clan, clan.members.indexOf(owner), ClanRank.DEPUTY_OWNER)
         setRank(clan, clan.members.indexOf(next), ClanRank.OWNER)
         settingsDelta(clan, listOf(ClanSettingsDelta.SetClanOwnerUpdate(clan.members.indexOf(next))))
