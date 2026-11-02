@@ -268,13 +268,24 @@ class QuestMode(unittest.TestCase):
         s.assertIn("respect-progress or assume-completed", run(yml, "quest-mode: off\n").stderr)
         s.assertNotEqual(run("game:\n  name: x\n", "").returncode, 0)
         up = src.split("\nup() {")[1].split("\n}")[0]
-        s.assertIn('| quests "$(quest_mode)" > "$state/game.yml"', up); s.assertIn('-v "$state/game.yml:/app/game.yml:ro"', up)
+        s.assertIn('| quests "$(quest_mode)" | idle_off > "$state/game.yml"', up); s.assertIn('-v "$state/game.yml:/app/game.yml:ro"', up)
 
     def test_restart_keeps_the_config_and_database_of_up(s):  # a hand-run container lost its game.yml mount at restart; a tmpfs database loses the accounts
         src = SRC
         up = src.split("\nup() {")[1].split("\n}")[0]; restart = src.split("\nrestart() {")[1].split("\n}")[0]
         s.assertIn('-v "$state/postgres:/app/.data/postgres"', up); s.assertNotIn("--tmpfs", up)
         s.assertIn('docker restart "server-$slug"', restart); s.assertNotIn("docker run", restart); s.assertNotIn("> \"$state/game.yml\"", restart)
+
+
+class IdleLogout(unittest.TestCase):
+    def test_a_runs_server_never_idle_logs_out_and_live_keeps_it(s):  # genie-review-355-131: desktops logged out 5 min after their last input and sat at the login screen
+        fn = next(l for l in SRC.splitlines() if l.startswith("idle_off()"))
+        render = lambda text: subprocess.run(["bash", "-c", f"set -euo pipefail\n{fn}\nidle_off"], input=text, capture_output=True, text=True).stdout
+        yml = "gameplay:\n  level-up-popups: false\n  # Log players out when their client reports them idle.\n  idle-logout: true\n  home-teleport: 30\n"   # game.example.yml's shape
+        s.assertEqual(render(yml), yml.replace("idle-logout: true", "idle-logout: false"))
+        s.assertEqual(render("gameplay:\n  home-teleport: 30\n"), "gameplay:\n  home-teleport: 30\n")   # a tree before the toggle has no idle logout
+        ship = SRC.split("\nship() {")[1].split("\n}")[0]
+        s.assertNotIn("idle_off", ship)   # live keeps the official idle logout
 
 
 class Resume(unittest.TestCase):
@@ -422,6 +433,20 @@ class DesktopInstance(unittest.TestCase):
         src = (HERE / "OsrsTestLauncher.java").read_text()
         s.assertIn('System.getenv("OPENRUNE_ENDPOINT")', src); s.assertIn('getJavConfigUrl().equals(endpoint + "/jav_config.ws")', src)
 
+    def test_a_home_copy_interop_ended_is_copied_again_and_a_failed_one_fails_up(s):  # genie-review-355-134: a WSL interop error left instance 6 with no home, up half-up
+        rc = s.t / "sys32/robocopy.exe"
+        rc.write_text(f'#!/bin/bash\n[ -e {s.t}/interop-fails ] && {{ rm {s.t}/interop-fails; echo "<3>WSL ERROR: UtilAcceptVsock:273: accept4 failed 110" >&2; exit 1; }}; cp -r "$1" "${{2//\\\\//}}"; exit 1\n')
+        (s.t / "interop-fails").write_text("")
+        p = s.sh("a", "desktop_start; echo $inst $dt"); out = p.communicate(timeout=60)[0].split()
+        s.assertEqual((p.returncode, out), (0, ["desktop1", "7780"])); s.assertFalse((s.t / "interop-fails").exists())
+        s.assertTrue((s.t / "desk/run/1/home/.rlcustom/settings.properties").exists())
+        rc.write_text("#!/bin/bash\nexit 16\n")
+        p = s.sh("b", "desktop_start", stderr=subprocess.PIPE); err = p.communicate(timeout=60)[1]
+        s.assertEqual(p.returncode, 1); s.assertIn("robocopy of the desktop home into", err)
+        up = SRC.split("\nup() {")[1].split("\n}")[0]
+        s.assertLess(up.index("trap 'down >/dev/null 2>&1' EXIT"), up.index('docker run -d --name "server-$slug"'))   # any failed step of up downs what it started
+        s.assertTrue(up.endswith('trap - EXIT; echo "up: game $game http $http desktops ${desktops[*]}${STAFF:+ administrator $(account "$STAFF")}"'))
+
     def test_up_records_each_desktop_before_its_login(s):  # a failed login aborts up under set -e; restart and the tools read up.json
         up = SRC.split("\nup() {")[1].split("\n}")[0]
         s.assertLess(up.index('| atomic "$state/up.json"'), up.index('login "$dt"'))
@@ -493,6 +518,51 @@ class DesktopLogin(unittest.TestCase):
         d.urllib.request.urlopen = lambda *a, **k: (_ for _ in ()).throw(d.urllib.error.URLError(ConnectionRefusedError()))
         with s.assertRaises(d.urllib.error.URLError):   # a refused connection (the desktop gone) is no start: it fails
             d.call(1, "press_key", key="ESCAPE")
+
+    def test_a_refusal_page_returns_not_hangs(s):  # server-token-auth-14: on 'Incorrect username or password.' Enter did nothing and token waited forever
+        d, sent = s.fake(["LOGIN_SCREEN"])   # Enter and, after Escape, Enter again start no attempt
+        s.assertTrue(d.token(1).startswith("FAILED: Enter started no login"))
+        s.assertEqual([a["key"] for n, a in sent if n == "press_key"], ["ENTER", "ESCAPE", "ENTER"])
+        d, sent = s.fake(["LOGIN_SCREEN"] * (1 + d.FRAMES + 1) + ["LOGGING_IN", "LOGGED_IN"])   # Escape left the response page: the Play page's Enter logs in
+        s.assertEqual(d.token(1), "LOGGED_IN")
+        d, _ = s.fake(["LOGIN_SCREEN"] * 2 + ["LOGGING_IN", "LOGIN_SCREEN"])   # a refusal: back at the login screen
+        s.assertEqual(d.token(1), "FAILED: back at the login screen: the server refused the token")
+        d, _ = s.fake(["LOGIN_SCREEN"])   # the form's Enter started no attempt
+        s.assertTrue(d.login(1, "u", "p").startswith("FAILED: Enter started no login"))
+
+    def test_keep_logs_a_logged_out_desktop_in_again(s):  # genie-review-355-cickwdoqbbpt88aaaabeelmng-1: 20+ min at the login screen after an idle logout
+        import desktop_login as d
+        def run(states, results, readies):   # the game state per read (then the desktop is gone), act's result per login, ready() per probe
+            seen, results, readies = iter(states), iter(results), iter(readies)
+            def call(port, name, **a):
+                g = next(seen, None)
+                if g is None:
+                    raise d.urllib.error.URLError(ConnectionRefusedError())   # the desktop stopped
+                return json.dumps({"gameState": g})
+            s.addCleanup(setattr, d, "call", d.call); s.addCleanup(setattr, d.time, "sleep", d.time.sleep)
+            d.call, d.time.sleep = call, lambda _: None
+            acts = []
+            with s.assertRaises(d.urllib.error.URLError):
+                d.keep(1, lambda: acts.append(1) or next(results), lambda since: next(readies))
+            return len(acts)
+        s.assertEqual(run(["LOGIN_SCREEN", "LOGGED_IN", "LOADING", "LOGGED_IN", "LOGIN_SCREEN", "LOGGED_IN", "LOGIN_SCREEN"], ["LOGGED_IN"] * 2, []), 2)   # each logout
+        s.assertEqual(run(["LOGGED_IN", "LOGIN_SCREEN", "LOGIN_SCREEN", "LOGIN_SCREEN"], ["FAILED", "LOGGED_IN"], [False, False, True, True]), 2)   # the server was restarting: tried again once it is ready
+        s.assertEqual(run(["LOGGED_IN", "LOGIN_SCREEN", "LOGIN_SCREEN", "LOGIN_SCREEN", "LOGGED_IN"], ["FAILED"], [False] * 9), 1)   # the same server refused it: no retry; another's login waits for the next logout
+        up = SRC.split("\nup() {")[1].split("\n}")[0]; down = SRC.split("\ndown() {")[1].split("\n}")[0]
+        s.assertGreater(up.index("keep \""), up.rindex('login "$(cut -d: -f2'))   # after up's own logout and login
+        s.assertLess(down.index("unkeep"), down.index("desktops_remove"))   # down stops them first
+        d = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, d); (d / "desktop_login.py").write_text("import time; time.sleep(60)\n")
+        ps = {k: subprocess.Popen(["python3", str(d / "desktop_login.py"), "7781", "keep", f"server-{k}", "h", "h"]) for k in (f"t{os.getpid()}", f"t{os.getpid()}-b")}   # slugs of this test alone
+        for q in ps.values(): s.addCleanup(q.kill)
+        fn = next(l for l in SRC.splitlines() if l.startswith("unkeep()"))
+        for _ in range(2):   # a second down finds none and still goes on: an unkeep that failed under set -e left the server up
+            s.assertEqual(subprocess.run(["bash", "-c", f"set -euo pipefail; slug=t{os.getpid()}\n{fn}\nunkeep; echo on"], capture_output=True, text=True).stdout, "on\n")
+        s.assertIsNotNone(ps[f"t{os.getpid()}"].wait(10)); s.assertIsNone(ps[f"t{os.getpid()}-b"].poll())   # its own keeper, never another slug's
+        restart = SRC.split("\nrestart() {")[1].split("\n}")[0]   # the server restart drops no logged-in client: no disconnected dialog
+        s.assertLess(restart.index("unkeep"), restart.index('" logout'))
+        s.assertLess(restart.index('" logout'), restart.index("offline")); s.assertLess(restart.index("offline"), restart.index('docker restart "server-$slug"'))
+        s.assertLess(restart.index('docker restart "server-$slug"'), restart.index("keep \""))
+        s.assertIn("with locked(port):", (HERE / "desktop_login.py").read_text().split("def keep")[1])   # restart's login and keep's take turns
 
     def test_logout_uses_the_logout_button_not_a_command(s):  # the server has no ::drop; relog hung on it
         d, sent = s.fake(["LOGGED_IN", "LOGIN_SCREEN"])

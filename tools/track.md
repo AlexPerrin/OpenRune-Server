@@ -56,8 +56,10 @@ Never edit the shared clone. Commit; `tools/track.sh build <slug>` builds T in t
 up <slug> [N]` starts the server from that build with N logged-in desktops and prints their devtools ports;
 `tools/track.sh test <slug> [module...]` builds, then runs each module's tests and spotlessCheck on the build copy
 (no module: every module the change touches) and writes `evidence/<slug>/test.log` (the `spotless` row runs spotlessCheck alone on those modules at T, so lint in a touched file fails the hand-over, not CI); never gradle by hand.
-`tools/track.sh log <slug> <pattern>` reads the server log; `tools/track.sh restart <slug>` restarts that server,
-its game.yml and database kept, and logs the desktops in again. Each up starts a fresh database; `RESUME=1
+`tools/track.sh log <slug> <pattern>` reads the server log; `tools/track.sh restart <slug>` logs the desktops out, restarts that server,
+its game.yml and database kept, and logs the desktops in again. A run's server has idle logout off (live keeps it), and
+until `down` each desktop that is logged out (a disconnect, a server restart, a logout of yours) is logged in again
+(`state/<slug>/keep-<port>.log`); a refusal is not retried until the server restarts. Each up starts a fresh database; `RESUME=1
 tools/track.sh up <slug>` starts from the accounts as the change's last `down` saved them (down waits until the server
 has saved and dropped every character), so a run resumes where the last stopped. The realm is live's (`dev_mode` off, xp at 1x) and every
 desktop's account a member at rank 0, as a player on live; `STAFF=<N>` on one `up` makes the Nth desktop's account an

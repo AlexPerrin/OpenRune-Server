@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""desktop_login.py <devtools port> <user> <password> | <devtools port> token | <devtools port> logout: logs a desktop
+"""desktop_login.py <devtools port> [keep <server container>] <user> <password> | <devtools port> [keep <server container>] token | <devtools port> logout: logs a desktop
 client in, by its login form or (token) by the token login its Jagex session variables start (prints LOGGED_IN or
-FAILED: <reason>; LOGGED_IN only once the inventory widget shows container 93), or out through the logout tab's button (prints LOGIN_SCREEN) through its devtools endpoint. Keys only:
+FAILED: <reason>; LOGGED_IN only once the inventory widget shows container 93), or out through the logout tab's button (prints LOGIN_SCREEN) through its devtools endpoint; keep: logs it in again after each logout, until the desktop is gone. Keys only:
 the login screen's place on the canvas changes with the window, so no point on it is clicked.
 """
-import json, sys, time, urllib.error, urllib.request
+import contextlib, fcntl, json, subprocess, sys, tempfile, time, urllib.error, urllib.request
 
 LOGOUT_BUTTON = 11927560  # component.logout:logout
 INVENTORY_ITEMS = 9764864  # component.inventory:items, one dynamic child per slot of container 93
+FRAMES = 10  # state reads after Enter: the client takes a key on its next frame, the rest a margin on a loaded host
 
 
 class Refused(Exception):
@@ -63,6 +64,21 @@ def clear(port):  # press_key takes one key per call
         call(port, "press_key", key="BACKSPACE")
 
 
+def attempt(port, again=True):
+    """Presses Enter and returns the attempt's end state: LOGGED_IN or LOGIN_SCREEN, or None when the key started no attempt.
+    The client takes a key on its next frame and a submit leaves LOGIN_SCREEN on that frame, and each state read runs on a
+    frame, so FRAMES reads still on LOGIN_SCREEN are a page Enter does not submit (a refusal's response page): Escape
+    leaves it, once (again), and Enter is pressed on the page under it."""
+    call(port, "press_key", key="ENTER")
+    for _ in range(FRAMES):
+        if state(port).get("gameState") != "LOGIN_SCREEN":
+            return wait(port, ("LOGGED_IN", "LOGIN_SCREEN"))["gameState"]
+    if not again:
+        return None
+    call(port, "press_key", key="ESCAPE")
+    return attempt(port, again=False)
+
+
 def login(port, user, password):
     s = wait(port, ("LOGIN_SCREEN", "LOGGED_IN"))
     if s["gameState"] == "LOGGED_IN":
@@ -74,22 +90,21 @@ def login(port, user, password):
     call(port, "type_chat", text=user, send=False)
     call(port, "press_key", key="TAB")
     clear(port)
-    call(port, "type_chat", text=password, send=True)
-    # the attempt starts at LOGIN_SCREEN and runs as LOGGING_IN: LOGIN_SCREEN right after Enter is not yet a result
-    # shortcut: a refusal faster than the 0.1 s poll is never seen and the wait blocks; a devtools login tool removes it (harness-desktop-login-devtools)
-    wait(port, ("LOGIN_SCREEN",), poll=0.1, leave=True)
-    s = wait(port, ("LOGGED_IN", "LOGIN_SCREEN"))
-    return inventory(port) if s["gameState"] == "LOGGED_IN" else "FAILED: back at the login screen: the server refused the login"
+    call(port, "type_chat", text=password, send=False)
+    return result(port, attempt(port, again=False), "the server refused the login")
 
 
 def token(port):
     s = wait(port, ("LOGIN_SCREEN", "LOGGED_IN"))
     if s["gameState"] == "LOGGED_IN":
         return inventory(port)
-    call(port, "press_key", key="ENTER")  # the session's login page: Enter plays; the client fetches its token from param 11
-    wait(port, ("LOGIN_SCREEN",), poll=0.1, leave=True)
-    s = wait(port, ("LOGGED_IN", "LOGIN_SCREEN"))
-    return inventory(port) if s["gameState"] == "LOGGED_IN" else "FAILED: back at the login screen: the server refused the token"
+    return result(port, attempt(port), "the server refused the token")   # the session's login page: Enter plays; the client fetches its token from param 11
+
+
+def result(port, g, refused):
+    if g is None:
+        return "FAILED: Enter started no login: the login screen is on a page Enter does not submit and Escape does not leave (the disconnected dialog, a refusal's page)"
+    return inventory(port) if g == "LOGGED_IN" else f"FAILED: back at the login screen: {refused}"
 
 
 def inventory(port):
@@ -116,10 +131,51 @@ def logout(port):
     return wait(port, ("LOGIN_SCREEN",))["gameState"]
 
 
+def keep(port, act, ready):
+    """A run's desktop that is logged out (a disconnect, a server restart, any logout) is logged in again by act: it waits
+    for LOGGED_IN, then for LOGIN_SCREEN, then logs in. A failed login is tried again once the server is ready after it
+    (ready(since): a server that was down or restarting), and never while the same server refuses it; a login made by
+    another waits for the next logout. Ends when the endpoint is gone (the desktop stopped)."""
+    while True:
+        wait(port, ("LOGGED_IN",)); wait(port, ("LOGIN_SCREEN",))
+        while True:
+            since = time.time()
+            with locked(port):
+                r = act()
+            print(r, flush=True)
+            while r != "LOGGED_IN" and not ready(since) and state(port).get("gameState") != "LOGGED_IN":
+                time.sleep(2)
+            if r == "LOGGED_IN" or not ready(since):
+                break
+
+
+def server_ready(container):  # ready(since): the container logged "Server ready in" at or after since
+    def ready(since):
+        t = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(since))
+        out = subprocess.run(["docker", "logs", "--since", t, container], capture_output=True, text=True)
+        return "Server ready in" in out.stdout + out.stderr
+    return ready
+
+
+@contextlib.contextmanager
+def locked(port):  # one action at a time on a desktop: up, restart and keep each log it in
+    with open(f"{tempfile.gettempdir()}/desktop-login-{port}.lock", "w") as f:
+        fcntl.flock(f, fcntl.LOCK_EX); yield
+
+
 if __name__ == "__main__":
-    port = sys.argv[1]
+    port, a = sys.argv[1], sys.argv[2:]
+    k = a[0] == "keep"; c, a = (a[1], a[2:]) if k else (None, a)
+    act = (lambda: logout(port)) if a[0] == "logout" else (lambda: token(port)) if a[0] == "token" else (lambda: login(port, a[0], a[1]))
+    if k:
+        try:
+            keep(port, act, server_ready(c))
+        except (OSError, Refused) as e:
+            print(f"keep: devtools endpoint on {port} gone: {e}")
+        sys.exit(0)
     try:
-        r = logout(port) if sys.argv[2] == "logout" else token(port) if sys.argv[2] == "token" else login(port, sys.argv[2], sys.argv[3])
+        with locked(port):
+            r = act()
     except (OSError, Refused) as e:
         r = f"FAILED: devtools endpoint on {port}: {e}"
     print(r)

@@ -6,13 +6,15 @@
 #                     matter quest-mode, else respect-progress; or assume-completed), N desktops logged in,
 #                     each loading the live client's devtools jar (CLIENT_TRACK: the client track's script, its build of slug live);
 #                     a fresh database, or with RESUME=1 the accounts as the change's last down saved them; the realm as live
-#                     (dev_mode off, xp at 1x), every account a member at rank 0, or with STAFF=N the Nth desktop's an administrator
+#                     (dev_mode off, xp at 1x), every account a member at rank 0, or with STAFF=N the Nth desktop's an administrator;
+#                     idle logout off (live keeps it); each desktop logged in again after any logout until down (keep); a failed
+#                     up takes down what it started
 #   up token          up 1, the desktop's login a token login (auth type 7) for its account: token-<slug> (server/issuer.py) is the
 #                     issuer of compact signed tokens whose secret game.yml's token-login block holds and jav_config param 11
 #                     names (https: the client takes no other)
 #   token [TOKEN]     the token the desktop's next login sends (none: a fresh valid one); server/issuer.py mint makes expired
 #                     ones (--exp -5), another account's, and forged ones (another key DIR)
-#   restart           restarts server-<slug>, its game.yml and database kept, and logs up's desktops in again
+#   restart           logs up's desktops out, restarts server-<slug>, its game.yml and database kept, and logs them in again
 #   down              stops the desktops, waits until the server has saved and dropped their characters, removes the containers (token-<slug> too)
 #   ship TCOMMIT      the integration tree: build, the deploy image with the live key and the issuer's secret, boot check, deploy, or roll back
 #   measure GOAL      the content inventory's share of rows whose unit is in PASSES
@@ -49,6 +51,7 @@ ready() {  # ready <container> [since]: blocks until "Server ready in" or the co
 }
 port() { echo $(( 20000 + 16#$(printf %s "$slug" | sha1sum | cut -c1-3) * 2 + $1 )); }   # game +0, http +1; shortcut: two slugs may hash alike, pick from up.json when it happens
 quest_mode() { m=${QUEST_MODE:-$(awk '/^---$/{n++; next} n==1 && /^quest-mode:/{print $2}' "$root/harness/changes/$slug.md" 2>/dev/null)}; echo "${m:-respect-progress}"; }   # QUEST_MODE, else the change's front matter quest-mode, else respect-progress
+idle_off() { sed -E 's/^([[:space:]]*idle-logout:[[:space:]]*).*/\1false/'; }   # stdin game.yml with idle logout off: a run's desktops idle while its agent reads (live keeps the image's); a tree without the key has no idle logout
 quests() { case $1 in respect-progress|assume-completed) ;; *) echo "quest-mode \"$1\": respect-progress or assume-completed" >&2; return 1 ;; esac   # quests MODE: stdin game.yml with quest-requirements mode MODE
   y=$(sed -E "/^[[:space:]]*quest-requirements:/,/^[[:space:]]*mode:/ s/(mode:[[:space:]]*).*/\1\"$1\"/"); grep -q "mode: \"$1\"" <<< "$y" || { echo "game.yml has no quest-requirements mode" >&2; return 1; }; printf '%s\n' "$y"; }
 account() { echo "h$(printf %s "$slug" | sha1sum | cut -c1-9)${1:-}"; }   # the Nth desktop's login name and password (no N: the prefix of this slug's names): 11 characters (a login name takes 12 at most), listed in the slug's up.json
@@ -60,6 +63,10 @@ login() {  # login <devtools port> <account>: logs that desktop in as the accoun
     if [ -n "${tok:-}" ]; then python3 "$self/server/desktop_login.py" "$1" token; else python3 "$self/server/desktop_login.py" "$1" "$2" "$2"; fi   # prints LOGGED_IN or FAILED: reason
     [ "$(sql "select string_agg(lower(account_name), ' ') from accounts where id > $m or lower(account_name) = '$2'")" = "$2" ] && return
     echo "login on $1 made another account than $2: logging in again"; python3 "$self/server/desktop_login.py" "$1" logout; done; }
+keep() {  # keep <devtools port> <account>: from now until down, that desktop logged out (a disconnect, a restart, a logout) logs in again
+  if [ -n "${tok:-}" ]; then set -- "$1" token; else set -- "$1" "$2" "$2"; fi
+  setsid python3 "$self/server/desktop_login.py" "$1" keep "server-$slug" "${@:2}" < /dev/null >> "$state/keep-$1.log" 2>&1 & }
+unkeep() { pkill -f "^python3 [^ ]*/desktop_login\.py [0-9]+ keep server-$slug " || true; }   # this slug's keepers stopped, by their command line (no pid file a reused pid could match): a logout that is meant stays out
 offline() { until [ "$(sql "select count(*) from main.character_progress where online_central_world_id is not null and character_id in ($mine)")" = 0 ]; do sleep 1; done; }   # each character saved at its logout
 
 sys32=${WINDOWS_SYSTEM32:-/mnt/c/Windows/System32}; desk=${DESKTOP_DIR:-/mnt/c/osrs-test}
@@ -80,7 +87,7 @@ marked() { "$desk/jdk/bin/jps.exe" -v | tr -d '\r' | awk -v m="-Dosrstest.marker
 # nothing without it is ever stopped (the user's own RuneLite). down stops and removes the instances its slug owns.
 desktop_start() {  # sets inst dt (desktopN, its devtools port)
   local i d dp w t l busy ex base ep p
-  need "$sys32/netstat.exe" WINDOWS_SYSTEM32; need "$sys32/netsh.exe" WINDOWS_SYSTEM32; need "$sys32/robocopy.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/java.exe" DESKTOP_DIR; need "$desk/jdk/bin/jps.exe" DESKTOP_DIR
+  need "$sys32/netstat.exe" WINDOWS_SYSTEM32; need "$sys32/netsh.exe" WINDOWS_SYSTEM32; need "$sys32/robocopy.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/java.exe" DESKTOP_DIR; need "$desk/jdk/bin/jps.exe" DESKTOP_DIR; [ -f "$desk/home/.rlcustom/settings.properties" ] || { echo "no staged home in $desk/home" >&2; return 1; }
   mkdir -p "$desk/run"; until busy=$(tcp); do sleep 1; done; busy=$(cut -d' ' -f1 <<< "$busy")
   until ex=$(timeout 20 "$sys32/netsh.exe" interface ipv4 show excludedportrange protocol=tcp); do sleep 1; done
   base=$({ cat /proc/sys/net/ipv4/ip_local_port_range; tr -d '\r' <<< "$ex" | awk '$1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ {print $1, $2}'; } | skip_base) || { echo "no RSProx ports outside the reserved ranges" >&2; return 1; }
@@ -89,7 +96,9 @@ desktop_start() {  # sets inst dt (desktopN, its devtools port)
   done
   [ -n "$d" ] || { echo "no free desktop instance" >&2; return 1; }
   echo "$slug" > "$d/owner"; w=$(wslpath -w "$d")
-  "$sys32/robocopy.exe" "$(wslpath -w "$desk/home")" "$w\\home" /E /MT:16 /NFL /NDL /NJH /NJS /NP /XD screenshots logs > /dev/null || [ $? -lt 8 ]   # robocopy: below 8 is success
+  until [ -f "$d/home/.rlcustom/settings.properties" ]; do   # a WSL interop error can end robocopy before it copied (below 8): copied again until the home is there
+    "$sys32/robocopy.exe" "$(wslpath -w "$desk/home")" "$w\\home" /E /MT:16 /NFL /NDL /NJH /NJS /NP /XD screenshots logs > /dev/null || [ $? -lt 8 ] || { echo "robocopy of the desktop home into $d failed" >&2; return 1; }   # robocopy: below 8 is success
+  done
   sed -i "s/^openrunedevtools\.port=.*/openrunedevtools.port=$dp/" "$d"/home/.rlcustom/settings.properties "$d"/home/.rlcustom/profiles2/*.properties
   mkdir -p "$d/home/.rlcustom/sideloaded-plugins" && cp "$jar" "$d/home/.rlcustom/sideloaded-plugins/OpenRune-Developer-Tools.jar"
   ep=http://127.0.0.1:$http   # OPENRUNE_ENDPOINT: the launcher takes jav_config from it alone, and jav_config names every other endpoint
@@ -149,7 +158,8 @@ up() {
   devtools_jar   # the jar every desktop of this up loads
   game=$(port 0); http=$(port 1)
   down >/dev/null   # a previous up's desktops and containers
-  docker run --rm --entrypoint cat "or:$T" /app/game.yml | quests "$(quest_mode)" > "$state/game.yml"   # upstream's default assume-completed skips every quest check
+  trap 'down >/dev/null 2>&1' EXIT   # a failed up leaves no half-up instance: its desktops and containers go
+  docker run --rm --entrypoint cat "or:$T" /app/game.yml | quests "$(quest_mode)" | idle_off > "$state/game.yml"   # upstream's default assume-completed skips every quest check
   tpl=$self/server/jav_config.ws.template
   if [ -n "$tok" ]; then  # the issuer: game.yml trusts its key; param 11 sends the desktop's game-session calls to it
     python3 "$self/server/issuer.py" key "$state/token" >> "$state/game.yml"; token >/dev/null
@@ -166,7 +176,7 @@ up() {
   ready "server-$slug"
   # Central seeds a dev realm (every login an administrator, xp at 150x); the server reads its realm at boot: as live, then restarted
   if [ -n "$(sql "update realms set dev_mode = 0, player_xp_rate_in_hundreds = 100, global_xp_rate_in_hundreds = 100 where dev_mode <> 0 or player_xp_rate_in_hundreds <> 100 or global_xp_rate_in_hundreds <> 100 returning 1")" ]; then since=$(date -u +%FT%TZ); docker restart "server-$slug" >/dev/null; ready "server-$slug" "$since"; fi
-  python3 "$self/server/javcheck.py" "http://127.0.0.1:$http/jav_config.ws" || { down; return 1; }   # no desktop is pointed at a foreign host
+  python3 "$self/server/javcheck.py" "http://127.0.0.1:$http/jav_config.ws"   # no desktop is pointed at a foreign host
   modulus=$(openssl rsa -in "$state/key/game.key" -noout -modulus | cut -d= -f2 | tr A-F a-f)
   desktops=(); accounts=()
   for i in $(seq 1 "$n"); do
@@ -183,16 +193,19 @@ up() {
   sql "update accounts set rights = $rights where lower(account_name) like '$(account)%'" >/dev/null
   for i in "${!desktops[@]}"; do login "$(cut -d: -f2 <<< "${desktops[$i]}")" "${accounts[$i]}"; done
   [ "$(sql "select count(*) from accounts where lower(account_name) like '$(account)%' and rights <> $rights")" = 0 ] || { echo "up: the accounts' rights did not hold after the login"; return 1; }   # read back once the logins ran: up fails rather than leave a cheat silently refused
-  echo "up: game $game http $http desktops ${desktops[*]}${STAFF:+ administrator $(account "$STAFF")}"
+  for i in "${!desktops[@]}"; do keep "$(cut -d: -f2 <<< "${desktops[$i]}")" "${accounts[$i]}"; done
+  trap - EXIT; echo "up: game $game http $http desktops ${desktops[*]}${STAFF:+ administrator $(account "$STAFF")}"
 }
-restart() {  # the server container restarted with its game.yml and database; the desktops of up logged in again
-  since=$(date -u +%FT%TZ); docker restart "server-$slug" >/dev/null; ready "server-$slug" "$since"
+restart() {  # the server container restarted with its game.yml and database; the desktops of up logged out first (a server dropping a client leaves the disconnected dialog, which no key closes) and logged in again
   d=$(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d["desktops"], "|", d["accounts"])' "$state/up.json")
   tok=$(docker ps -q -f "name=^token-$slug\$"); read -ra ds <<< "${d%%|*}"; read -ra as <<< "${d#*|}"
-  for i in "${!ds[@]}"; do login "$(cut -d: -f2 <<< "${ds[$i]}")" "${as[$i]}"; done
+  unkeep; for c in "${ds[@]}"; do python3 "$self/server/desktop_login.py" "$(cut -d: -f2 <<< "$c")" logout; done; offline
+  since=$(date -u +%FT%TZ); docker restart "server-$slug" >/dev/null; ready "server-$slug" "$since"
+  for i in "${!ds[@]}"; do login "$(cut -d: -f2 <<< "${ds[$i]}")" "${as[$i]}"; keep "$(cut -d: -f2 <<< "${ds[$i]}")" "${as[$i]}"; done
   echo "restarted: quest-requirements $(sed -n '/quest-requirements:/,/mode:/p' "$state/game.yml" | grep -o 'mode:.*')"
 }
 down() {
+  unkeep   # no keeper logs in a desktop down stops
   (desktops_remove) || true   # a missing program still lets the containers go
   if [ "$(docker inspect -f '{{.State.Running}}' "server-$slug" 2>/dev/null)" = true ] && docker logs "server-$slug" 2>&1 | grep -q "Server ready in"; then offline; fi   # the server drops each disconnected character and saves it: RESUME starts there
   docker rm -f "server-$slug" "http-$slug" "token-$slug" >/dev/null 2>&1 || true; rm -f "$state/up.json"; echo "down"
