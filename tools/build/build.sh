@@ -5,6 +5,7 @@
 #   build [TCOMMIT]   the image or:<T> of the tree T (a dev: the working copy snapshotted, T from `hd tree`); cached by T;
 #                     CENTRAL=<Central clone>:<commit> builds and tests with that Central in place of the published dev.or2 modules
 #                     (build/central.init.gradle substitutes each, :central-app included); state/<slug>/build.lock is held by the build alone
+#                     each container waits for the host's room (`hd room`); a step failed for the host's cause (memory, disk, docker) exits 75, no result
 #   tree              prints TCOMMIT and T (a dev: the working copy snapshotted)
 set -euo pipefail
 verb=$1; slug=${2:-${SLUG:-}}; arg=${3:-}   # a contract row passes no slug: hd exports SLUG
@@ -16,6 +17,16 @@ state=$root/state/$slug; mkdir -p "$state"
 dev=$repo/.worktrees/$slug; copy=$repo/.worktrees/$slug-build
 atomic() { cat > "$1.$$.tmp"; if [ -s "$1.$$.tmp" ]; then mv -f "$1.$$.tmp" "$1"; else rm -f "$1.$$.tmp"; return 1; fi; }   # a state record whole or not at all: hd reads it at any moment
 record() { python3 -c 'import json,sys;print(json.dumps({"T":sys.argv[1],"ok":sys.argv[2]=="true","detail":sys.stdin.read()[-2000:]}))' "$T" "$1" | atomic "$state/$2.json"; }
+size=(--cpus=4 --memory=5g)   # one build or check container's share of the host: `hd room` starts it once every held one's --memory and --cpus with it fit the host's
+fault='cannot allocate memory|no space left on device|Cannot connect to the Docker daemon|error during connect|is already in use by container'   # the host refusing the step (memory, disk, the daemon, a container left by a killed run), never the tree
+ooms() { dmesg 2>/dev/null | grep -c '\] Out of memory: Killed process' || true; }   # the host OOM killer's kills so far (a container's own --memory limit logs 'Memory cgroup out of memory')
+hosted() {  # hosted <log> <command...>: the command, its output appended to log; failed for the host's cause, not the tree's, it exits 75: no result, the pass runs it again
+  local log=$1 n rc=0 why; shift; n=$(ooms); "$@" >> "$log" 2>&1 || rc=$?
+  [ $rc != 0 ] || return 0
+  why=$(grep -m1 -oiE "$fault" "$log") || { [ "$rc" = 137 ] && [ "$(ooms)" -gt "$n" ] && why="killed by the host's OOM killer"; } || return $rc
+  echo "the host's fault, not the tree's ($why): no result"; exit 75
+}
+box() { local log=$1; shift; hosted "$log" python3 "$root/hd.py" room docker run --init "${size[@]}" "$@"; }   # box <log> <docker run args>: one container in the host's room; --init: a stop's SIGTERM, proxied by docker run, ends it
 
 tree() {  # TCOMMIT and T: the pass gives them; a dev's build snapshots the working copy and asks hd
   if [ -n "$arg" ]; then tc=$arg; T=${T:-$(git -C "$repo" rev-parse "$tc^{tree}")}; return; fi
@@ -44,7 +55,9 @@ build_locked() {
   gk=$(git -C "$repo" rev-parse -q --verify "$tc:game.example.yml" | cut -c1-12 || true)   # the game data's: the revision (game.example.yml), as the gate's release asset
   central; vols=(-v "gradle-$slug:/gradle" -v or-cache-store:/store "${cvols[@]}")
   docker run --rm "${vols[@]}" eclipse-temurin:21 chown 1000:1000 /gradle /store   # docker makes a new volume root's; the build runs as 1000
-  docker run --rm --name "build-$slug" --cpus=4 --memory=5g -u 1000:1000 -e HOME=/gradle/home -e GRADLE_USER_HOME=/gradle -e CK="$ck" -e GK="$gk" -e CDIR="$cdir" \
+  docker rm -f "build-$slug" >/dev/null 2>&1 || true   # a killed build's container, still running: the slug's build lock is held, it is no one else's
+  trap 'docker rm -f "build-$slug" >/dev/null 2>&1 || true' EXIT; trap 'exit 143' TERM INT   # a stopped build's container ends with it
+  box "$log" --rm --name "build-$slug" -u 1000:1000 -e HOME=/gradle/home -e GRADLE_USER_HOME=/gradle -e CK="$ck" -e GK="$gk" -e CDIR="$cdir" \
     "${vols[@]}" -v "$repo/.git:$repo/.git:ro" -v "$copy:$copy" -w "$copy" \
     eclipse-temurin:21 bash -c '
       set -e; mkdir -p "$HOME"; g="./gradlew --console=plain --build-cache --no-configuration-cache --max-workers=4 -Dorg.gradle.jvmargs=-Xmx1536m${CDIR:+ --init-script /central.init.gradle}"
@@ -58,11 +71,12 @@ build_locked() {
         $g :or-cache:mergePluginGamevals :or-cache:buildCache
         rm -rf $s.tmp && mkdir -p $s.tmp && cp -a --parents .data/cache .data/gamevals .data/gamevals-binary api/generated $s.tmp/ && mv $s.tmp $s
       fi
-      $g generateRsa :server:app:installDist -x test' > "$log" 2>&1 || { record false build < "$log"; echo "build failed: $log"; return 1; }
+      $g generateRsa :server:app:installDist -x test' || { record false build < "$log"; echo "build failed: $log"; return 1; }
+  trap - EXIT TERM INT   # past its container: a gate sourcing this never removes a later build's
   st=$copy/.image; rm -rf "$st"; mkdir -p "$st/data"
   cp -a "$copy/server/app/build/install/app" "$st/server"; cp "$copy/game.yml" "$st/"
   cp -a "$copy/.data/." "$st/data/"; rm -rf "$st/data/client.key" "$st/data/game.key" "$st/data/postgres"
-  docker build -q -f "$self/Dockerfile" -t "or:$T" "$st" >> "$log" 2>&1 || { record false build < "$log"; echo "build failed: $log"; return 1; }
+  hosted "$log" docker build -q -f "$self/Dockerfile" -t "or:$T" "$st" || { record false build < "$log"; echo "build failed: $log"; return 1; }
   record true build < "$log"; echo "built or:$T"
 }
 [ "${BASH_SOURCE[0]}" = "$0" ] || return 0   # sourced by gate.sh: its functions alone
