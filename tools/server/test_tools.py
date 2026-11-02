@@ -517,8 +517,15 @@ class DesktopInstance(unittest.TestCase):
         p = s.sh("b", "desktop_start", stderr=subprocess.PIPE); err = p.communicate(timeout=60)[1]
         s.assertEqual(p.returncode, 1); s.assertIn("robocopy of the desktop home into", err)
         up = SRC.split("\nup() {")[1].split("\n}")[0]
-        s.assertLess(up.index("trap 'down >/dev/null 2>&1' EXIT"), up.index('docker run -d --name "server-$slug"'))   # any failed step of up downs what it started
+        s.assertLess(up.index("down >/dev/null 2>&1' EXIT"), up.index('docker run -d --name "server-$slug"'))   # any failed step of up downs what it started
         s.assertTrue(up.endswith('trap - EXIT; echo "up: game $game http $http desktops ${desktops[*]}${STAFF:+ administrator $(account "$STAFF")}"'))
+
+    def test_an_up_that_fails_or_is_stopped_names_the_step_it_ended_at(s):  # server-clan-channels-6: two RESUME=1 ups ended after the guard line with no message
+        trap = "\n".join(l for l in SRC.split("\nup() {")[1].split("\n}")[0].split("\n") if "' ERR" in l or "' EXIT" in l)
+        for step, sig in (("[ -n \"\" ]", "f() { [ -n \"\" ]; echo never; }; "), ("sleep 5", "(sleep 0.5; kill -TERM $$) & ")):
+            d = Path(tempfile.mkdtemp()) / "downed"
+            p = subprocess.run(["bash", "-c", f"set -euo pipefail; down() {{ touch {d}; }}\n{trap}\n{sig}{'f' if sig.startswith('f') else step}; echo never"], capture_output=True, text=True, timeout=30)
+            s.assertNotIn("never", p.stdout); s.assertIn(f"up ended before it was up, at: {step}", p.stderr); s.assertTrue(d.exists())   # and down ran
 
     def test_up_records_each_desktop_before_its_login(s):  # a failed login aborts up under set -e; restart and the tools read up.json
         up = SRC.split("\nup() {")[1].split("\n}")[0]

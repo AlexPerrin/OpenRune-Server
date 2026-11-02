@@ -180,7 +180,8 @@ up() {
   devtools_jar   # the jar every desktop of this up loads
   game=$(port 0); http=$(port 1)
   down >/dev/null   # a previous up's desktops and containers
-  trap 'down >/dev/null 2>&1' EXIT   # a failed up leaves no half-up instance: its desktops and containers go
+  set -E; trap 'why="$BASH_COMMAND (status $?)"' ERR   # the step set -e ends at, in the function it failed in (it may print nothing)
+  trap 'echo "up ended before it was up, at: ${why:-$BASH_COMMAND}" >&2; down >/dev/null 2>&1' EXIT   # a failed or stopped up names the step it ended at, then leaves no half-up instance: its desktops and containers go
   docker run --rm --entrypoint cat "or:$T" /app/game.yml | quests "$(quest_mode)" | idle_off > "$state/game.yml"   # upstream's default assume-completed skips every quest check
   tpl=$self/server/jav_config.ws.template
   if [ -n "$tok" ]; then  # the issuer: game.yml trusts its key; param 11 sends the desktop's game-session calls to it
