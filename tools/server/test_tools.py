@@ -232,6 +232,16 @@ class ShipFailure(unittest.TestCase):
         r = subprocess.run(["bash", "-c", "set -euo pipefail\nship() {" + f.split("\n")[0] + "\n" + f.split("\n")[1] + "\n  false\n}\narg=t; ship"], capture_output=True, text=True)
         s.assertNotEqual(r.returncode, 0); s.assertIn("ship of t failed: false (exit 1)", r.stdout)
 
+    def test_ready_fails_on_a_container_not_started_since(s):  # sweep-67 P0-a: compose left osrs-openrune running from 17:14:56Z and ready waited on a line that never came
+        root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, root); (root / "docker").write_text(
+            '#!/bin/bash\ncase $1 in inspect) case $3 in *StartedAt*) echo 2026-11-02T17:14:56.123Z ;; *) echo true ;; esac ;; logs) echo "Server ready in 9s" ;; esac\n')
+        (root / "docker").chmod(0o755)
+        f = "ready() {" + SRC.split("\nready() {")[1].split("\n}")[0] + "\n}\n"
+        run = lambda since: subprocess.run(["bash", "-c", f"set -euo pipefail\n{f}ready c {since}"], capture_output=True, text=True, env={**os.environ, "PATH": f"{root}:{os.environ['PATH']}"})
+        r = run("2026-11-02T18:18:48Z"); s.assertEqual(r.returncode, 1); s.assertIn("c has run since 2026-11-02T17:14:56, not started since", r.stdout)
+        s.assertEqual(run("2026-11-02T17:14:56Z").returncode, 0)                  # started in the second it was asked: ready
+        s.assertEqual(run("").returncode, 0)                                      # no since: the first start counts
+
     def test_ship_recreates_the_stack_and_records_its_containers(s):  # harness-live-http-mount: compose restarted the exited http, whose file mount a WSL restart had turned into a directory
         f = SRC.split("\nship() {")[1].split("\n}")[0]
         side, game = f.index("--force-recreate http http-desktop issuer"), f.index("--force-recreate openrune)")

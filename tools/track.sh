@@ -55,7 +55,9 @@ for a in sys.argv[2:]:
     k, v = a.split("=", 1); d[k.rstrip(":")] = json.loads(v) if k.endswith(":") else v
 print(json.dumps(d))' "$state/up.json" "$@" | atomic "$state/up.json"; }
 modulus_of() { openssl rsa -noout -modulus 2>/dev/null | cut -d= -f2 | tr A-F a-f; }   # stdin a private key: its public modulus, lowercase hex as client.key and the APK carry it
-ready() {  # ready <container> [since]: blocks until "Server ready in" or the container stops
+ready() {  # ready <container> [since]: blocks until "Server ready in" or the container stops; fails at once on one not (re)started since
+  local s; s=$(docker inspect -f '{{.State.StartedAt}}' "$1" 2>/dev/null | cut -c1-19)
+  [ -z "${2:-}" ] || [[ ! "$s" < "${2:0:19}" ]] || { echo "$1 has run since $s, not started since $2"; return 1; }
   while ! docker logs ${2:+--since "$2"} "$1" 2>&1 | grep -q "Server ready in"; do
     [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = true ] || { echo "$1 is not running"; return 1; }; sleep 5
   done
