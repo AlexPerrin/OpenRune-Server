@@ -735,13 +735,17 @@ class GateCi(Repo):
         s.assertEqual(r.returncode, 1); s.assertIn("CI failure/completed", r.stdout)
         s.assertEqual(sorted(c.split()[2] for c in calls if c.startswith("workflow run")), ["CI", "Formatting"])
 
-    FAILED = staticmethod(lambda att: f'HTTP/2.0 200 OK\nEtag: W/"f{att}"\n\n' + json.dumps({"workflow_runs": [
-        {"name": "CI", "status": "completed", "conclusion": "failure", "id": 7, "run_attempt": att}, {"name": "Formatting", "status": "completed", "conclusion": "success", "id": 8}]}))
+    FAILED = staticmethod(lambda att, c="failure": f'HTTP/2.0 200 OK\nEtag: W/"f{att}"\n\n' + json.dumps({"workflow_runs": [
+        {"name": "CI", "status": "completed", "conclusion": c, "id": 7, "run_attempt": att}, {"name": "Formatting", "status": "completed", "conclusion": "success", "id": 8}]}))
 
     def test_a_run_failed_outside_the_head_is_re_run_not_the_heads_fail(s):  # GitHub's checkout failed, not the head: CI runs 41357682052, 41357793032
         r, calls, _ = s.gate([s.FAILED(1), s.FAILED(1), s.RUNS("success")], step="Checkout repository")
         s.assertEqual(r.returncode, 0, r.stdout + r.stderr); s.assertIn("a step the head does not touch: re-run", r.stdout)
         s.assertEqual([c for c in calls if c.startswith("run rerun")], ["run rerun 7 --failed -R " + calls[0].split("repos/")[1].split("/actions")[0]])  # once per attempt
+
+    def test_a_run_stopped_in_the_cache_step_is_re_run_not_the_heads_fail(s):  # ci.yml's 30-min timeout cancelled the openrs2 download: CI runs 41364734674, 41362166155
+        r, calls, _ = s.gate([s.FAILED(1, "cancelled"), s.FAILED(1, "cancelled"), s.RUNS("success")], step="Cache game data")
+        s.assertEqual(r.returncode, 0, r.stdout + r.stderr); s.assertEqual(len([c for c in calls if c.startswith("run rerun 7")]), 1)
 
     def test_a_cache_step_failure_is_the_heads_when_the_head_changes_its_input(s):
         base = git(s.repo, "rev-parse", "HEAD"); s.write("or-cache/x", "y"); head = s.commit("touches the cache")

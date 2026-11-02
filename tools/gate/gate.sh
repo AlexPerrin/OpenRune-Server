@@ -85,7 +85,7 @@ gate_ci() {  # pushes T (gate_sha) to gate/<slug>; the newest run of each workfl
     for wf in CI Formatting; do
       read -r _ st id att <<< "$(grep -m1 "^$wf " <<< "$runs" || true)"   # newest first
       case $st in success/*) ok=$((ok + 1)) ;;
-        failure/completed) case " $rr " in *" $id.$att "*) continue ;; esac   # its re-run asked for: GitHub has not yet shown it
+        failure/completed|cancelled/completed|timed_out/completed) case " $rr " in *" $id.$att "*) continue ;; esac   # its re-run asked for: GitHub has not yet shown it
           f=$(failed_step "$id")
           if ! infra "$f"; then echo "$wf $st at '$f' on gate/$slug at $sha (T $TCOMMIT)"; return 1; fi
           [ "$att" -lt 3 ] || { echo "$wf failed at '$f' in $att attempts on gate/$slug at $sha, a step the head does not touch: no result"; exit 75; }
@@ -123,8 +123,8 @@ seed() {  # the fork release asset game-data-<k> (k: game.example.yml's blob, wh
   gh release view game-data -R "$R" >/dev/null 2>&1 || gh release create game-data -R "$R" --prerelease --title "game data" --notes "The harness gate's game data, one asset per game.example.yml" || true
   gh release upload game-data "$f" -R "$R" --clobber || echo "seeding $a failed: CI downloads the cache from openrs2"; rm -f "$f"
 }
-failed_step() {  # the first failed step of run $1 (one read per failed run)
-  until gh api "repos/$R/actions/runs/$1/jobs" -q '[.jobs[].steps[] | select(.conclusion == "failure") | .name][0] // ""'; do sleep 30; done
+failed_step() {  # the first step of run $1 that failed or was stopped (a cancel, ci.yml's timeout) (one read per such run)
+  until gh api "repos/$R/actions/runs/$1/jobs" -q '[.jobs[].steps[] | select(.conclusion == "failure" or .conclusion == "cancelled") | .name][0] // ""'; do sleep 30; done
 }
 infra() {  # step $1 reads nothing the head changes: the runner's setup, the cache's download and generation when the head changes no cache input
   case $1 in "Set up job"|"Checkout repository"|"Set up JDK"*|"Set up Gradle"|"Cache game data"|*"(tools/gate/gate.sh gate-ci)"|"Post "*|"Complete job") return 0 ;;
