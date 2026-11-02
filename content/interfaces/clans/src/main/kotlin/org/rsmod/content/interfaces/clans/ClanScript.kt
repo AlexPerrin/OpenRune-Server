@@ -579,15 +579,6 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
 
     private fun Clan.permission(permission: Int): Int = permissionRank(permission)
 
-    private fun Clan.permissionRank(permission: Int): Int {
-        val setting = PERMISSION_SETTINGS[permission] ?: return ClanRank.OWNER
-        return when (setting) {
-            TALK_RANK_KEY -> talkRank()
-            KICK_RANK_KEY -> kickRank()
-            else -> intSettings[setting]?.minus(2) ?: ClanRank.OWNER
-        }
-    }
-
     private fun Player.totalLevel(): Int =
         ServerCacheManager.getStats().values.sumOf {
             val stat = dev.openrune.rscm.RSCM.getReverseMapping(RSCMType.STAT, it.id)
@@ -600,8 +591,6 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
 
     private companion object {
         const val TALK_IN_CHAT = 2954
-        const val TALK_RANK_KEY = -1
-        const val KICK_RANK_KEY = -2
         const val GUESTS_LISTEN_KEY = -3
         const val WIPE_OP = 10
         const val MAX_MEMBERS = 500
@@ -610,11 +599,23 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
         const val TITLE_COUNT = 265
         const val MAX_WORLD = 2047
 
-        val PERMISSION_SETTINGS: Map<Int, Int> by lazy {
-            cacheEnum("enum.clan_permission_settings").mapValues { it.value as Int }
-        }
-
         fun editingVarbit(rank: Int): String = "varbit.clan_editing_ranktitle_%03d".format(rank)
+    }
+}
+
+private const val TALK_RANK_KEY = -1
+private const val KICK_RANK_KEY = -2
+
+private val PERMISSION_SETTINGS: Map<Int, Int> by lazy {
+    cacheEnum("enum.clan_permission_settings").mapValues { it.value as Int }
+}
+
+internal fun Clan.permissionRank(permission: Int): Int {
+    val setting = PERMISSION_SETTINGS[permission] ?: return ClanRank.OWNER
+    return when (setting) {
+        TALK_RANK_KEY -> talkRank()
+        KICK_RANK_KEY -> kickRank()
+        else -> intSettings[setting]?.minus(2) ?: ClanRank.OWNER
     }
 }
 

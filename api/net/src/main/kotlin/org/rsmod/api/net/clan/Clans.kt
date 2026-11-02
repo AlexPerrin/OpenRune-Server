@@ -43,6 +43,8 @@ private val RUNEDAY_EPOCH: LocalDate = LocalDate.of(2002, 2, 27)
 
 public data class ClanFounderAccept(val player: Player, val leader: Player) : UnboundEvent
 
+public data class ClanAccessChanged(val player: Player) : UnboundEvent
+
 public fun runeDay(): Int = ChronoUnit.DAYS.between(RUNEDAY_EPOCH, LocalDate.now()).toInt()
 
 @Singleton
@@ -59,6 +61,7 @@ constructor(
     private val sessions = HashSet<Player>()
     private val founderInvites = HashMap<Player, Player>()
     private val founding = HashSet<Player>()
+    private val memberInvites = HashMap<Player, Player>()
     private var messageCounter = 0
 
     init {
@@ -74,6 +77,13 @@ constructor(
         clan.online.firstOrNull { it.characterId == characterId }
 
     public fun isLoggedIn(player: Player): Boolean = player in sessions
+
+    public fun inviteMember(invitee: Player, recruiter: Player) {
+        memberInvites[invitee] = recruiter
+    }
+
+    public fun takeMemberInvite(invitee: Player, recruiter: Player): Boolean =
+        memberInvites.remove(invitee, recruiter)
 
     public fun isFounding(player: Player): Boolean = player in founding
 
@@ -155,6 +165,7 @@ constructor(
         if (player.vars[CHANNEL_LEFT_VARBIT] == 0) {
             joinChannel(player, clan)
         }
+        eventBus.publish(ClanAccessChanged(player))
     }
 
     public fun logout(player: Player) {
@@ -162,6 +173,8 @@ constructor(
         founderInvites.remove(player)
         founderInvites.values.removeIf { it == player }
         founding -= player
+        memberInvites.remove(player)
+        memberInvites.values.removeIf { it == player }
         val clan = clanOf.remove(player) ?: return
         leaveChannel(player, clan, explicit = false)
         clan.online -= player
@@ -253,6 +266,9 @@ constructor(
             channelDelta(clan, listOf(update))
         }
         settingsDelta(clan, listOf(ClanSettingsDelta.SetMemberRankUpdate(slot, rank)))
+        clan.online.firstOrNull { it.characterId == member.characterId }?.let {
+            eventBus.publish(ClanAccessChanged(it))
+        }
     }
 
     public fun addMember(clan: Clan, player: Player, rank: Int): Boolean {
@@ -284,6 +300,7 @@ constructor(
             player.client.write(ClanSettingsFull(CLAN_TYPE, ClanSettingsFull.LeaveUpdate))
             VarPlayerIntMapSetter.set(player, AFFINITY_VARBIT, NO_CLAN)
             VarPlayerIntMapSetter.set(player, CHANNEL_LEFT_VARBIT, 0)
+            eventBus.publish(ClanAccessChanged(player))
         }
         clan.members.removeAt(slot)
         val clanId = clan.id
@@ -310,6 +327,7 @@ constructor(
         if (setting == HOME_WORLD_SETTING) {
             clan.online.forEach { VarPlayerIntMapSetter.set(it, HOME_WORLD_VARBIT, value) }
         }
+        clan.online.toList().forEach { eventBus.publish(ClanAccessChanged(it)) }
     }
 
     public fun setBaseSettings(clan: Clan, talkRank: Int, kickRank: Int, allowUnaffined: Boolean) {

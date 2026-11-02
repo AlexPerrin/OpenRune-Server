@@ -25,3 +25,6 @@ clan_info_refresh = 65523
 
 [gamevals.area]
 clan_hub = 32755
+
+[gamevals.queue]
+clan_recruit_invite = 65512
