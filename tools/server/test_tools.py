@@ -470,6 +470,12 @@ class DesktopInstance(unittest.TestCase):
         err = p.communicate(timeout=60)[1]
         s.assertEqual(p.returncode, 1); s.assertIn("could not bind 7780", err); s.assertIn("BindException: Address already in use", err); s.assertNotIn("at x", err)
 
+    def test_a_launch_wsl_interop_failed_fails_up_with_its_error(s):  # sweep-51 P3-b: server-clan-channels' desktop6 logged only the interop error
+        (s.t / "desk/jdk/bin/java.exe").write_text('#!/bin/bash\necho "<3>WSL (1 - ) ERROR: UtilAcceptVsock:273: accept4 failed 110" >&2; exit 1\n')
+        p = s.sh("a", "desktop_start", stderr=subprocess.PIPE)
+        err = p.communicate(timeout=60)[1]
+        s.assertEqual(p.returncode, 1); s.assertIn("desktop 1 exited: ", err); s.assertIn("UtilAcceptVsock:273: accept4 failed 110", err)
+
     def test_the_desktop_takes_jav_config_from_openrune_endpoint_alone(s):  # the user's word: one variable points every Jagex endpoint at our server
         java = s.t / "desk/jdk/bin/java.exe"
         java.write_text(java.read_text().replace("#!/bin/bash\n", f'#!/bin/bash\necho "$OPENRUNE_ENDPOINT $WSLENV" > {s.t}/env; ', 1))   # before its port: desktop_start returns once the port answers
