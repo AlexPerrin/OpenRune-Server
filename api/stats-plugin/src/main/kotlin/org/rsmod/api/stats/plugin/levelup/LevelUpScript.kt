@@ -169,7 +169,6 @@ constructor(private val worldRepo: WorldRepository, private val worldQueues: Wor
         const val GUIDE_LIST_DISABLED_VARBIT = "varbit.option_level_up_guide_list_disabled"
         const val CHATBOX_LIST_VARBIT = "varbit.option_level_up_chatbox_list"
         const val FLASHSIDE_VARBIT = "varbit.flashside"
-        const val FLASHSIDE_STATS = 2
         const val STATS_STONE = "component.toplevel_osrs_stretch:stone1"
         const val CHATBOX_LIST_SCRIPT = "clientscript.[clientscript,script7781]"
         const val CHATBOX_LIST_SLOTS = 4
