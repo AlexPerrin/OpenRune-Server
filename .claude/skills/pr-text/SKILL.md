@@ -18,8 +18,8 @@ fixed in this PR.
 On an existing PR, `pr-comment.md` covers exactly the commits the push carries since the PR's live head, no more.
 ## one-change
 One quest, feature or fix; nothing unrelated; no open upstream PR for the same content; `Depends:` stated.
-## tests (hard)
-Every test file and method the diff adds is justified in the text as a rule with several cases, a reviewer's request
-or a dupe test; otherwise the row fails and the test leaves the PR.
+## tests
+Every test file the diff adds is named in the text as the dupe test, the multi-case rule or the reviewer's request it
+is; whether it is one is the code row `style` (`qa-server`), never fixed in the text.
 
 A failed row of this skill is text only: qa fixes the text in the evidence dir and marks the row pass (no dev run).

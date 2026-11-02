@@ -18,8 +18,9 @@ contract records their blob shas)
 - A PR is ready only when every reported defect is fixed in it; nothing is promised for a later PR, no Not-done list,
   no unticked checklist item.
 - Updates are new commits on the PR branch (merge `main` in, never force-push); the description is never replaced.
-- Default no tests, except a dupe test per item-moving flow (below) and a rule with several cases, justified in
-  the PR text. No new KDoc or explanatory comments. Nothing public for a test. Toggles in the config with a default.
+- Default no tests, except a dupe test per item-moving flow (below), a rule with several input cases, or a test a
+  reviewer asked for, each named so in the PR text; never a test of an interaction, a dialogue, quest stages or a
+  script's flow (qa fails `style` on it). No new KDoc or explanatory comments. Nothing public for a test. Toggles in the config with a default.
   Subjects `feat:`/`fix:`. State in varbits and varps; gameval symbols, never raw ids; game data in the cache, not
   in Kotlin. A difference from the official game is fixed, never recorded as a quirk; one the server cannot fix is
   `hd ask`.
@@ -116,7 +117,7 @@ Rows the contract starts from (a row tagged `upstream` judges the upstream PR an
 - no-raw-data | no game data or raw ids in Kotlin; gameval symbols; state in varbits and varps | judge: qa-server
 - playable | every flow playable without a cheat; in-game evidence in the evidence dir | judge: qa-server
 - one-change | one feature, nothing unrelated, no open upstream PR for the same content, Depends stated | judge: pr-text | upstream
-- style | no added comments or KDoc, no unjustified test, nothing public for a test, no quirk entries | judge: qa-server
+- style | no added comments or KDoc, no test but a dupe test, a multi-case rule or a reviewer's request, nothing public for a test, no quirk entries | judge: qa-server
 - dupes | each item-moving flow's four paths tested with totals, or a reason that holds | judge: dupes
 - accuracy | each rule of accuracy.md matches in game or is a fixed difference | judge: accuracy
 - evidence | accuracy.md, pr-title.txt, pr-body.md, pr-comment.md present and non-empty | check: tools/server/text.py evidence

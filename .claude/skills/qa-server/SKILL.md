@@ -15,6 +15,10 @@ row, in the order of the contract → `hd verdict <slug> <head> rows.json` with 
   history) in the evidence dir; a blocker's repro passes.
 - **style**: no added comments or KDoc, no unjustified test, nothing public for a test, no quirk entries, toggles in
   the config with a default, no deviation recorded instead of fixed.
+  A test is justified only as one of: the dupe test of an item-moving flow (`dupes`); a test of one rule with several
+  input cases, each case asserted; a test a reviewer asked for on the PR.
+  A test of an interaction, a dialogue, a quest's stages or a script's flow is none of these, whatever the PR text
+  says: `fail: <test file>: not a dupe test, a multi-case rule or a reviewer's request` so the dev removes it.
 
 ## Rows other skills judge
 accuracy, rsprox, unsourced → `accuracy`; claims, no-deferral, net-change, one-change → `pr-text`; dupes → `dupes`.
