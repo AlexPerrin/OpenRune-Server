@@ -32,8 +32,8 @@ import org.rsmod.api.script.onOpPlayerT
 import org.rsmod.api.script.onPlayerQueueWithArgs
 import org.rsmod.events.EventBus
 import org.rsmod.game.entity.Player
-import org.rsmod.game.inv.isType
 import org.rsmod.game.entity.player.SessionStateEvent
+import org.rsmod.game.inv.isType
 import org.rsmod.plugin.scripts.PluginScript
 import org.rsmod.plugin.scripts.ScriptContext
 
@@ -465,7 +465,10 @@ class ClanFoundingScript @Inject constructor(private val clans: Clans, private v
                 recruiter.mes("Your clan is full.")
                 return@hasClan
             }
-            clans.systemMessage(clan, "${invitee.displayName} has been invited into the clan by ${recruiter.displayName}.")
+            clans.systemMessage(
+                clan,
+                "${invitee.displayName} has been invited into the clan by ${recruiter.displayName}.",
+            )
         }
     }
 
