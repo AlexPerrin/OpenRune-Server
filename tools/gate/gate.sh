@@ -12,7 +12,8 @@
 #                     workflows first move the runner's ephemeral ports above the game port 43594 (an outgoing socket on it
 #                     fails the boot's bind), and with CENTRAL build that Central in, as build does (the change's head unchanged)
 #                     and whose CI restores the game data from the fork release asset game-data-<game.example.yml blob12>
-#                     (seeded once from or:<T>) on an actions/cache miss, never openrs2 (no asset fails that step, the runner's);
+#                     (seeded once from or:<T>) on an actions/cache miss, never openrs2 (no asset fails that step, the runner's),
+#                     unless the head changes a cache input: then neither restores and the CI runs :or-cache:freshCache, the head's step;
 #                     each step is timed alone (the job's timeout-minutes on every step), so a timeout names the step that ran
 #                     out; a run failed at a step the head does not touch is re-run once its source answers, and after 3
 #                     attempts the row exits 75: held, no result
@@ -101,13 +102,17 @@ gate_ci() {  # pushes T (gate_sha) to gate/<slug>; the newest run of each workfl
 }
 game_data() {  # workflow $1 with a step restoring the game data from the fork release asset game-data-<k> on an actions/cache miss, so the gate never downloads openrs2's cache;
   # and the job's timeout on each step, so a slow download never times out in a step that reads the head (cannon's run 41366859771 timed out in 'Compile and run tests')
-  K=$(git -C "$repo" rev-parse -q --verify "$TCOMMIT:game.example.yml" | cut -c1-12 || true) python3 -c '
+  # a head changing a cache input runs freshCache: no actions/cache restore, no asset (infra() calls that step the head's)
+  local fresh=; if cache_input; then fresh=1; fi
+  FRESH=$fresh K=$(git -C "$repo" rev-parse -q --verify "$TCOMMIT:game.example.yml" | cut -c1-12 || true) python3 -c '
 import os, re, sys
 y, k = sys.argv[1], os.environ["K"]
 def timed(y):
     m = re.search(r"^    timeout-minutes: (\d+)\n", y, re.M)
     return re.sub(r"^(      - name: .*\n)", rf"\g<1>        timeout-minutes: {m.group(1)}\n", y.replace(m.group(0), "", 1), flags=re.M) if m else y
 gen = "      - name: Generate cache and gameval sources\n"
+if os.environ["FRESH"]:
+    print(timed(y.replace("        id: gamecache\n", "        id: gamecache\n        if: false\n", 1))); sys.exit()
 if not k or "id: gamecache" not in y or gen not in y:
     print(timed(y)); sys.exit()
 step = ("      - name: Game data of the gate (tools/gate/gate.sh gate-ci)\n        id: gamedata\n        if: steps.gamecache.outputs.cache-hit != \x27true\x27\n"
@@ -133,10 +138,12 @@ failed_step() {  # the first step of run $1 that failed or was stopped (a cancel
 }
 infra() {  # step $1 reads nothing the head changes: the runner's setup, the cache's download and generation when the head changes no cache input
   case $1 in "Set up job"|"Checkout repository"|"Set up JDK"*|"Set up Gradle"|"Cache game data"|*"(tools/gate/gate.sh gate-ci)"|"Post "*|"Complete job") return 0 ;;
-    "Generate cache and gameval sources"|"Rebuild sources from cached game data")
-      [ -n "${BASE:-}" ] && [ -n "${HEAD:-}" ] || return 1
-      ! git -C "$repo" diff --name-only "$BASE...$HEAD" | grep -qE 'or-cache/|/pack/|gamevals|raw-cache|game\.example\.yml' ;;
+    "Generate cache and gameval sources"|"Rebuild sources from cached game data") ! cache_input ;;
     *) return 1 ;; esac
+}
+cache_input() {  # the head changes a cache input (or BASE...HEAD is unknown): the cache's generation is the head's, so gate-ci's CI runs it
+  [ -n "${BASE:-}" ] && [ -n "${HEAD:-}" ] || return 0
+  grep -qE 'or-cache/|/pack/|gamevals|raw-cache|game\.example\.yml' <<< "$(git -C "$repo" diff --name-only "$BASE...$HEAD")"   # not a pipe: grep -q ending first would fail git under pipefail
 }
 answers() {  # blocks until the source step $1 reads answers: GitHub for the runner's own steps (it answered this read), the release asset for the game data's, openrs2 for the cache's
   case $1 in "Generate cache"*) until curl -sfI -o /dev/null https://archive.openrs2.org/; do sleep 30; done ;;

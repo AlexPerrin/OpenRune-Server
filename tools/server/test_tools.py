@@ -807,7 +807,7 @@ class GateCi(Repo):
         bin = Path(tempfile.mkdtemp()); s.fake_gh(bin, s.GREEN); root = tempfile.mkdtemp(); change(root, "s1")
         (bin / "docker").write_text('#!/bin/sh\necho "$*" >> "$(dirname "$0")/docker.calls"; [ "$1" = run ] && echo tarball; exit 0\n'); (bin / "docker").chmod(0o755)
         gate = lambda: subprocess.run(["bash", str(HERE.parent / "track.sh"), "gate-ci"], capture_output=True, text=True,
-                                      env={**os.environ, **s.env, "HD_ROOT": root, "TCOMMIT": t, "T": "tk", "PATH": f"{bin}:{os.environ['PATH']}"})
+                                      env={**os.environ, **s.env, "HD_ROOT": root, "TCOMMIT": t, "T": "tk", "BASE": t, "HEAD": t, "PATH": f"{bin}:{os.environ['PATH']}"})
         r = gate(); s.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         calls = (bin / "calls").read_text()
         s.assertIn(f"release upload game-data {root}/state/s1/game-data-{k}.tar.gz", calls); s.assertIn("run --rm --entrypoint tar or:tk", (bin / "docker.calls").read_text())
@@ -822,6 +822,20 @@ class GateCi(Repo):
         s.assertEqual(steps.count("        timeout-minutes: 30\n"), steps.count("      - name: "))
         (bin / "assets").write_text(f"game-data-{k}.tar.gz\n"); (bin / "calls").unlink(); gate()
         s.assertNotIn("release upload", (bin / "calls").read_text())                 # seeded once per game.example.yml
+        for d in (fork, bin, root): shutil.rmtree(d)
+
+    def test_a_head_changing_a_cache_input_runs_fresh_cache(s):  # 8c6d9679e (or-cache/CacheTools.kt) passed the gate on restored data and failed upstream in freshCache
+        s.write(".github/workflows/ci.yml", s.CI); s.write(".github/workflows/format.yml", s.WF); s.write("game.example.yml", "revision: 241\n"); b = s.commit("ci")
+        s.write("or-cache/CacheTools.kt", "x\n"); t = s.commit("cache")
+        fork = tempfile.mkdtemp(); git(fork, "init", "-q", "--bare"); git(s.repo, "remote", "add", "fork", fork)
+        bin = Path(tempfile.mkdtemp()); s.fake_gh(bin, s.GREEN); root = tempfile.mkdtemp(); change(root, "s1")
+        r = subprocess.run(["bash", str(HERE.parent / "track.sh"), "gate-ci"], capture_output=True, text=True,
+                           env={**os.environ, **s.env, "HD_ROOT": root, "TCOMMIT": t, "BASE": b, "HEAD": t, "PATH": f"{bin}:{os.environ['PATH']}"})
+        s.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        y = git(fork, "show", "gate/s1:.github/workflows/ci.yml")
+        s.assertIn("id: gamecache\n        if: false\n", y)                                # no actions/cache restore
+        s.assertNotIn("game-data-", y)                                                  # no release asset
+        s.assertIn("cache-hit != 'true'\n        run: ./gradlew :or-cache:freshCache", y)  # so freshCache runs, the step infra() calls the head's
         for d in (fork, bin, root): shutil.rmtree(d)
 
     def test_a_row_without_a_slug_pushes_gate_of_the_env_slug(s):  # its CI moves the runner's ephemeral ports above 43594 before gradle: run 41312919759's boot bind failed
