@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """desktop_login.py <devtools port> [keep <server container>] <user> <password> | <devtools port> [keep <server container>] token | <devtools port> logout: logs a desktop
 client in, by its login form or (token) by the token login its Jagex session variables start (prints LOGGED_IN or
-FAILED: <reason>; LOGGED_IN only once the inventory widget shows container 93), or out through the logout tab's button (prints LOGIN_SCREEN) through its devtools endpoint; keep: logs it in again after each logout, until the desktop is gone. Keys only:
+FAILED: <reason>; LOGGED_IN only once the inventory widget shows container 93, FAILED when TICKS game ticks pass with no slot in it), or out through the logout tab's button (prints LOGIN_SCREEN) through its devtools endpoint; keep: logs it in again after each logout, until the desktop is gone. Keys only:
 the login screen's place on the canvas changes with the window, so no point on it is clicked. It acts only on the instance
 that owns the port when it starts (DESKTOP_DIR/run/<port - 7779>/owner, its up's slug and claim): no call is sent once that
 instance changes hands, and keep ends then.
@@ -11,6 +11,7 @@ import contextlib, fcntl, json, os, subprocess, sys, tempfile, time, urllib.erro
 LOGOUT_BUTTON = 11927560  # component.logout:logout
 INVENTORY_ITEMS = 9764864  # component.inventory:items, one dynamic child per slot of container 93
 FRAMES = 10  # state reads after Enter: the client takes a key on its next frame, the rest a margin on a loaded host
+TICKS = 10  # game ticks a logged-in client waits for the inventory widget's slots: the server sends the interface and container 93 on the login tick
 
 
 class Refused(Exception):
@@ -128,7 +129,9 @@ def result(port, g, refused):
 
 def inventory(port):
     """LOGGED_IN when the inventory widget's slots show container 93's items, else FAILED naming both (an empty widget over
-    a full container leaves every item_action unfound); waits until the logged-in client has built the widget's slots."""
+    a full container leaves every item_action unfound); waits until the logged-in client has built the widget's slots, and
+    FAILED once TICKS game ticks pass without them (the server sent no inventory)."""
+    first = None
     while True:
         try:
             slots = json.loads(call(port, "get_widget", componentId=INVENTORY_ITEMS)).get("dynamicChildren") or []
@@ -136,6 +139,10 @@ def inventory(port):
             slots = []
         if slots:
             break
+        if (t := tick(port)) is not None:
+            first = t if first is None or t < first else first   # a lower tick: the client counts again from a new login
+            if t - first >= TICKS:
+                return f"FAILED: {TICKS} game ticks after LOGGED_IN the inventory widget has no slots: the server sent no inventory (container 93)"
         time.sleep(1)
     shown = {c["childIndex"]: (c["itemId"], c["itemQuantity"]) for c in slots if not c.get("selfHidden") and c.get("itemId", -1) > 0}
     try:
@@ -143,6 +150,11 @@ def inventory(port):
     except Refused:  # no container 93: the server sent no inventory, an empty one
         held = {}
     return "LOGGED_IN" if shown == held else f"FAILED: the inventory widget shows {shown} but container 93 holds {held}"
+
+
+def tick(port):  # the game tick of the newest recorded event (a logged-in client's interfaces fire scripts every frame), None before any
+    events = json.loads(call(port, "get_timeline", channels=["script", "var", "chat", "container"], limit=1)).get("events") or []
+    return events[-1]["tick"] if events else None
 
 
 def logout(port):

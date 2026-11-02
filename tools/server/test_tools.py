@@ -492,6 +492,8 @@ class DesktopLogin(unittest.TestCase):
                 if inv is None:
                     raise d.Refused("Item container 93 is not loaded")
                 return json.dumps({"items": inv})
+            if name == "get_timeline":   # one game tick passes between two reads
+                return json.dumps({"events": [{"tick": sum(n == "get_timeline" for n, _ in sent)}]})
             return json.dumps({"gameState": states.pop(0) if len(states) > 1 else states[0]}) if name == "get_client_state" else "{}"
         s.addCleanup(setattr, d, "call", d.call); s.addCleanup(setattr, d.time, "sleep", d.time.sleep)
         d.call, d.time.sleep = call, lambda _: None
@@ -515,6 +517,11 @@ class DesktopLogin(unittest.TestCase):
         s.assertEqual(d.login(1, "u", "p"), "FAILED: the inventory widget shows {} but container 93 holds {0: (995, 5)}")
         d, _ = s.fake(["LOGGED_IN"], widgets=[[dict(coins[0], selfHidden=False, hidden=True)]], inv=held)   # another side tab open hides the slots through their parent alone
         s.assertEqual(d.login(1, "u", "p"), "LOGGED_IN")
+
+    def test_no_inventory_widget_ticks_after_logged_in_fails_not_hangs(s):  # sweep-43: LOGGED_IN, container 93 never arrived, the restart waited 20 min
+        d, sent = s.fake(["LOGGED_IN"], widgets=[None])
+        s.assertEqual(d.token(1), f"FAILED: {d.TICKS} game ticks after LOGGED_IN the inventory widget has no slots: the server sent no inventory (container 93)")
+        s.assertEqual(sum(n == "get_timeline" for n, _ in sent), d.TICKS + 1)
 
     def test_a_refused_call_raises(s):  # press_key BACK_SPACE was refused as an unknown key and the login went on
         import desktop_login as d, io
