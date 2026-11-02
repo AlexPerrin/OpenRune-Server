@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""desktop_login.py <devtools port> [keep <server container>] <user> <password> | <devtools port> [keep <server container>] token | <devtools port> logout: logs a desktop
+"""desktop_login.py <devtools port> [keep <server container>] <user> <password> | <devtools port> [keep <server container>] token | <devtools port> logout | <devtools port> guard <token>: logs a desktop
 client in, by its login form or (token) by the token login its Jagex session variables start (prints LOGGED_IN or
 FAILED: <reason>; LOGGED_IN only once the inventory widget shows container 93, FAILED when TICKS game ticks pass with no slot in it), or out through the logout tab's button (prints LOGIN_SCREEN) through its devtools endpoint; keep: logs it in again after each logout, until the desktop is gone. Keys only:
 the login screen's place on the canvas changes with the window, so no point on it is clicked. It acts only on the instance
 that owns the port when it starts (DESKTOP_DIR/run/<port - 7779>/owner, its up's slug and claim): no call is sent once that
 instance changes hands, and keep ends then. Each call carries that up's devtools token (its up.json), which the endpoint requires.
+guard: writes the instance's guard file (DevtoolsOwner reads it on each request): the token, or empty (any caller) while a
+session's desktop bridge predates mcp/serve.py; keep writes it again whenever that fact changes, so the guard turns on once none lives.
 """
-import contextlib, fcntl, http.client, json, os, subprocess, sys, tempfile, time, urllib.error, urllib.request
+import contextlib, fcntl, http.client, json, os, re, subprocess, sys, tempfile, threading, time, urllib.error, urllib.request
 
 LOGOUT_BUTTON = 11927560  # component.logout:logout
 INVENTORY_ITEMS = 9764864  # component.inventory:items, one dynamic child per slot of container 93
@@ -20,7 +22,8 @@ class Refused(Exception):
 
 
 class Cancelled(Refused):
-    """The endpoint interrupted the call ('Cancelled': a caller's notifications/cancelled interrupts whichever call is active): it is there."""
+    """The endpoint interrupted the call ('Cancelled': a caller's notifications/cancelled interrupts whichever call is active), or
+    answered it unanswered past its bound (code -32002): it is there."""
 
 
 def whole(f):  # f() again from its start while one of its calls is cancelled: a cancelled step may have half run (a type_chat half typed)
@@ -44,6 +47,34 @@ def owner(port):  # the text of the owner file of the instance on that devtools 
             return f.read()
     except OSError:
         return None
+
+
+def legacy():  # pids of the desktop bridges no mcp/serve.py runs: a session started before serve.py, whose bridge never reloads and sends no token
+    ps = {f[0]: f for f in (l.split(None, 2) for l in subprocess.run(["ps", "-eo", "pid=,ppid=,args="], capture_output=True, text=True).stdout.splitlines()) if len(f) == 3}
+    return [p for p, (_, pp, a) in ps.items() if re.search(r"devtools_bridge\.py \S+ http", a) and "mcp/serve.py" not in ps.get(pp, ("", "", ""))[2]]
+
+
+def guard(port, tok):  # the instance's guard file: the up's token, or empty while a legacy bridge lives (its runs send no token); the legacy pids
+    old = legacy(); want = "" if old else tok
+    f = f"{os.environ.get('DESKTOP_DIR', '/mnt/c/osrs-test')}/run/{int(port) - 7779}/guard"
+    try:
+        with open(f) as g:
+            have = g.read()
+    except OSError:
+        have = None
+    if have != want and (claim is None or owner(port) == claim):
+        with open(f + ".new", "w") as g:
+            g.write(want)
+        os.replace(f + ".new", f)
+    return old
+
+
+def guarding(port):  # keep's guard: written again on each change of the legacy bridges, until the instance changes hands
+    while owner(port) == claim:
+        t = devtoken(port)
+        if t:  # an unread up.json never opens the guard
+            guard(port, t)
+        time.sleep(2)
 
 
 def devtoken(port):  # the devtools token of the up owning the instance on that port (its state/<slug>/up.json): the endpoint answers no other caller
@@ -88,7 +119,8 @@ def call(port, name, **args):
     msg = json.loads(line); out = msg.get("result", {})
     text = "".join(c.get("text", "") for c in out.get("content", []) if c.get("type") == "text") or json.dumps(out)
     if "error" in msg or out.get("isError"):  # a refused call (an unknown key) must not pass as done
-        raise (Cancelled if text == "Cancelled" else Refused)(f"{name}: {msg.get('error') or text}")
+        unanswered = (msg.get("error") or {}).get("code") == -32002   # the endpoint's bound passed (a call ahead held the desktop, or the plugin hung): it is there
+        raise (Cancelled if text == "Cancelled" or unanswered else Refused)(f"{name}: {msg.get('error') or text}")
     return text
 
 
@@ -246,9 +278,15 @@ if __name__ == "__main__":
     claim = owner(port)
     if claim is None:
         print(f"FAILED: no desktop instance owns port {port}"); sys.exit(1)
+    if a[0] == "guard":
+        old = guard(port, a[1])
+        if old:
+            print(f"desktop on {port} answers any caller while the desktop bridges {' '.join(old)} predate mcp/serve.py and send no token")
+        sys.exit(0)
     k = a[0] == "keep"; c, a = (a[1], a[2:]) if k else (None, a)
     act = (lambda: logout(port)) if a[0] == "logout" else (lambda: token(port)) if a[0] == "token" else (lambda: login(port, a[0], a[1]))
     if k:
+        threading.Thread(target=guarding, args=(port,), daemon=True).start()
         try:
             keep(port, act, server_ready(c))
         except (OSError, Refused, Gone) as e:

@@ -372,20 +372,33 @@ class DesktopInstance(unittest.TestCase):
             s.assertTrue((s.t / f"desk/run/{n}/home/.rlcustom/sideloaded-plugins/OpenRune-Developer-Tools.jar").exists())
         owners = [(s.t / "desk/run" / g[len("desktop"):].split(":")[0] / "owner").read_text().split() for g in got]
         opts = [f.read_text() for f in s.t.glob("win/*.opts")]
-        s.assertEqual(sorted(o.split("-Dosrstest.devtools=")[1].split()[0] for o in opts), sorted(g.split(":")[1] + ":tk" for g in got))   # each desktop's endpoint answers its up's token alone
+        s.assertEqual(sorted(o.split("-Dosrstest.devtools=")[1].split()[0] for o in opts), sorted(f"{g.split(':')[1]}:{s.t}/desk/run/{g[len('desktop'):].split(':')[0]}\\guard" for g in got))   # each desktop's endpoint reads its instance's guard
+        s.assertEqual({(s.t / "desk/run" / g[len("desktop"):].split(":")[0] / "guard").read_text() for g in got}, {"tk"})   # and answers its up's token alone
         s.assertTrue(all("-javaagent:" in o and "HttpServerProvider=DevtoolsOwner" in o for o in opts))
         s.assertEqual(len(list(s.t.glob("desk/rsprox/owner-*.jar"))), 1)   # the owner check's jar in the template, the same for every up
         s.assertEqual(sorted(o[0] for o in owners), ["s0", "s0", "s1", "s1", "s2", "s2"]); s.assertEqual(len({o[1] for o in owners}), 6)   # each claim its own: a process that started on one never acts on the next
 
-    def test_a_session_bridge_older_than_serve_leaves_the_endpoint_open(s):  # endpoint-owner-2: the orchestrator's bridge, run without serve.py, sends no token: every desktop refused its runs
+    def test_a_session_bridge_older_than_serve_leaves_the_endpoint_open_while_it_lives(s):  # endpoint-owner-2: the orchestrator's bridge, run without serve.py, sends no token: every desktop refused its runs; sweep-50: it kept every later guard off
+        import desktop_login as dl
         (s.t / "ps").write_text("10 1 /usr/bin/claude\n11 10 python3 /h/mcp/serve.py osrs-devtools-desktop\n12 11 python3 /h/mcp/devtools_bridge.py desktop http://127.0.0.1:7780/mcp\n"
                                 "13 10 python3 /h/mcp/devtools_bridge.py mobile /c/tools/devtools-mcp.sh\n")
-        p = s.sh("a", "desktop_start"); p.communicate(timeout=60)
-        (s.t / "ps").write_text((s.t / "ps").read_text() + "20 1 /usr/bin/claude\n21 20 python3 /h/mcp/devtools_bridge.py desktop http://127.0.0.1:7780/mcp\n")
-        p = s.sh("b", "desktop_start", stderr=subprocess.PIPE); err = p.communicate(timeout=60)[1]
-        opts = sorted((f.read_text() for f in s.t.glob("win/*.opts")), key=lambda o: "-Dosrstest.devtools=" not in o)
-        s.assertIn("-Dosrstest.devtools=7780:tk", opts[0]); s.assertNotIn("-Dosrstest.devtools=", opts[1])   # served bridges send the token; a bridge of no serve.py: any caller
+        p = s.sh("a", "desktop_start; echo $inst"); a = p.communicate(timeout=60)[0].split()[0][len("desktop"):]
+        served = (s.t / "ps").read_text(); (s.t / "ps").write_text(served + "20 1 /usr/bin/claude\n21 20 python3 /h/mcp/devtools_bridge.py desktop http://127.0.0.1:7780/mcp\n")
+        p = s.sh("b", "desktop_start; echo $inst", stderr=subprocess.PIPE); out, err = p.communicate(timeout=60); b = out.split()[0][len("desktop"):]
+        guard = lambda n: (s.t / f"desk/run/{n}/guard").read_text()
+        s.assertEqual((guard(a), guard(b)), ("tk", ""))   # served bridges send the token; while a bridge of no serve.py lives: any caller
         s.assertIn("the desktop bridges 21 predate mcp/serve.py", err)
+        s.addCleanup(os.environ.update, {"PATH": os.environ["PATH"]}); os.environ["PATH"] = s.env["PATH"]; os.environ["DESKTOP_DIR"] = s.env["DESKTOP_DIR"]; s.addCleanup(os.environ.pop, "DESKTOP_DIR")
+        s.addCleanup(setattr, dl, "claim", None); s.addCleanup(setattr, dl, "devtoken", dl.devtoken); s.addCleanup(setattr, dl.time, "sleep", dl.time.sleep)
+        port = 7779 + int(b); dl.claim = dl.owner(port); dl.devtoken = lambda _: "tk"; turns = []
+        def sleep(_):   # keep's guard, each turn: the stale session ends, then b's down removes the instance
+            turns.append(guard(b))
+            if len(turns) == 1: (s.t / "ps").write_text(served)
+            else: (s.t / f"desk/run/{b}/owner").write_text("gone")
+        dl.time.sleep = sleep
+        dl.guarding(port)
+        s.assertEqual(turns, ["", "tk"])   # the guard is on once no bridge from before serve.py lives
+        s.assertIn("threading.Thread(target=guarding", (HERE / "desktop_login.py").read_text().split('if k:')[1][:200])   # every keeper guards its desktop
 
     def test_one_up_restart_or_down_of_a_slug_at_a_time(s):  # sweep-42: three overlapping ups and downs of server-clan-channels-4 left a login on an instance it no longer owned
         lock = SRC[SRC.index("case $verb in up|restart|down) ["):]; lock = lock[:lock.index("\n", lock.index("exec flock"))]
@@ -529,7 +542,8 @@ public class Plug { public static void main(String[] a) throws Exception {   // 
         ports = []
         for _ in range(2):
             with socket.socket() as k: k.bind(("127.0.0.1", 0)); ports.append(k.getsockname()[1])
-        opts = f"-javaagent:{t / 'o.jar'} -Dcom.sun.net.httpserver.HttpServerProvider=DevtoolsOwner --add-exports=jdk.httpserver/sun.net.httpserver=ALL-UNNAMED -Dosrstest.devtools={ports[0]}:tk"
+        opts = f"-javaagent:{t / 'o.jar'} -Dcom.sun.net.httpserver.HttpServerProvider=DevtoolsOwner --add-exports=jdk.httpserver/sun.net.httpserver=ALL-UNNAMED -Dosrstest.devtools={ports[0]}:{t / 'guard'}"
+        (t / "guard").write_text("tk")
         p = subprocess.Popen(["java", "-cp", str(t / "app"), "Plug", *map(str, ports)], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, env={**os.environ, "JAVA_TOOL_OPTIONS": opts})
         s.addCleanup(p.stdout.close); s.addCleanup(p.wait); s.addCleanup(p.kill); s.assertEqual(p.stdout.readline().strip(), "up")
         def code(port, auth=None):
@@ -539,6 +553,10 @@ public class Plug { public static void main(String[] a) throws Exception {   // 
             except urllib.error.HTTPError as e:
                 return e.code
         s.assertEqual([code(ports[0]), code(ports[0], "Bearer other"), code(ports[0], "Bearer tk"), code(ports[1])], [401, 401, 200, 200])   # another port is the JDK's own
+        (t / "guard").write_text("")
+        s.assertEqual([code(ports[0]), code(ports[0], "Bearer tk")], [200, 200])   # an empty guard, read on each request: any caller
+        (t / "guard").write_text("tk")
+        s.assertEqual(code(ports[0]), 401)   # the guard back on, the desktop still up
 
     def test_the_owners_calls_run_one_at_a_time_and_a_notification_passes(s):  # sweep-47 P0-a: the plugin interrupts the active tool on every tools/call, so the keeper's state reads cancelled a run's walk_to
         import socket, threading, urllib.request
@@ -557,7 +575,8 @@ public class Plug { public static void main(String[] a) throws Exception {   // 
         subprocess.run(["javac", "-d", str(t / "app"), str(t / "Plug.java")], check=True)
         (t / "m").write_text("Premain-Class: DevtoolsOwner\n"); subprocess.run(["jar", "cfm", str(t / "o.jar"), str(t / "m"), "-C", str(t / "c"), "."], check=True)
         with socket.socket() as k: k.bind(("127.0.0.1", 0)); port = k.getsockname()[1]
-        opts = f"-javaagent:{t / 'o.jar'} -Dcom.sun.net.httpserver.HttpServerProvider=DevtoolsOwner --add-exports=jdk.httpserver/sun.net.httpserver=ALL-UNNAMED -Dosrstest.devtools={port}:tk"
+        opts = f"-javaagent:{t / 'o.jar'} -Dcom.sun.net.httpserver.HttpServerProvider=DevtoolsOwner --add-exports=jdk.httpserver/sun.net.httpserver=ALL-UNNAMED -Dosrstest.devtools={port}:{t / 'guard'}"
+        (t / "guard").write_text("tk")
         p = subprocess.Popen(["java", "-cp", str(t / "app"), "Plug", str(port)], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, env={**os.environ, "JAVA_TOOL_OPTIONS": opts})
         s.addCleanup(p.stdout.close); s.addCleanup(p.wait); s.addCleanup(p.kill); s.assertEqual(p.stdout.readline().strip(), "up")
         def send(body, out, i):
@@ -569,6 +588,35 @@ public class Plug { public static void main(String[] a) throws Exception {   // 
         send({"jsonrpc": "2.0", "method": "notifications/cancelled"}, out, 2)   # answered while a call holds the lock
         for c in calls: c.join()
         s.assertEqual(out, [1, 1, 1])   # each call ran alone in the handler
+
+    def test_every_call_is_answered_within_its_bound(s):  # sweep-47/48: a hover on 7780 had no answer for 20 min through a session's bridge with no whole-call bound
+        import socket, threading, time, urllib.request
+        t = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, t, True); (t / "c").mkdir(); (t / "app").mkdir()
+        (t / "Plug.java").write_text("""import com.sun.net.httpserver.HttpServer; import java.net.*; import java.util.concurrent.*;
+public class Plug { public static void main(String[] a) throws Exception {   // "hang" never answers (a hung plugin; a stream that never ends), "ok" answers at once
+  HttpServer s = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), Integer.parseInt(a[0])), 0); s.setExecutor(Executors.newFixedThreadPool(4));
+  s.createContext("/mcp", x -> { String b = new String(x.getRequestBody().readAllBytes());
+    if (b.contains("hang")) { System.out.println("hung"); System.out.flush(); x.getResponseHeaders().set("Content-Type", "text/event-stream"); x.sendResponseHeaders(200, 0); while (true) { x.getResponseBody().write(": ping\\n".getBytes()); x.getResponseBody().flush(); try { Thread.sleep(500); } catch (InterruptedException e) { return; } } }
+    byte[] r = "{\\"jsonrpc\\":\\"2.0\\",\\"id\\":2,\\"result\\":{}}".getBytes(); x.sendResponseHeaders(200, r.length); x.getResponseBody().write(r); x.close(); }); s.start();
+  System.out.println("up"); System.out.flush(); Thread.sleep(120000); System.exit(0); } }""")
+        subprocess.run(["javac", "-nowarn", "--add-exports", "jdk.httpserver/sun.net.httpserver=ALL-UNNAMED", "-d", str(t / "c"), str(HERE / "DevtoolsOwner.java")], check=True)
+        subprocess.run(["javac", "-d", str(t / "app"), str(t / "Plug.java")], check=True)
+        (t / "m").write_text("Premain-Class: DevtoolsOwner\n"); subprocess.run(["jar", "cfm", str(t / "o.jar"), str(t / "m"), "-C", str(t / "c"), "."], check=True)
+        with socket.socket() as k: k.bind(("127.0.0.1", 0)); port = k.getsockname()[1]
+        (t / "guard").write_text("")   # as while a stale session's bridge lives: no token
+        opts = f"-javaagent:{t / 'o.jar'} -Dcom.sun.net.httpserver.HttpServerProvider=DevtoolsOwner --add-exports=jdk.httpserver/sun.net.httpserver=ALL-UNNAMED -Dosrstest.devtools={port}:{t / 'guard'}"
+        p = subprocess.Popen(["java", "-cp", str(t / "app"), "Plug", str(port)], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, env={**os.environ, "JAVA_TOOL_OPTIONS": opts})
+        s.addCleanup(p.stdout.close); s.addCleanup(p.wait); s.addCleanup(p.kill); s.assertEqual(p.stdout.readline().strip(), "up")
+        out = {}
+        def send(i, name, ms):
+            t0 = time.monotonic()
+            with urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{port}/mcp", json.dumps({"jsonrpc": "2.0", "id": i, "method": "tools/call", "params": {"name": name, "arguments": {"timeoutMs": ms}}}).encode()), timeout=240) as r:   # the stale bridge's per-read timeout
+                out[i] = (json.loads(r.read()), time.monotonic() - t0)
+        hung = threading.Thread(target=send, args=(1, "hang", 1000)); hung.start()
+        s.assertEqual(p.stdout.readline().strip(), "hung")   # the hung call holds the desktop
+        send(2, "ok", 25000); hung.join()   # queued behind the hung call
+        s.assertIn("did not answer the call within 21 s", out[1][0]["error"]["message"]); s.assertEqual(out[1][0]["error"]["code"], -32002); s.assertEqual(out[1][0]["id"], 1); s.assertLess(out[1][1], 23)
+        s.assertEqual(out[2][0], {"jsonrpc": "2.0", "id": 2, "result": {}}); s.assertLess(out[2][1], 45)   # the next call runs once the hung one is answered
 
     def test_a_login_sends_the_token_of_the_up_owning_the_port(s):
         import desktop_login as d
@@ -694,6 +742,14 @@ class DesktopLogin(unittest.TestCase):
         s.assertEqual([a["text"] for n, a in sent if n == "type_chat"], ["u", "p"])   # the cancelled user field typed again, then the password
         s.assertEqual(sum(n == "press_key" and a["key"] == "ESCAPE" for n, a in sent), 2)   # the login from its start
         s.assertTrue(issubclass(d.Cancelled, d.Refused))
+
+    def test_a_call_the_endpoint_left_unanswered_starts_the_login_again(s):  # the endpoint answers -32002 past its bound (a run's walk_to held the desktop): the keeper goes on
+        import desktop_login as d, io
+        s.addCleanup(setattr, d.urllib.request, "urlopen", d.urllib.request.urlopen); s.addCleanup(setattr, d, "devtoken", d.devtoken)
+        d.devtoken = lambda _: "tk"
+        d.urllib.request.urlopen = lambda req, timeout: io.BytesIO(b'{"jsonrpc":"2.0","id":1,"error":{"code":-32002,"message":"a call ahead held the desktop past 20 s"}}')
+        with s.assertRaises(d.Cancelled):
+            d.call(7780, "press_key", key="ENTER")
 
     def test_keep_logs_a_logged_out_desktop_in_again(s):  # genie-review-355-cickwdoqbbpt88aaaabeelmng-1: 20+ min at the login screen after an idle logout
         import desktop_login as d
