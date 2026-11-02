@@ -1,5 +1,6 @@
 [gamevals.enum]
 clan_permission_settings = 65468
+clan_guest_requirements = 65449
 clan_interest_names = 3792
 clan_ranks = 3795
 clan_ranks_locked = 3796

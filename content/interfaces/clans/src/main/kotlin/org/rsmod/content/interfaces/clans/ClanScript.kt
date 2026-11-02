@@ -387,7 +387,7 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
 
     private suspend fun ProtectedAccess.editPermission(permission: Int) {
         val clan = clan() ?: return
-        val requirement = GUEST_REQUIREMENTS[permission]
+        val requirement = guestRequirement(permission)
         val setting = PERMISSION_SETTINGS[permission]
         if (requirement == null && setting == null) {
             return
@@ -397,8 +397,8 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
             mes("You do not have permission to change this setting.")
             return
         }
-        if (requirement != null) {
-            editGuestRequirement(permission, requirement)
+        if (setting == null) {
+            editGuestRequirement(permission, requirement ?: return)
             return
         }
         if (setting == GUESTS_LISTEN_KEY) {

@@ -103,7 +103,7 @@ internal fun interestsText(bits: Int): String {
 internal fun creationDate(minute: Int): String =
     CREATION_DATE.format(Instant.ofEpochSecond(minute * 60L).atZone(ZoneOffset.UTC))
 
-internal class GuestRequirement(private val start: Int, private val end: Int) {
+internal class GuestRequirement(val start: Int, end: Int) {
     val max: Int = (1 shl (end - start + 1)) - 1
 
     fun of(requirements: Int): Int = (requirements ushr start) and max
@@ -120,5 +120,7 @@ internal const val IRON_ANY = 1
 internal const val IRON_ULTIMATE = 2
 internal const val IRON_HARDCORE = 3
 
-internal val GUEST_REQUIREMENTS: Map<Int, GuestRequirement> =
-    mapOf(2958 to GUEST_COMBAT, 2959 to GUEST_TOTAL, 2960 to GUEST_QP, 2961 to GUEST_IRON)
+internal fun guestRequirement(permission: Int): GuestRequirement? {
+    val start = cacheEnum("enum.clan_guest_requirements")[permission] ?: return null
+    return listOf(GUEST_COMBAT, GUEST_TOTAL, GUEST_QP, GUEST_IRON).firstOrNull { it.start == start }
+}

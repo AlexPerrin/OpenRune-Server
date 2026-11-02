@@ -65,6 +65,18 @@ valueType = "INT"
 6243 = 108
 6244 = 109
 
+[[enum]]
+isServerOnly = true
+id = "enum.clan_guest_requirements"
+keyType = "INT"
+valueType = "INT"
+
+[enum.values]
+2958 = 0
+2959 = 7
+2960 = 19
+2961 = 30
+
 [[varp]]
 id = "varp.clan_guest_channel"
 scope = "Perm"
