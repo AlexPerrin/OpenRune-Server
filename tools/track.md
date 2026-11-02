@@ -54,7 +54,7 @@ repeat, source removed mid-action, counts read with `get_inventory` and `get_con
 Clone `~/src/work/<slug>` (a shared clone of `~/src/OpenRune-Server`, remote `fork` = the fork, `origin` = upstream).
 Never edit the shared clone. Commit; `tools/track.sh build <slug>` builds T in the build copy; `tools/track.sh
 up <slug> [N]` starts the server from that build with N logged-in desktops and prints their devtools ports;
-`tools/track.sh test <slug> [module...]` builds, then runs each module's tests and spotlessCheck on the build copy
+`tools/track.sh test <slug> [module...]` builds, then runs each module's tests, its integration tests (a module with `src/integration`, as upstream CI's `integration`) and spotlessCheck on the build copy
 (no module: every module the change touches) and writes `evidence/<slug>/test.log` (the `spotless` row runs spotlessCheck alone on those modules at T, so lint in a touched file fails the hand-over, not CI); never gradle by hand.
 `tools/track.sh log <slug> <pattern>` reads the server log; `tools/track.sh restart <slug>` logs the desktops out, restarts that server,
 its game.yml and database kept, and logs the desktops in again. A run's server has idle logout off (live keeps it), and
