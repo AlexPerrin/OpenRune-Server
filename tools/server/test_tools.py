@@ -232,6 +232,11 @@ class ShipFailure(unittest.TestCase):
         r = subprocess.run(["bash", "-c", "set -euo pipefail\nship() {" + f.split("\n")[0] + "\n" + f.split("\n")[1] + "\n  false\n}\narg=t; ship"], capture_output=True, text=True)
         s.assertNotEqual(r.returncode, 0); s.assertIn("ship of t failed: false (exit 1)", r.stdout)
 
+    def test_ship_recreates_the_stack_and_records_its_containers(s):  # harness-live-http-mount: compose restarted the exited http, whose file mount a WSL restart had turned into a directory
+        f = SRC.split("\nship() {")[1].split("\n}")[0]
+        s.assertIn("up -d --no-deps --force-recreate openrune http http-desktop issuer", f)
+        s.assertIn('"containers":sys.argv[8].split()', f); s.assertIn("ps -a --format '{{.Name}}'", f)
+
 
 class DesktopDevtools(unittest.TestCase):
     def test_each_desktop_loads_the_live_clients_devtools_jar(s):  # the client track's build, not a jar staged by hand
