@@ -518,7 +518,7 @@ class DesktopInstance(unittest.TestCase):
         s.assertEqual(p.returncode, 1); s.assertIn("robocopy of the desktop home into", err)
         up = SRC.split("\nup() {")[1].split("\n}")[0]
         s.assertLess(up.index("down >/dev/null 2>&1' EXIT"), up.index('docker run -d --name "server-$slug"'))   # any failed step of up downs what it started
-        s.assertTrue(up.endswith('trap - EXIT; echo "up: game $game http $http desktops ${desktops[*]}${STAFF:+ administrator $(account "$STAFF")}"'))
+        s.assertTrue(up.endswith('trap - EXIT; echo "up: game $game http $http desktops ${desktops[*]}${staff:+ administrators $staff}"'))
 
     def test_an_up_that_fails_or_is_stopped_names_the_step_it_ended_at(s):  # server-clan-channels-6: two RESUME=1 ups ended after the guard line with no message
         trap = "\n".join(l for l in SRC.split("\nup() {")[1].split("\n}")[0].split("\n") if "' ERR" in l or "' EXIT" in l)
@@ -529,7 +529,7 @@ class DesktopInstance(unittest.TestCase):
 
     def test_up_records_each_desktop_before_its_login(s):  # a failed login aborts up under set -e; restart and the tools read up.json
         up = SRC.split("\nup() {")[1].split("\n}")[0]
-        s.assertLess(up.index('| atomic "$state/up.json"'), up.index('login "$dt"'))
+        s.assertLess(up.index('stack desktops="${desktops[*]}"'), up.index('login "$dt"'))
         s.assertLess(up.index("down >/dev/null"), up.index("desktop_start"))
 
 
@@ -1304,14 +1304,19 @@ class RealmLikeLive(unittest.TestCase):  # Central seeds a dev realm: every logi
         q = lambda staff: subprocess.run(["bash", "-c", f'set -euo pipefail\nsql() {{ echo "$1"; }}\n{s.fn}\nslug=s\n{line.replace(">/dev/null", "")}'],
                                          capture_output=True, text=True, env={**os.environ, **({"STAFF": staff} if staff else {})}).stdout
         name = lambda i: subprocess.run(["bash", "-c", f'{s.fn}\nslug=s; account {i}'], capture_output=True, text=True).stdout.strip()
-        s.assertIn(f"lower(account_name) = '{name(0)}' then", q(None))   # no desktop is numbered 0
-        s.assertIn(f"lower(account_name) = '{name(2)}' then 'ADMINISTRATOR' else ''", q("2"))
+        staff = next(l for l in s.up.splitlines() if l.startswith("  staff="))
+        q = lambda st: subprocess.run(["bash", "-c", f'set -euo pipefail\nsql() {{ echo "$1"; }}\n{s.fn}\nslug=s\n{staff}\n{line.replace(">/dev/null", "")}'],
+                                      capture_output=True, text=True, env={**os.environ, **({"STAFF": st} if st else {})}).stdout
+        s.assertIn("lower(account_name) in ('') then", q(None))   # no administrator
+        s.assertIn(f"lower(account_name) in ('{name(2)}', '') then 'ADMINISTRATOR' else ''", q("2"))
+        s.assertIn(f"lower(account_name) in ('{name(1)}', '{name(2)}', '') then 'ADMINISTRATOR'", q("1,2"))   # sweep 44 P2-a: one up, every desktop needing cheats
         s.assertIn(f"like '{name('')}%'", q("2"))
 
 
 class KeyOnCachedBuild(unittest.TestCase):  # a cached or:<T> left state/<slug>/key empty: docker made the mount sources directories and the server exited at boot
     t = SRC
     fn = "keys() {" + t.split("\nkeys() {")[1].split("\n}")[0] + "\n}"
+    mod = next(l for l in t.splitlines() if l.startswith("modulus_of()"))
 
     def test_up_makes_a_key_pair_before_the_server_runs_and_keeps_an_existing_one(s):
         up = s.t.split("\nup() {")[1].split("\n}")[0]
@@ -1319,7 +1324,7 @@ class KeyOnCachedBuild(unittest.TestCase):  # a cached or:<T> left state/<slug>/
         s.assertNotIn("state/key", s.t.split("\nbuild() {")[1].split("\n}")[0])   # no key comes from a build: one source for every up
         st = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, st)
         (st / "key/game.key").mkdir(parents=True); (st / "key/client.key").mkdir()   # what docker leaves after an up with no key
-        run = lambda: subprocess.run(["bash", "-c", f"set -euo pipefail\nstate={st}\n{s.fn}\nkeys"], capture_output=True, text=True)
+        run = lambda: subprocess.run(["bash", "-c", f"set -euo pipefail\nstate={st}\n{s.mod}\n{s.fn}\nkeys"], capture_output=True, text=True)
         r = run(); s.assertEqual(r.returncode, 0, r.stderr)
         game, client = (st / "key/game.key").read_text(), (st / "key/client.key").read_text()
         s.assertTrue(game.startswith("-----BEGIN PRIVATE KEY-----"))   # PKCS#8: the server's RsaProvider reads it
@@ -1383,7 +1388,7 @@ class TokenLogin(unittest.TestCase):  # a test desktop's token login (auth type 
         s.assertIn('issuer.py" key "$state/token" >> "$state/game.yml"', up)
         s.assertIn("param=\\1=https://127.0.0.1:", up)   # the client casts params 11 and 22 connections to https
         s.assertIn('-v "$tpl:/app/protocol/jav_config.ws.template:ro"', up)
-        s.assertIn('"token-$slug"', down)
+        s.assertIn('containers="server-$slug http-$slug${tok:+ token-$slug}"', up); s.assertIn('docker rm -f $cs', down)   # the record names it; down removes what the record names
         s.assertIn('"-Dosrstest.token=${tok:-false}"', sh); s.assertIn("JX_SESSION_ID:JX_CHARACTER_ID:JX_DISPLAY_NAME", sh)
 
     def test_live_takes_the_apks_tokens_from_the_issuer_whose_secret_its_game_yml_holds(s):  # the sidecar's LOCAL_AUTH tokens were unsigned
@@ -1408,3 +1413,75 @@ class TokenLogin(unittest.TestCase):  # a test desktop's token login (auth type 
         s.assertIn('boolean session = v.equals("JX_SESSION_ID") || v.equals("JX_CHARACTER_ID") || v.equals("JX_DISPLAY_NAME");', src)
         s.assertIn("token && session ? System.getenv(v) == null : System.getenv(v) != null", src)
         s.assertIn('-cp "$t\\\\rsprox\\\\$l;', SRC)   # up runs this tree's launcher, compiled from this source
+
+
+class StackRecord(unittest.TestCase):  # each step re-derived the stack: down looped in offline() once the container was gone, hd's repair ran a script with no down
+    t = SRC
+    up = t.split("\nup() {")[1].split("\n}")[0]
+    fn = lambda s, name: f"{name}() {{" + s.t.split(f"\n{name}() {{")[1].split("\n}")[0] + "\n}"
+    line = lambda s, pre: next(l for l in s.t.splitlines() if l.startswith(pre))
+
+    def test_up_writes_the_record_before_its_first_container(s):
+        rec = s.up.index("  stack started=")
+        for c in ('docker run -d --name "token-$slug"', 'docker run -d --name "server-$slug"', 'docker run -d --name "http-$slug"', "desktop_start"):
+            s.assertLess(rec, s.up.index(c))
+        for f in ('script="${TOOLS_SRC:-$self}/track.sh"', 'containers="server-$slug http-$slug${tok:+ token-$slug}"', 'modulus="$modulus"', 'staff="$staff"', 'token="$devtoken"'):
+            s.assertIn(f, s.up[rec:s.up.index("\n", s.up.index("\n", rec) + 1)])
+        st = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, st)
+        run = lambda *a: subprocess.run(["bash", "-c", f"set -euo pipefail\nstate={st}\n{s.line('atomic()')}\n{s.fn('stack')}\nstack \"$@\"", "-", *a], capture_output=True, text=True)
+        s.assertEqual(run("game:=20001", "desktops=", "script=/x/track.sh").returncode, 0)
+        s.assertEqual(run("desktops=desktop1:7780").returncode, 0)
+        s.assertEqual(json.loads((st / "up.json").read_text()), {"game": 20001, "desktops": "desktop1:7780", "script": "/x/track.sh"})   # each later step adds, none drops a field
+
+    def down(s, record, inspect):  # down against a fake docker; inspect: what each `docker inspect` answers in turn (the last repeats)
+        root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, root); (root / "bin").mkdir(); (root / "st").mkdir()
+        (root / "inspect").write_text("\n".join(inspect) + "\n")
+        (root / "bin/docker").write_text(f"""#!/bin/bash
+echo "$*" >> {root}/calls
+case $1 in inspect) a=$(head -1 {root}/inspect); [ "$(wc -l < {root}/inspect)" -gt 1 ] && sed -i 1d {root}/inspect; echo "$a" ;;
+  logs) echo "Server ready in 1s" ;; run) exit 1 ;; ps) cat {root}/names 2>/dev/null ;; rm) : > {root}/names ;; esac
+""")
+        (root / "bin/docker").chmod(0o755)
+        if record: (root / "st/up.json").write_text(json.dumps(record))
+        script = "\n".join(["set -euo pipefail", f"slug=x; state={root}/st", s.line("account()"), s.line("mine="), s.fn("sql"), s.line("offline()"), s.fn("down"),
+                            "unkeep() { :; }; desktops_remove() { :; }", "down"])
+        r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=60, env={**os.environ, "PATH": f"{root}/bin:{os.environ['PATH']}"})
+        return r, root
+
+    def test_down_ends_once_the_server_is_gone_and_removes_the_records_containers(s):  # sweep 48 P1-b: the container gone, sql answered nothing and offline looped forever
+        r, root = s.down({"containers": "server-x http-x token-x"}, ["true", "true", "false"])   # running and ready, then gone mid-wait
+        s.assertEqual(r.returncode, 0, r.stderr); s.assertEqual(r.stdout.strip(), "down")
+        s.assertIn("rm -f server-x http-x token-x", (root / "calls").read_text())
+        s.assertFalse((root / "st/up.json").exists())
+
+    def test_a_container_left_keeps_the_record_and_fails(s):
+        root = None
+        r, root = s.down({"containers": "server-x http-x"}, ["false"])
+        s.assertEqual(r.returncode, 0, r.stderr)
+        (root / "st/up.json").write_text(json.dumps({"containers": "server-x http-x"}))
+        (root / "bin/docker").write_text((root / "bin/docker").read_text().replace("rm) : > ", "rm) cat ").replace("ps) cat", "ps) echo http-x; cat"))
+        script = "\n".join(["set -euo pipefail", f"slug=x; state={root}/st", s.line("account()"), s.line("mine="), s.fn("sql"), s.line("offline()"), s.fn("down"), "unkeep() { :; }; desktops_remove() { :; }", "down"])
+        r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=60, env={**os.environ, "PATH": f"{root}/bin:{os.environ['PATH']}"})
+        s.assertEqual(r.returncode, 1); s.assertIn("down: http-x not removed", r.stderr); s.assertTrue((root / "st/up.json").exists())
+
+    def test_ship_deploys_the_live_pair_and_refuses_another_key_before_boot_and_tag(s):  # every image since 2026-10-31 18:32Z carried a key no APK had: 'Invalid RSA check'
+        ship = s.t.split("\nship() {")[1].split("\n}")[0]
+        s.assertNotIn("--from=$live_image", ship); s.assertIn("COPY --chown=1000:1000 key/game.key key/client.key /app/.data/", ship)
+        s.assertLess(ship.index('image_key "osrs-openrune:$T"'), ship.index('boot-$T'))
+        s.assertLess(ship.index('image_key "osrs-openrune:$T"'), ship.index('docker tag'))
+        s.assertIn('"modulus":sys.argv[6]', ship)   # the live stack's record names the modulus the APK's up checks
+        root = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, root); (root / "bin").mkdir()
+        keys = {}
+        for n in ("pair", "other"):
+            subprocess.run(["openssl", "genpkey", "-algorithm", "RSA", "-pkeyopt", "rsa_keygen_bits:1024", "-out", str(root / f"{n}.key")], check=True, capture_output=True)
+            keys[n] = subprocess.run(["openssl", "rsa", "-in", str(root / f"{n}.key"), "-noout", "-modulus"], capture_output=True, text=True).stdout.split("=")[1].strip().lower()
+            (root / f"{n}.client").write_text(f"Exponent: 10001\nModulus: {keys[n]}")
+        (root / "bin/docker").write_text(f"""#!/bin/bash
+img=${{5%%:*}}; img=${{5#*:}}; f=${{@: -1}}; case $f in */game.key) cat {root}/$img.key ;; */client.key) cat {root}/$img.client ;; esac
+""")
+        (root / "bin/docker").chmod(0o755)
+        run = lambda img: subprocess.run(["bash", "-c", f"set -euo pipefail\n{s.line('modulus_of()')}\n{s.fn('image_key')}\nmodulus={keys['pair']}\nimage_key x:{img}"],
+                                         capture_output=True, text=True, env={**os.environ, "PATH": f"{root}/bin:{os.environ['PATH']}"})
+        r = run("pair"); s.assertEqual(r.returncode, 0, r.stderr + r.stdout); s.assertIn(f"key: the live pair's {keys['pair'][:8]}", r.stdout)
+        r = run("other"); s.assertEqual(r.returncode, 4)
+        s.assertIn(f"carries game.key {keys['other'][:8]} and client.key {keys['other'][:8]}, not the live pair's {keys['pair'][:8]}", r.stdout)

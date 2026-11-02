@@ -62,8 +62,8 @@ until `down` each desktop that is logged out (a disconnect, a server restart, a 
 (`state/<slug>/keep-<port>.log`); a refusal is not retried until the server restarts. Each up starts a fresh database; `RESUME=1
 tools/track.sh up <slug>` starts from the accounts as the change's last `down` saved them (down waits until the server
 has saved and dropped every character), so a run resumes where the last stopped. The realm is live's (`dev_mode` off, xp at 1x) and every
-desktop's account a member at rank 0, as a player on live; `STAFF=<N>` on one `up` makes the Nth desktop's account an
-administrator, for a row that needs staff. `tools/track.sh up <slug> token` starts one desktop whose login is a token
+desktop's account a member at rank 0, as a player on live; `STAFF=<N>[,<M>...]` on one `up` makes those desktops' accounts
+administrators, for rows that need staff on several accounts. `tools/track.sh up <slug> token` starts one desktop whose login is a token
 login (auth type 7) for its account, the token minted by the local issuer `token-<slug>` (`server/issuer.py`: a compact
 signed token of at most 90 bytes, whose secret game.yml's `token-login` block holds); `tools/track.sh token <slug>
 [TOKEN]` sets the token its next login sends (`server/issuer.py mint` makes expired and forged ones). The server `up` starts runs the image's game.yml with
@@ -91,7 +91,12 @@ One up, restart or down of a slug runs at a time (`state/<slug>/desktops.lock`):
 reservation of the Linux ephemeral range, which moves each boot, and Windows' excluded port ranges), and a launcher whose
 start throws exits, so up fails with its exception. Every JVM
 of instance N carries `-Dosrstest.marker=osrs-test-runN`, and only such a JVM is ever stopped (never the user's own
-RuneLite). up lists each desktop in `up.json` (field `desktops`: `desktopN:port`) before its login, with the up's `token`:
+RuneLite). `state/<slug>/up.json` is the stack's one record, written by up before its first container: its `containers`, the
+`script` that started it (down and hd's repair run that script's `down`), its key's `modulus`, `accounts`, `staff` and `token`;
+`down` removes the containers it names, ends when the server is gone at any point, and removes the record once none is left.
+The live stack's key pair is `state/live/key` of osrs-harness (the modulus every APK carries): ship puts it in each image it deploys,
+refuses an image whose key is not it before the boot and the tag, and names its modulus in `state/live/tree.json`.
+up lists each desktop in `up.json` (field `desktops`: `desktopN:port`) before its login, with the up's `token`:
 each desktop's devtools endpoint answers only a request carrying `Authorization: Bearer <token>` (server/DevtoolsOwner.java,
 loaded into every JVM of the instance), so a script that calls it directly sends its own change's token; `down` stops the
 JVMs of every instance its slug owns until none is alive and none holds a file (jps can miss a live one), then removes those instances, each owner file last so a failed down re-runs; each JVM up starts is recorded, its Windows pid and image, in `state/winpids/<the run's slice>/` of osrs-harness, which ends it with the run, and down drops the record of each JVM it stops; The server logs out a desktop that sends no input
