@@ -11,8 +11,6 @@ import org.rsmod.game.region.Region
 import org.rsmod.plugin.scripts.PluginScript
 import org.rsmod.plugin.scripts.ScriptContext
 
-// shortcut: test server only (local/*): one static raft off Port Sarim, no riding or steering;
-// drop it once upstream has world entities (OpenRune PR #182).
 class TestWorldEntityScript
 @Inject
 constructor(private val service: NetworkService<Player>, private val regionRepo: RegionRepository) :
