@@ -6,11 +6,12 @@ the login screen's place on the canvas changes with the window, so no point on i
 that owns the port when it starts (DESKTOP_DIR/run/<port - 7779>/owner, its up's slug and claim): no call is sent once that
 instance changes hands, and keep ends then. Each call carries that up's devtools token (its up.json), which the endpoint requires.
 """
-import contextlib, fcntl, json, os, subprocess, sys, tempfile, time, urllib.error, urllib.request
+import contextlib, fcntl, http.client, json, os, subprocess, sys, tempfile, time, urllib.error, urllib.request
 
 LOGOUT_BUTTON = 11927560  # component.logout:logout
 INVENTORY_ITEMS = 9764864  # component.inventory:items, one dynamic child per slot of container 93
 FRAMES = 10  # state reads after Enter: the client takes a key on its next frame, the rest a margin on a loaded host
+CONNECT = 30  # seconds a connect may take: a starting client may not accept yet, and an unsent call is sent again
 TICKS = 10  # game ticks a logged-in client waits for the inventory widget's slots: the server sends the interface and container 93 on the login tick
 
 
@@ -53,6 +54,21 @@ def devtoken(port):  # the devtools token of the up owning the instance on that 
         return ""
 
 
+class Answered(http.client.HTTPConnection):
+    """Only the connect is bounded: once sent, a call waits for its answer. The endpoint runs its up's calls one at a time
+    (DevtoolsOwner), so a call may queue behind a run's walk_to; a call given up on would still run later (a replayed ENTER)."""
+    def connect(s):
+        super().connect(); s.sock.settimeout(None)
+
+
+class AnsweredHandler(urllib.request.HTTPHandler):
+    def http_open(s, req):
+        return s.do_open(Answered, req)
+
+
+urllib.request.install_opener(urllib.request.build_opener(AnsweredHandler))
+
+
 def call(port, name, **args):
     req = urllib.request.Request(f"http://127.0.0.1:{port}/mcp", json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
                                  "params": {"name": name, "arguments": args}}).encode(), {"Content-Type": "application/json", "Accept": "application/json, text/event-stream",
@@ -61,7 +77,7 @@ def call(port, name, **args):
         if claim is not None and owner(port) != claim:
             raise Gone(f"the instance on {port} changed hands")
         try:
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urllib.request.urlopen(req, timeout=CONNECT) as r:
                 body = r.read().decode()
             break
         except urllib.error.URLError as e:  # urlopen wraps a failure to connect or send: the request never reached the client
@@ -79,7 +95,7 @@ def call(port, name, **args):
 def state(port):
     try:
         s = call(port, "get_client_state")
-    except (Refused, TimeoutError):
+    except Refused:
         return {}  # no state yet (the client is starting, its thread busy): the next read has one
     except urllib.error.URLError as e:
         if isinstance(e.reason, TimeoutError):

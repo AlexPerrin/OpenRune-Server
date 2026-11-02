@@ -642,6 +642,22 @@ class DesktopLogin(unittest.TestCase):
         with s.assertRaises(d.urllib.error.URLError):   # a refused connection (the desktop gone) is no start: it fails
             d.call(1, "press_key", key="ESCAPE")
 
+    def test_a_call_queued_behind_a_long_call_waits_for_its_answer(s):  # sweep-49 P1-a: a keeper call queued behind a run's walk_to timed out, keep ended as gone and the abandoned ENTER ran later
+        import desktop_login as d, http.server, time
+        got = []
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_POST(h):
+                got.append(json.loads(h.rfile.read(int(h.headers["Content-Length"])))["params"]["name"])
+                time.sleep(1)   # the run's long call holds the endpoint: this answer comes after the connect bound
+                b = json.dumps({"result": {"content": [{"type": "text", "text": "{}"}]}}).encode()
+                h.send_response(200); h.send_header("Content-Length", str(len(b))); h.end_headers(); h.wfile.write(b)
+            def log_message(h, *a): pass
+        srv = http.server.HTTPServer(("127.0.0.1", 0), H); threading.Thread(target=srv.serve_forever, daemon=True).start()
+        s.addCleanup(srv.server_close); s.addCleanup(srv.shutdown); s.addCleanup(setattr, d, "CONNECT", d.CONNECT)
+        d.CONNECT = 0.2
+        s.assertEqual(d.call(srv.server_address[1], "press_key", key="ENTER"), "{}")
+        s.assertEqual(got, ["press_key"])   # sent once, answered in its turn, never given up on
+
     def test_a_refusal_page_returns_not_hangs(s):  # server-token-auth-14: on 'Incorrect username or password.' Enter did nothing and token waited forever
         d, sent = s.fake(["LOGIN_SCREEN"])   # Enter and, after Escape, Enter again start no attempt
         s.assertTrue(d.token(1).startswith("FAILED: Enter started no login"))
