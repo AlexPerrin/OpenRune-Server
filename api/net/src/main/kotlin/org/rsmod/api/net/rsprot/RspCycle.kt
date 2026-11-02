@@ -124,7 +124,9 @@ class RspCycle(
         }
 
         session.queue(rootPackets.activeWorld)
-        infos.worldEntityInfo.updateRenderDistance(WORLD_ENTITY_RENDER_DISTANCE)
+        if (player.lastMapBuildComplete != Int.MIN_VALUE) {
+            infos.worldEntityInfo.updateRenderDistance(WORLD_ENTITY_RENDER_DISTANCE)
+        }
     }
 
     override fun release() {
