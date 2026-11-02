@@ -354,7 +354,10 @@ class DesktopInstance(unittest.TestCase):
         exe(t / "sys32/robocopy.exe", 'cp -r "$1" "${2//\\\\//}"; exit 1\n')   # 1: files copied
         exe(t / "bin/ps", f'cat {t}/ps 2>/dev/null; true\n')   # the host's processes: none but those a test writes
         exe(t / "bin/wslpath", 'sleep 0.5; echo "$2"\n')   # widens the window between picking an instance and claiming it
+        exe(t / "bin/docker", f'[ "$1" = exec ] && exec tar -c -C {t}/served .; exit 1\n')   # the server's served cache
+        (t / "served").mkdir(); (t / "served/main_file_cache.dat2").write_text("served")
         d = t / "desk"; (d / "home/.rsprox").mkdir(parents=True); (d / "home/.rlcustom/profiles2").mkdir(parents=True); (d / "jdk/bin").mkdir(parents=True)
+        (d / "home/.rlcustom/jagexcache/oldschool/LIVE").mkdir(parents=True); (d / "home/.rlcustom/jagexcache/oldschool/LIVE/main_file_cache.dat2").write_text("template")
         (d / "home/.rlcustom/settings.properties").write_text("a=1\n"); (d / "home/.rlcustom/profiles2/p.properties").write_text("openrunedevtools.port=7780\n")
         exe(d / "jdk/bin/java.exe", f'echo "$$ OsrsTestLauncher $*" > {t}/win/$$.jvm; echo "$JAVA_TOOL_OPTIONS" > {t}/win/$$.opts; echo $((7779 + ${{1##*run}})) > {t}/win/$$.port; pwd > {t}/win/$$.dir; mkdir held; touch held/f; chmod 555 held; exec sleep 30\n')   # a live JVM holds its files
         exe(d / "jdk/bin/javac.exe", f'echo "$*" >> {t}/javac; touch "${{5//\\\\//}}/OsrsTestLauncher.class"\n')
@@ -388,6 +391,7 @@ class DesktopInstance(unittest.TestCase):
             n, port = g[len("desktop"):].split(":")
             s.assertEqual((s.t / f"desk/run/{n}/home/.rlcustom/profiles2/p.properties").read_text(), f"openrunedevtools.port={port}\n")
             s.assertTrue((s.t / f"desk/run/{n}/home/.rlcustom/sideloaded-plugins/OpenRune-Developer-Tools.jar").exists())
+            s.assertEqual((s.t / f"desk/run/{n}/home/.rlcustom/jagexcache/oldschool/LIVE/main_file_cache.dat2").read_text(), "served")   # the disk cache its server serves: a login fetches no group
         owners = [(s.t / "desk/run" / g[len("desktop"):].split(":")[0] / "owner").read_text().split() for g in got]
         opts = [f.read_text() for f in s.t.glob("win/*.opts")]
         s.assertEqual(sorted(o.split("-Dosrstest.devtools=")[1].split()[0] for o in opts), sorted(f"{g.split(':')[1]}:{s.t}/desk/run/{g[len('desktop'):].split(':')[0]}\\guard" for g in got))   # each desktop's endpoint reads its instance's guard

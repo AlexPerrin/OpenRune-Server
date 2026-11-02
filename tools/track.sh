@@ -95,7 +95,7 @@ winpid() { local sl; sl=$(grep -o 'hd-[^/]*\.slice' /proc/self/cgroup) || return
 marked() { "$desk/jdk/bin/jps.exe" -v | tr -d '\r' | awk -v m="-Dosrstest.marker=osrs-test-run$1" '{for (f = 3; f <= NF; f++) if ($f == m) {print $1, $2; next}}'; }   # "<Windows PID> <main class>" of instance N's JVMs: only desktop_start sets the marker
 # The desktops: each up creates its own instances. DESKTOP_DIR is the template (JDK, RSProx and its launcher, a staged
 # home); instance N is the dir DESKTOP_DIR/run/N, claimed by its mkdir and naming its up's slug in run/N/owner, with its
-# own home copied from the template's (devtools plugin: the live client's build), devtools port 7779+N answering only the up's
+# own home copied from the template's (devtools plugin: the live client's build; disk cache: the server's), devtools port 7779+N answering only the up's
 # token (up.json "token", sent as Authorization: Bearer <token>) and RSProx ports
 # moved up by skip_base + N-1. Every JVM of instance N carries -Dosrstest.marker=osrs-test-runN;
 # nothing without it is ever stopped (the user's own RuneLite). down stops and removes the instances its slug owns.
@@ -111,8 +111,10 @@ desktop_start() {  # sets inst dt (desktopN, its devtools port)
   [ -n "$d" ] || { echo "no free desktop instance" >&2; return 1; }
   echo "$slug $$-$(date +%s%N)" > "$d/owner"; w=$(wslpath -w "$d")   # the slug and this claim: desktop_login.py acts only while the text it started with is there
   until [ -f "$d/home/.rlcustom/settings.properties" ]; do   # a WSL interop error can end robocopy before it copied (below 8): copied again until the home is there
-    "$sys32/robocopy.exe" "$(wslpath -w "$desk/home")" "$w\\home" /E /MT:16 /NFL /NDL /NJH /NJS /NP /XD screenshots logs > /dev/null || [ $? -lt 8 ] || { echo "robocopy of the desktop home into $d failed" >&2; return 1; }   # robocopy: below 8 is success
+    "$sys32/robocopy.exe" "$(wslpath -w "$desk/home")" "$w\\home" /E /MT:16 /NFL /NDL /NJH /NJS /NP /XD screenshots logs /XF 'main_file_cache.*' > /dev/null || [ $? -lt 8 ] || { echo "robocopy of the desktop home into $d failed" >&2; return 1; }   # robocopy: below 8 is success
   done
+  # the disk cache is the one the server serves: a login then fetches no group over JS5, which its interfaces' onLoad scripts would run before
+  mkdir -p "$d/home/.rlcustom/jagexcache/oldschool/LIVE" && docker exec "server-$slug" tar -c -C /app/.data/cache/LIVE . | tar -x -C "$d/home/.rlcustom/jagexcache/oldschool/LIVE"   # docker cp fails writing the dat2 to a Windows drive in one piece
   sed -i "s/^openrunedevtools\.port=.*/openrunedevtools.port=$dp/" "$d"/home/.rlcustom/settings.properties "$d"/home/.rlcustom/profiles2/*.properties
   mkdir -p "$d/home/.rlcustom/sideloaded-plugins" && cp "$jar" "$d/home/.rlcustom/sideloaded-plugins/OpenRune-Developer-Tools.jar"
   ep=http://127.0.0.1:$http   # OPENRUNE_ENDPOINT: the launcher takes jav_config from it alone, and jav_config names every other endpoint
