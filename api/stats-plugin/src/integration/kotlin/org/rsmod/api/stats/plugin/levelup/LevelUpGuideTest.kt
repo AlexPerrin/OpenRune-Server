@@ -97,8 +97,8 @@ class LevelUpGuideTest {
             assertEquals(0, client.count { it is RunClientScript })
         }
 
-    private fun GameTestState.runLevelUpTest(testBody: GameTestScope.(LevelUpScript) -> Unit) =
-        runInjectedGameTest(LevelUpScript::class, null, LevelUpScript::class, testBody = testBody)
+    private fun GameTestState.runLevelUpTest(testBody: GameTestScope.(LevelUpGuideHook) -> Unit) =
+        runInjectedGameTest(LevelUpGuideHook::class, null, LevelUpScript::class, testBody = testBody)
 
     private fun GameTestScope.guideMessages(): List<String> =
         client.filterIsInstance<MessageGame>().filter { it.type == LEVEL_UP_MESSAGE }.map { it.message }

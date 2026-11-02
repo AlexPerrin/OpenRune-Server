@@ -4,14 +4,12 @@ import dev.openrune.ServerCacheManager
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import jakarta.inject.Inject
-import org.rsmod.api.player.hook.PlayerPostTickHook
 import org.rsmod.api.player.midiJingle
 import org.rsmod.api.player.midiSong
 import org.rsmod.api.player.output.ChatType
 import org.rsmod.api.player.output.mes
 import org.rsmod.api.player.output.runClientScript
 import org.rsmod.api.player.protect.ProtectedAccess
-import org.rsmod.api.player.stat.statBase
 import org.rsmod.api.player.vars.VarPlayerIntMapSetter
 import org.rsmod.api.repo.world.WorldRepository
 import org.rsmod.api.script.advanced.onAdvanceCombat
@@ -29,7 +27,7 @@ import org.rsmod.plugin.scripts.ScriptContext
 public class LevelUpScript
 @Inject
 constructor(private val worldRepo: WorldRepository, private val worldQueues: WorldQueueList) :
-    PluginScript(), PlayerPostTickHook {
+    PluginScript() {
     private val unlocks by lazy { SkillUnlocks.load() }
     private val guideUnlocks by lazy { LevelUpUnlocks.load() }
 
@@ -45,31 +43,6 @@ constructor(private val worldRepo: WorldRepository, private val worldQueues: Wor
         // UNVERIFIED: login clearing the stats tab flash (guess)
         onPlayerLogin { VarPlayerIntMapSetter.set(player, FLASHSIDE_VARBIT, 0) }
         onIfOverlayButton(STATS_STONE) { VarPlayerIntMapSetter.set(player, FLASHSIDE_VARBIT, 0) }
-    }
-
-    override fun onPostTick(player: Player) {
-        val queues = player.engineQueueList.iterator() ?: return
-        while (queues.hasNext()) {
-            val advance = queues.next().args as? StatAdvance ?: continue
-            player.guideList(advance)
-        }
-        queues.cleanUp()
-    }
-
-    private fun Player.guideList(advance: StatAdvance) {
-        val stat = LevelUpStat.of(advance.stat) ?: return
-        val level = statBase(advance.stat.internalName)
-        // UNVERIFIED: the guide list setting turning off the list, flash and hint (guess)
-        if (vars[GUIDE_LIST_DISABLED_VARBIT] != 0) {
-            return
-        }
-        if (guideUnlocks.between(stat.guide, advance.previousLevel, level).isEmpty()) {
-            return
-        }
-        if (vars[stat.listVarbit] == 0) {
-            VarPlayerIntMapSetter.set(this, stat.listVarbit, advance.previousLevel + 1)
-        }
-        VarPlayerIntMapSetter.set(this, FLASHSIDE_VARBIT, FLASHSIDE_STATS)
     }
 
     private suspend fun ProtectedAccess.advanceStat(advance: StatAdvance) {
