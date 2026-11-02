@@ -788,6 +788,14 @@ class GateCi(Repo):
         s.assertEqual(r.returncode, 1); s.assertIn("CI failure/completed at 'Generate cache and gameval sources'", r.stdout)
         s.assertFalse([c for c in calls if c.startswith("run rerun")])
 
+    def test_the_carry_asks_the_same_classifier_of_a_failed_upstream_step(s):  # PR 448's freshCache failed upstream; hd's carry judged every failure the head's
+        base = git(s.repo, "rev-parse", "HEAD"); s.write("or-cache/x", "y"); head = s.commit("touches the cache")
+        root = tempfile.mkdtemp(); change(root, "s1")
+        step = lambda st: subprocess.run(["bash", str(HERE.parent / "track.sh"), "ci-step", "s1", st], capture_output=True, text=True,
+                                         env={**os.environ, **s.env, "HD_ROOT": root, "BASE": base, "HEAD": head}).returncode
+        s.assertEqual([step(x) for x in ("Checkout repository", "Compile and run tests", "Generate cache and gameval sources")], [0, 1, 1])
+        shutil.rmtree(root)
+
     def test_a_run_stopped_in_the_game_data_step_waits_on_the_asset_then_re_runs(s):  # 10 gates re-uploaded the asset at once: goblin's CI 41371460666 found none
         r, calls, _ = s.gate([s.FAILED(1, "cancelled"), s.FAILED(1, "cancelled"), s.RUNS("success")], step="Game data of the gate (tools/gate/gate.sh gate-ci)")
         s.assertEqual(r.returncode, 0, r.stdout + r.stderr); s.assertEqual(len([c for c in calls if c.startswith("run rerun 7")]), 1)

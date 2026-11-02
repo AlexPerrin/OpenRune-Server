@@ -17,6 +17,8 @@
 #                     each step is timed alone (the job's timeout-minutes on every step), so a timeout names the step that ran
 #                     out; a run failed at a step the head does not touch is re-run once its source answers, and after 3
 #                     attempts the row exits 75: held, no result
+#   ci-step STEP      the carry's CI wait (hd.py ci_fault) asks of an upstream CI step that failed: exit 0 when STEP reads nothing
+#                     the head (HEAD over BASE) changes, once its source answers (gate-ci's own classifier); 1 when it is the head's
 . "$(dirname "$0")/../build/build.sh"   # verb slug arg self(tools/build) repo root state dev copy atomic record size hosted box tree central build
 projects() { local f d; for f; do d=$(dirname "$f"); while [ "$d" != . ] && [ ! -f "$copy/$d/build.gradle.kts" ]; do d=$(dirname "$d"); done; [ "$d" = . ] || { [ "${d##*/}" = pack ] && d=${d%/pack}/$(basename "${d%/pack}")-pack; echo ":${d//\//:}"; }; done | sort -u; }   # the Gradle projects holding these files: settings.gradle.kts names a pack directory <parent>-pack
 projdir() { local d=${1#:}; d=${d//://}; [ "${d##*/}" = "$(basename "$(dirname "$d")")-pack" ] && d=$(dirname "$d")/pack; echo "$d"; }   # a project's directory
@@ -145,6 +147,10 @@ cache_input() {  # the head changes a cache input (or BASE...HEAD is unknown): t
   [ -n "${BASE:-}" ] && [ -n "${HEAD:-}" ] || return 0
   grep -qE 'or-cache/|/pack/|gamevals|raw-cache|game\.example\.yml' <<< "$(git -C "$repo" diff --name-only "$BASE...$HEAD")"   # not a pipe: grep -q ending first would fail git under pipefail
 }
+ci_step() {  # one classifier of a failed CI step for gate-ci and the carry
+  infra "$arg" || exit 1
+  R=$(git -C "$repo" remote get-url fork 2>/dev/null | sed -E 's#.*github.com[:/]##; s#\.git$##' || true); answers "$arg"
+}
 answers() {  # blocks until the source step $1 reads answers: GitHub for the runner's own steps (it answered this read), the release asset for the game data's, openrs2 for the cache's
   case $1 in "Generate cache"*) until curl -sfI -o /dev/null https://archive.openrs2.org/; do sleep 30; done ;;
     "Game data of the gate"*) local k; k=$(git -C "$repo" rev-parse -q --verify "$TCOMMIT:game.example.yml" | cut -c1-12 || true); [ -n "$k" ] || return 0
@@ -173,5 +179,5 @@ else:
   done
 }
 
-case $verb in gate|gate-ci) "${verb//-/_}" ;; test) arg= tests "${@:3}" ;; spotless) arg=${TCOMMIT:-} spotless ;;
-  *) echo "verbs: test spotless gate gate-ci" >&2; exit 2 ;; esac
+case $verb in gate|gate-ci|ci-step) "${verb//-/_}" ;; test) arg= tests "${@:3}" ;; spotless) arg=${TCOMMIT:-} spotless ;;
+  *) echo "verbs: test spotless gate gate-ci ci-step" >&2; exit 2 ;; esac
