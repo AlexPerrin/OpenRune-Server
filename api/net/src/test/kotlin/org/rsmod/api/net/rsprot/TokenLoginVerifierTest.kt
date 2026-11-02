@@ -4,7 +4,9 @@ import java.time.Instant
 import java.util.Base64
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+import net.rsprot.protocol.loginprot.outgoing.LoginResponse
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 
@@ -13,26 +15,59 @@ class TokenLoginVerifierTest {
 
     @Test
     fun `a token the issuer signed names its account`() {
-        assertEquals("tester", verifier.accountName(token()))
-        assertEquals("a.b", verifier.accountName(token(account = "a.b")))
+        assertAccepted("tester", token())
+        assertAccepted("a.b", token(account = "a.b"))
     }
 
     @Test
-    fun `a token signed by another secret is refused`() {
-        assertNull(verifier.accountName(token(secret = OTHER_SECRET)))
+    fun `a token signed by another secret is refused for its mac`() {
+        assertRefused(TokenLogin.Refusal.Mac, "tester", token(secret = OTHER_SECRET))
+        assertRefused(TokenLogin.Refusal.Mac, "admin", token().replace("tester", "admin"))
     }
 
     @Test
-    fun `an expired token is refused`() {
-        assertNull(verifier.accountName(token(exp = Instant.now().epochSecond - 1)))
+    fun `an expired token is refused for its expiry`() {
+        assertRefused(TokenLogin.Refusal.Expiry, "tester", token(exp = Instant.now().epochSecond - 1))
     }
 
     @Test
-    fun `a malformed token is refused`() {
-        assertNull(verifier.accountName("not-a-token"))
-        assertNull(verifier.accountName(token(account = "")))
-        assertNull(verifier.accountName(token().substringBeforeLast('.') + ".!!!!"))
-        assertNull(verifier.accountName(token().replace("tester", "admin")))
+    fun `a malformed token is refused for its shape`() {
+        assertRefused(TokenLogin.Refusal.Shape, null, "not-a-token")
+        assertRefused(TokenLogin.Refusal.Shape, null, "a.b")
+        assertRefused(TokenLogin.Refusal.Shape, "", token(account = ""))
+        assertRefused(TokenLogin.Refusal.Shape, "tester", "tester.soon.AAAA")
+        assertRefused(TokenLogin.Refusal.Shape, "tester", token().substringBeforeLast('.') + ".!!!!")
+    }
+
+    @Test
+    fun `a refusal line names its cause, length and account but not the mac`() {
+        val token = token(secret = OTHER_SECRET)
+        val login = verifier.verify(token)
+        val mac = token.substringAfterLast('.')
+        assertEquals("Token login refused: mac (length=${token.length}, account='tester')", login.refused("mac"))
+        assertEquals(
+            "Token login refused: no account (length=${token.length}, account='tester')",
+            login.refused("no account"),
+        )
+        assertEquals(
+            "Token login refused: Central Banned (length=${token.length}, account='tester')",
+            login.refused("Central ${LoginResponse.Banned}"),
+        )
+        assertFalse(login.refused("mac").contains(mac))
+        assertEquals("Token login refused: shape (length=11, account=none)", verifier.verify("not-a-token").refused("shape"))
+    }
+
+    private fun assertAccepted(account: String, token: String) {
+        val login = verifier.verify(token)
+        assertNull(login.refusal)
+        assertEquals(account, login.account)
+    }
+
+    private fun assertRefused(refusal: TokenLogin.Refusal, account: String?, token: String) {
+        val login = verifier.verify(token)
+        assertEquals(refusal, login.refusal)
+        assertEquals(account, login.account)
+        assertEquals(token.length, login.length)
     }
 
     private fun token(
