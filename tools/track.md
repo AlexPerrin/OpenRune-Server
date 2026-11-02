@@ -107,21 +107,21 @@ restart the live server (`osrs-openrune*`); push any ref but yours; open or edit
 `C:\Users\Alex\.runelite`; stop a process you did not start; use the DB tool for writes.
 
 ## Seed rows
-Rows the contract starts from (`check:` rows run with SLUG, HEAD, T, BASE, CLONE, BUILD, EVIDENCE in the env).
+Rows the contract starts from (a row tagged `upstream` judges the upstream PR and seeds only a change that opens one; `check:` rows run with SLUG, HEAD, T, BASE, CLONE, BUILD, EVIDENCE in the env).
 - claims | every PR claim, id, file, test name and ticked box is true of the exact head | judge: pr-text
 - rsprox | timings, steps and messages checked against RSProx recordings tick by tick before the wiki | judge: accuracy
-- no-deferral | no Not-done list, no unticked item, no open ask; every reported defect fixed in this PR | judge: pr-text
-- net-change | on an existing PR, pr-comment.md covers only the commits since the PR's live head | judge: pr-text
+- no-deferral | no Not-done list, no unticked item, no open ask; every reported defect fixed in this PR | judge: pr-text | upstream
+- net-change | on an existing PR, pr-comment.md covers only the commits since the PR's live head | judge: pr-text | upstream
 - unsourced | the PR notes name every reconstruction and every cheat used to verify | judge: accuracy
 - no-raw-data | no game data or raw ids in Kotlin; gameval symbols; state in varbits and varps | judge: qa-server
 - playable | every flow playable without a cheat; in-game evidence in the evidence dir | judge: qa-server
-- one-change | one feature, nothing unrelated, no open upstream PR for the same content, Depends stated | judge: pr-text
+- one-change | one feature, nothing unrelated, no open upstream PR for the same content, Depends stated | judge: pr-text | upstream
 - style | no added comments or KDoc, no unjustified test, nothing public for a test, no quirk entries | judge: qa-server
 - dupes | each item-moving flow's four paths tested with totals, or a reason that holds | judge: dupes
 - accuracy | each rule of accuracy.md matches in game or is a fixed difference | judge: accuracy
 - evidence | accuracy.md, pr-title.txt, pr-body.md, pr-comment.md present and non-empty | check: tools/server/text.py evidence
-- subject | commit subjects (on an existing PR, those after its live head) start with feat: or fix:; no Claude-Session trailer; the co-author line only | check: tools/server/text.py commits
-- texts | template sections present; no fork PR link; pr-comment.md names HEAD | check: tools/server/text.py texts
+- subject | commit subjects (on an existing PR, those after its live head) start with feat: or fix:; no Claude-Session trailer; the co-author line only | check: tools/server/text.py commits | upstream
+- texts | template sections present; no fork PR link; pr-comment.md names HEAD | check: tools/server/text.py texts | upstream
 - gamevals | custom gameval ids unique across upstream main, the pins and open dev heads | check: tools/server/gamevals.py check
 - dupe-tests | every module whose main sources gain an item-moving call has a test source added or changed | check: tools/server/text.py dupes
 - spotless | spotlessCheck passes on every module the head changes from main | check: tools/track.sh spotless

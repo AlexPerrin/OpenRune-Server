@@ -36,7 +36,7 @@ def live():
 
 def commits():
     bad = []
-    for c in git("log", "--format=%H%x01%s%x01%b%x02", HEAD, f"^{BASE}", *([f"^{live()}"] if live() else [])).split("\x02"):
+    for c in git("log", "--no-merges", "--format=%H%x01%s%x01%b%x02", HEAD, f"^{BASE}", *([f"^{live()}"] if live() else [])).split("\x02"):
         if not c.strip():
             continue
         sha, subject, body = (c.strip("\n") + "\x01\x01").split("\x01")[:3]

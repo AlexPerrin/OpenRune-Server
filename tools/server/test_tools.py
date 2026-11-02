@@ -582,6 +582,10 @@ class Text(Repo):
         s.assertEqual(rc, 1); s.assertIn("already public", out)
         rc, out = s.row("text.py", "commits", HEAD=head, PR="9", PUBLIC_BRANCH="content/x")
         s.assertEqual(rc, 0, out)
+        git(s.repo, "checkout", "-q", "-b", "side", public); s.write("mod/src/main/kotlin/B.kt", "x\n"); main = s.commit("fix: main moved")
+        git(s.repo, "checkout", "-q", "-"); git(s.repo, "merge", "-q", "--no-edit", main)   # the track's `merge main in`: no subject of its own
+        rc, out = s.row("text.py", "commits", HEAD=git(s.repo, "rev-parse", "HEAD"), PR="9", PUBLIC_BRANCH="content/x")
+        s.assertEqual(rc, 0, out)
 
     def test_dupes_after_an_existing_prs_head(s):  # cannon-354: the dev ref at #354's live head failed on the whole PR's item flows
         s.write("mod/src/main/kotlin/A.kt", "fun a() { invAdd(x) }\n")
