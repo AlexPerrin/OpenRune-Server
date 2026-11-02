@@ -14,8 +14,8 @@ constructor(private val clans: Clans, private val publicMessage: MessagePublicHa
     override fun handle(player: Player, message: MessagePublic) {
         if (message.type != CLAN_CHAT_TYPE) {
             publicMessage.handle(player, message)
-        } else if (message.clanType == 0) {
-            clans.message(player, message.message)
+        } else {
+            clans.message(player, message.message, guest = message.clanType != 0)
         }
     }
 }

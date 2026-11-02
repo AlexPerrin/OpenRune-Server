@@ -7,8 +7,9 @@ import org.rsmod.game.entity.Player
 
 class ClanSettingsFullRequestHandler @Inject constructor(private val clans: Clans) : MessageHandler<ClanSettingsFullRequest> {
     override fun handle(player: Player, message: ClanSettingsFullRequest) {
-        if (message.clanId == 0) {
-            clans.resendSettings(player)
+        when {
+            message.clanId == 0 -> clans.resendSettings(player)
+            message.clanId < 0 -> clans.resendSettings(player, guest = true)
         }
     }
 }

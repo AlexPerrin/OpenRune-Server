@@ -9,7 +9,9 @@ import net.rsprot.protocol.game.incoming.buttons.IfButtonD
 import net.rsprot.protocol.game.incoming.buttons.IfButtonT
 import net.rsprot.protocol.game.incoming.buttons.IfScriptTrigger
 import net.rsprot.protocol.game.incoming.buttons.IfSubOp
+import net.rsprot.protocol.game.incoming.clan.AffinedClanSettingsAddBannedFromChannel
 import net.rsprot.protocol.game.incoming.clan.ClanChannelFullRequest
+import net.rsprot.protocol.game.incoming.clan.ClanChannelKickUser
 import net.rsprot.protocol.game.incoming.clan.ClanSettingsFullRequest
 import net.rsprot.protocol.game.incoming.events.EventKeyboard
 import net.rsprot.protocol.game.incoming.events.EventMouseClickV1
@@ -51,7 +53,9 @@ import net.rsprot.protocol.game.incoming.social.IgnoreListAdd
 import net.rsprot.protocol.game.incoming.social.IgnoreListDel
 import net.rsprot.protocol.message.codec.incoming.GameMessageConsumerRepositoryBuilder
 import net.rsprot.protocol.message.codec.incoming.provider.DefaultGameMessageConsumerRepositoryProvider
+import org.rsmod.api.net.rsprot.handlers.ClanAddBannedFromChannelHandler
 import org.rsmod.api.net.rsprot.handlers.ClanChannelFullRequestHandler
+import org.rsmod.api.net.rsprot.handlers.ClanChannelKickUserHandler
 import org.rsmod.api.net.rsprot.handlers.ClanMessagePublicHandler
 import org.rsmod.api.net.rsprot.handlers.ClanSettingsFullRequestHandler
 import org.rsmod.api.net.rsprot.handlers.ClickWorldMapHandler
@@ -143,6 +147,8 @@ constructor(
     private val clanChannelFullRequest: ClanChannelFullRequestHandler,
     private val clanSettingsFullRequest: ClanSettingsFullRequestHandler,
     private val clanMessagePublic: ClanMessagePublicHandler,
+    private val clanChannelKickUser: ClanChannelKickUserHandler,
+    private val clanAddBannedFromChannel: ClanAddBannedFromChannelHandler,
     private val eventBus: EventBus,
 ) {
     fun get(): DefaultGameMessageConsumerRepositoryProvider<Player> {
@@ -189,6 +195,11 @@ constructor(
         builder.addListener(IfScriptTrigger::class.java, scriptTriggerHandler)
         builder.addListener(ClanChannelFullRequest::class.java, clanChannelFullRequest)
         builder.addListener(ClanSettingsFullRequest::class.java, clanSettingsFullRequest)
+        builder.addListener(ClanChannelKickUser::class.java, clanChannelKickUser)
+        builder.addListener(
+            AffinedClanSettingsAddBannedFromChannel::class.java,
+            clanAddBannedFromChannel,
+        )
         builder.addListener(EventMouseClickV1::class.java, InputEventHandler(eventBus))
         builder.addListener(EventMouseClickV2::class.java, InputEventHandler(eventBus))
         builder.addListener(EventMouseScroll::class.java, InputEventHandler(eventBus))

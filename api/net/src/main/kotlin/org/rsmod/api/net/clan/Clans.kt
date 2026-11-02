@@ -12,6 +12,7 @@ import net.rsprot.protocol.game.outgoing.clan.ClanSettingsFull
 import net.rsprot.protocol.game.outgoing.clan.MessageClanChannel
 import net.rsprot.protocol.game.outgoing.clan.MessageClanChannelSystem
 import net.rsprot.protocol.game.outgoing.clan.VarClanDisable
+import org.rsmod.api.db.DatabaseConnection
 import org.rsmod.api.db.gateway.GameDbManager
 import org.rsmod.api.db.gateway.model.GameDbResult
 import org.rsmod.api.db.gateway.model.isOk
@@ -24,6 +25,7 @@ import org.rsmod.events.UnboundEvent
 import org.rsmod.game.entity.Player
 
 private const val CLAN_TYPE = 0
+private const val GUEST_TYPE = -1
 private const val MAX_MEMBERS = 500
 private const val LAST_SEEN_RUNEDAY_BASE = 6880
 private const val LAST_SEEN_END_BIT = 12
@@ -39,6 +41,9 @@ private const val DISABLE_LAST_SEEN_VARBIT = "varbit.clan_disable_lastseen"
 private const val NO_CLAN = 1
 private const val LOADED = 3
 private const val TALK_HINT = "To talk in your clan's channel, start each line of chat with // or /c."
+private const val GUEST_TALK_HINT = "To talk in your guest clan's channel, start each line of chat with ///."
+private const val GUEST_CHANNEL_VARP = "varp.clan_guest_channel"
+private const val GUESTS_BLOCKED = "Guests are no longer allowed in this channel."
 private val RUNEDAY_EPOCH: LocalDate = LocalDate.of(2002, 2, 27)
 
 public data class ClanFounderAccept(val player: Player, val leader: Player) : UnboundEvent
@@ -58,6 +63,7 @@ constructor(
     private val logger = InlineLogger()
     private val loaded = HashMap<Int, Clan>()
     private val clanOf = HashMap<Player, Clan>()
+    private val guestOf = HashMap<Player, Clan>()
     private val sessions = HashSet<Player>()
     private val founderInvites = HashMap<Player, Player>()
     private val founding = HashSet<Player>()
@@ -72,6 +78,11 @@ constructor(
     }
 
     public fun clanOf(player: Player): Clan? = clanOf[player]
+
+    public fun guestOf(player: Player): Clan? = guestOf[player]
+
+    private fun typeOf(clan: Clan, player: Player): Int =
+        if (clanOf[player] === clan) CLAN_TYPE else GUEST_TYPE
 
     public fun onlineMember(clan: Clan, characterId: Int): Player? =
         clan.online.firstOrNull { it.characterId == characterId }
@@ -117,6 +128,9 @@ constructor(
             },
             response = { result ->
                 val clan = if (result.isOk()) result.value else null
+                if (player in sessions && guestOf[player] == null) {
+                    player.client.write(ClanSettingsFull(GUEST_TYPE, ClanSettingsFull.LeaveUpdate))
+                }
                 if (clan == null || player !in sessions) {
                     if (result.isOk()) VarPlayerIntMapSetter.set(player, AFFINITY_VARBIT, NO_CLAN)
                     return@request
@@ -128,6 +142,9 @@ constructor(
 
     private fun attach(player: Player, clan: Clan) {
         val member = clan.memberOf(player) ?: return
+        if (guestOf[player] === clan) {
+            discardGuest(player)
+        }
         clan.online += player
         clanOf[player] = clan
         sendSettingsFull(player, clan)
@@ -179,10 +196,19 @@ constructor(
         founding -= player
         memberInvites.remove(player)
         memberInvites.values.removeIf { it == player }
+        guestOf.remove(player)?.let { guest ->
+            leaveChannel(player, guest, explicit = false)
+            guest.listeners -= player
+            release(guest)
+        }
         val clan = clanOf.remove(player) ?: return
         leaveChannel(player, clan, explicit = false)
         clan.online -= player
-        if (clan.online.isEmpty()) {
+        release(clan)
+    }
+
+    private fun release(clan: Clan) {
+        if (clan.online.isEmpty() && clan.listeners.isEmpty() && loaded[clan.id] === clan) {
             loaded.remove(clan.id)
         }
     }
@@ -204,7 +230,7 @@ constructor(
         val add = ClanChannelDelta.AddUserEvent(player.displayName, config.world, clan.rankOf(player))
         channelDelta(clan, listOf(add))
         clan.channel += player
-        player.client.write(ClanChannelFull(CLAN_TYPE, channelJoinUpdate(clan)))
+        player.client.write(ClanChannelFull(typeOf(clan, player), channelJoinUpdate(clan)))
         player.softTimer("timer.clan_channel_hint", 1)
     }
 
@@ -213,6 +239,9 @@ constructor(
         if (clanOf[player]?.channel?.contains(player) == true) {
             player.mes(TALK_HINT, ChatType.ClanMessage)
         }
+        if (guestOf[player]?.channel?.contains(player) == true) {
+            player.mes(GUEST_TALK_HINT, ChatType.ClanMessage)
+        }
     }
 
     private fun leaveChannel(player: Player, clan: Clan, explicit: Boolean) {
@@ -220,17 +249,18 @@ constructor(
         if (slot == -1) {
             return
         }
+        val type = typeOf(clan, player)
         clan.channel.removeAt(slot)
         if (explicit) {
-            VarPlayerIntMapSetter.set(player, CHANNEL_LEFT_VARBIT, 1)
+            if (type == CLAN_TYPE) VarPlayerIntMapSetter.set(player, CHANNEL_LEFT_VARBIT, 1)
             player.mes("You have left the channel.", ChatType.ClanMessage)
         }
-        player.client.write(ClanChannelFull(CLAN_TYPE, ClanChannelFull.LeaveUpdate))
+        player.client.write(ClanChannelFull(type, ClanChannelFull.LeaveUpdate))
         channelDelta(clan, listOf(ClanChannelDelta.DeleteUserEvent(slot)))
     }
 
-    public fun message(player: Player, text: String) {
-        val clan = clanOf[player] ?: return
+    public fun message(player: Player, text: String, guest: Boolean) {
+        val clan = (if (guest) guestOf[player] else clanOf[player]) ?: return
         if (player !in clan.channel) {
             return
         }
@@ -238,21 +268,26 @@ constructor(
             player.mes("You do not have a high enough rank to talk in this channel.", ChatType.ClanMessage)
             return
         }
-        val message =
-            MessageClanChannel(
-                CLAN_TYPE,
-                player.displayName,
-                config.world,
-                nextMessageCounter(),
-                player.modLevel.clientCode,
-                text,
-            )
-        clan.channel.forEach { it.client.write(message) }
+        val counter = nextMessageCounter()
+        clan.channel.forEach {
+            val message =
+                MessageClanChannel(
+                    typeOf(clan, it),
+                    player.displayName,
+                    config.world,
+                    counter,
+                    player.modLevel.clientCode,
+                    text,
+                )
+            it.client.write(message)
+        }
     }
 
     public fun systemMessage(clan: Clan, text: String) {
-        val message = MessageClanChannelSystem(CLAN_TYPE, config.world, nextMessageCounter(), text)
-        clan.channel.forEach { it.client.write(message) }
+        val counter = nextMessageCounter()
+        clan.channel.forEach {
+            it.client.write(MessageClanChannelSystem(typeOf(clan, it), config.world, counter, text))
+        }
     }
 
     public fun setRank(clan: Clan, slot: Int, rank: Int) {
@@ -310,6 +345,7 @@ constructor(
         val clanId = clan.id
         val characterId = member.characterId
         if (clan.members.isEmpty()) {
+            clan.listeners.toList().forEach { discardGuest(it) }
             loaded.remove(clanId)
             db.request(
                 request = { connection -> GameDbResult.Ok(ClanStore.deleteClan(connection, clanId)) },
@@ -349,6 +385,150 @@ constructor(
             clan,
             listOf(ClanChannelDelta.UpdateBaseSettingsEvent(clan.name, talkRank, kickRank)),
         )
+        if (!allowUnaffined) {
+            clan.channel.filter { clanOf[it] !== clan }.forEach { removeGuest(it, clan, GUESTS_BLOCKED) }
+        }
+    }
+
+    public fun findClan(name: String, onResult: (Clan?) -> Unit) {
+        val key = nameKey(name)
+        loaded.values.firstOrNull { nameKey(it.name) == key }?.let {
+            onResult(it)
+            return
+        }
+        loadClan({ connection -> ClanStore.clanIdByName(connection, name) }, onResult)
+    }
+
+    public fun findClan(clanId: Int, onResult: (Clan?) -> Unit) {
+        loaded[clanId]?.let {
+            onResult(it)
+            return
+        }
+        loadClan({ clanId }, onResult)
+    }
+
+    private fun loadClan(id: (DatabaseConnection) -> Int?, onResult: (Clan?) -> Unit) {
+        db.request(
+            request = { connection -> GameDbResult.Ok(id(connection)?.let { ClanStore.load(connection, it) }) },
+            response = { result ->
+                val clan = if (result.isOk()) result.value else null
+                onResult(clan?.let { loaded[it.id] ?: it })
+            },
+        )
+    }
+
+    public fun joinAsGuest(player: Player, clan: Clan) {
+        if (player !in sessions) {
+            return
+        }
+        if (guestOf[player] !== clan) {
+            guestOf[player]?.let { discardGuest(player) }
+            loaded.putIfAbsent(clan.id, clan)
+            guestOf[player] = clan
+            clan.listeners += player
+            player.client.write(ClanSettingsFull(GUEST_TYPE, settingsJoinUpdate(clan)))
+            VarPlayerIntMapSetter.set(player, GUEST_AFFINITY_VARBIT, LOADED)
+        }
+        VarPlayerIntMapSetter.set(player, GUEST_CHANNEL_VARP, clan.id)
+        if (player !in clan.channel) {
+            player.mes("Now talking in the clan channel ${clan.name}.", ChatType.ClanMessage)
+            joinChannel(player, clan)
+        }
+    }
+
+    public fun leaveGuestChannel(player: Player) {
+        val clan = guestOf[player] ?: return
+        VarPlayerIntMapSetter.set(player, GUEST_CHANNEL_VARP, 0)
+        leaveChannel(player, clan, explicit = true)
+    }
+
+    public fun discardGuest(player: Player) {
+        val clan = guestOf.remove(player) ?: return
+        VarPlayerIntMapSetter.set(player, GUEST_CHANNEL_VARP, 0)
+        leaveChannel(player, clan, explicit = false)
+        clan.listeners -= player
+        player.client.write(ClanSettingsFull(GUEST_TYPE, ClanSettingsFull.LeaveUpdate))
+        VarPlayerIntMapSetter.set(player, GUEST_AFFINITY_VARBIT, NO_CLAN)
+        release(clan)
+    }
+
+    private fun removeGuest(guest: Player, clan: Clan, text: String) {
+        VarPlayerIntMapSetter.set(guest, GUEST_CHANNEL_VARP, 0)
+        leaveChannel(guest, clan, explicit = false)
+        guest.mes(text, ChatType.ClanMessage)
+    }
+
+    private fun channelGuest(player: Player, memberIndex: Int, name: String): Pair<Clan, Player>? {
+        val clan = clanOf[player] ?: return null
+        val target = clan.channel.getOrNull(memberIndex) ?: return null
+        if (clanOf[target] === clan || !target.displayName.equals(name, ignoreCase = true)) {
+            return null
+        }
+        return clan to target
+    }
+
+    public fun kickGuest(player: Player, memberIndex: Int, name: String) {
+        val (clan, guest) = channelGuest(player, memberIndex, name) ?: return
+        if (clan.rankOf(player) < clan.kickRank()) {
+            player.mes("You do not have a high enough rank to kick guests from this channel.", ChatType.ClanMessage)
+            return
+        }
+        removeGuest(guest, clan, "You have been kicked from the channel.")
+    }
+
+    public fun banGuest(player: Player, memberIndex: Int, name: String) {
+        val (clan, guest) = channelGuest(player, memberIndex, name) ?: return
+        if (clan.rankOf(player) < clan.banRank()) {
+            player.mes("You do not have a high enough rank to ban guests from this channel.", ChatType.ClanMessage)
+            return
+        }
+        ban(clan, ClanBan(guest.characterId, guest.displayName))
+    }
+
+    public fun banByName(clan: Clan, name: String, onResult: (String) -> Unit) {
+        db.request(
+            request = { connection -> GameDbResult.Ok(ClanStore.characterByName(connection, name)) },
+            response = { result ->
+                val ban = if (result.isOk()) result.value else null
+                when {
+                    ban == null -> onResult("Could not find a player named $name.")
+                    clan.members.any { it.characterId == ban.characterId } ->
+                        onResult("You cannot ban a member of the clan.")
+                    clan.bannedFrom(ban.characterId) -> onResult("${ban.name} is already on the ban list.")
+                    else -> ban(clan, ban)
+                }
+            },
+        )
+    }
+
+    private fun ban(clan: Clan, ban: ClanBan) {
+        if (clan.bannedFrom(ban.characterId)) {
+            return
+        }
+        clan.banned += ban
+        val clanId = clan.id
+        db.request(
+            request = { connection -> GameDbResult.Ok(ClanStore.saveBan(connection, clanId, ban)) },
+            response = { logError(it) },
+        )
+        settingsDelta(clan, listOf(ClanSettingsDelta.AddBannedUpdate(ban.name)))
+        val guest = clan.listeners.firstOrNull { it.characterId == ban.characterId } ?: return
+        guest.mes("You have been banned from the channel.", ChatType.ClanMessage)
+        discardGuest(guest)
+    }
+
+    public fun unban(clan: Clan, name: String) {
+        val index = clan.banned.indexOfFirst { nameKey(it.name) == nameKey(name) }
+        if (index == -1) {
+            return
+        }
+        val ban = clan.banned.removeAt(index)
+        val clanId = clan.id
+        db.request(
+            request = { connection -> GameDbResult.Ok(ClanStore.deleteBan(connection, clanId, ban.characterId)) },
+            response = { logError(it) },
+        )
+        settingsDelta(clan, listOf(ClanSettingsDelta.DeleteBannedUpdate(index)))
     }
 
     public fun resign(clan: Clan) {
@@ -433,19 +613,19 @@ constructor(
         )
     }
 
-    public fun resendSettings(player: Player) {
-        clanOf[player]?.let { sendSettingsFull(player, it) }
+    public fun resendSettings(player: Player, guest: Boolean = false) {
+        (if (guest) guestOf[player] else clanOf[player])?.let { sendSettingsFull(player, it) }
     }
 
-    public fun resendChannel(player: Player) {
-        val clan = clanOf[player] ?: return
+    public fun resendChannel(player: Player, guest: Boolean = false) {
+        val clan = (if (guest) guestOf[player] else clanOf[player]) ?: return
         if (player in clan.channel) {
-            player.client.write(ClanChannelFull(CLAN_TYPE, channelJoinUpdate(clan)))
+            player.client.write(ClanChannelFull(typeOf(clan, player), channelJoinUpdate(clan)))
         }
     }
 
     private fun sendSettingsFull(player: Player, clan: Clan) {
-        player.client.write(ClanSettingsFull(CLAN_TYPE, settingsJoinUpdate(clan)))
+        player.client.write(ClanSettingsFull(typeOf(clan, player), settingsJoinUpdate(clan)))
     }
 
     private fun settingsJoinUpdate(clan: Clan): ClanSettingsFull.JoinUpdate =
@@ -468,7 +648,7 @@ constructor(
                         muted = false,
                     )
                 },
-            bannedMembers = emptyList(),
+            bannedMembers = clan.banned.map { ClanSettingsFull.BannedClanMember(it.name) },
             settings =
                 clan.intSettings.filterKeys { it >= 0 }.map { ClanSettingsFull.IntClanSetting(it.key, it.value) } +
                     clan.stringSettings.map { ClanSettingsFull.StringClanSetting(it.key, it.value) },
@@ -489,13 +669,18 @@ constructor(
         )
 
     private fun settingsDelta(clan: Clan, updates: List<ClanSettingsDelta.Update>) {
-        val delta = ClanSettingsDelta(CLAN_TYPE, 0, clan.settingsUpdateNum++, updates)
-        clan.online.forEach { it.client.write(delta) }
+        val updateNum = clan.settingsUpdateNum++
+        val member = ClanSettingsDelta(CLAN_TYPE, 0, updateNum, updates)
+        clan.online.forEach { it.client.write(member) }
+        val guest = ClanSettingsDelta(GUEST_TYPE, 0, updateNum, updates)
+        clan.listeners.forEach { it.client.write(guest) }
     }
 
     private fun channelDelta(clan: Clan, events: List<ClanChannelDelta.Event>) {
-        val delta = ClanChannelDelta(CLAN_TYPE, clan.id.toLong(), clan.channelUpdateNum++, events)
-        clan.channel.forEach { it.client.write(delta) }
+        val updateNum = clan.channelUpdateNum++
+        clan.channel.forEach {
+            it.client.write(ClanChannelDelta(typeOf(clan, it), clan.id.toLong(), updateNum, events))
+        }
     }
 
     private fun nextMessageCounter(): Int {

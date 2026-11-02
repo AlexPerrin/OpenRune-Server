@@ -11,6 +11,7 @@ import org.rsmod.api.net.clan.ClanRank
 import org.rsmod.api.net.clan.Clans
 import org.rsmod.api.player.input.DialogInput
 import org.rsmod.api.player.input.ResumePCountDialogInput
+import org.rsmod.api.player.input.ResumePStringDialogInput
 import org.rsmod.api.player.output.mes
 import org.rsmod.api.player.output.runClientScript
 import org.rsmod.api.player.protect.ProtectedAccess
@@ -72,6 +73,7 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
         onIfOverlayButton("component.clans_sidepanel:chat") { toggleChannel() }
         onIfOverlayButton("component.clans_sidepanel:info") { openInfo() }
         onIfOverlayButton("component.clans_sidepanel:refresh") { clans.resendSettings(player) }
+        onIfOverlayButton("component.clans_guest_sidepanel:info") { openGuestInfo() }
 
         onIfOpen("interface.clans_info") { player.enableInfoButtons() }
         onIfModalButton("component.clans_info:close") { ifClose() }
@@ -86,6 +88,10 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
         onIfModalButton("component.clans_info:talkrank") { editPermission(TALK_IN_CHAT) }
         onIfModalButton("component.clans_info:allowunaffined") { toggleGuestsListen() }
         onIfModalButton("component.clans_info:outfit") { editOutfit() }
+        onIfModalButton("component.clans_info:banned") { openBans() }
+        onIfModalButton("component.clans_banned:exit") { openInfo() }
+        onIfModalButton("component.clans_banned:add") { addBan() }
+        onIfModalButton("component.clans_banned:list_contents") { unban() }
         onIfOverlayButton("component.clans_interests:list") { player.toggleInterest(it.comsub) }
         onEvent<DialogInput> {
             if (player.ui.containsOverlay("interface.clans_interests")) player.submitInterests(count == 1)
@@ -127,7 +133,8 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
         }
     }
 
-    private fun ProtectedAccess.clan(): Clan? = clans.clanOf(player)
+    private fun ProtectedAccess.clan(): Clan? =
+        if (player.vars["varbit.clan_transmit_loadasguest"] == 1) null else clans.clanOf(player)
 
     private suspend fun ProtectedAccess.toggleChannel() {
         val clan = clan() ?: return
@@ -144,14 +151,54 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
     }
 
     private fun ProtectedAccess.openInfo() {
-        val clan = clan() ?: return
+        val clan = clans.clanOf(player) ?: return
+        player.setVar("varbit.clan_transmit_loadasguest", 0)
         ifOpenMainModal("interface.clans_info", -1, -2)
         player.drawInfo(clan)
         softTimer("timer.clan_info_refresh", INFO_REFRESH_CYCLES)
     }
 
+    private fun ProtectedAccess.openGuestInfo() {
+        val clan = clans.guestOf(player) ?: return
+        player.setVar("varbit.clan_transmit_loadasguest", 1)
+        ifOpenMainModal("interface.clans_info", -1, -2)
+        player.drawInfo(clan)
+        softTimer("timer.clan_info_refresh", INFO_REFRESH_CYCLES)
+    }
+
+    private fun ProtectedAccess.openBans() {
+        clan() ?: return
+        ifOpenMainModal("interface.clans_banned", -1, -2)
+        ifSetEvents("component.clans_banned:list_contents", 0 until MAX_BANS, IfEvent.Op1)
+        ifSetEvents("component.clans_banned:add", -1..-1, IfEvent.Op1)
+        ifSetEvents("component.clans_banned:exit", -1..-1, IfEvent.Op1)
+    }
+
+    private suspend fun ProtectedAccess.addBan() {
+        val clan = clan() ?: return
+        if (clan.rankOf(player) < clan.banRank()) {
+            mes("You do not have a high enough rank to ban players from this clan's channel.")
+            return
+        }
+        val name = stringDialog("Enter the name of the player to ban:").trim()
+        val live = clan() ?: return
+        if (name.isNotEmpty()) {
+            val player = player
+            clans.banByName(live, name) { player.mes(it) }
+        }
+    }
+
+    private suspend fun ProtectedAccess.unban() {
+        val name = coroutine.pause(ResumePStringDialogInput::class).text
+        val clan = clan() ?: return
+        if (clan.rankOf(player) >= clan.banRank()) {
+            clans.unban(clan, name)
+        }
+    }
+
     private fun Player.refreshInfo() {
-        val clan = clans.clanOf(this)
+        val guest = vars["varbit.clan_transmit_loadasguest"] == 1
+        val clan = if (guest) clans.guestOf(this) else clans.clanOf(this)
         if (clan == null || !ui.containsModal("interface.clans_info")) {
             clearSoftTimer("timer.clan_info_refresh")
             return
@@ -206,7 +253,7 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
         val buttons =
             listOf(
                 "close", "outfit", "members", "permissions", "titles", "quit", "name",
-                "homeworld", "abdication", "interests", "talkrank", "allowunaffined",
+                "homeworld", "abdication", "interests", "talkrank", "allowunaffined", "banned",
             )
         for (button in buttons) {
             ifSetEvents("component.clans_info:$button", -1..-1, IfEvent.Op1)
@@ -340,10 +387,18 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
 
     private suspend fun ProtectedAccess.editPermission(permission: Int) {
         val clan = clan() ?: return
-        val setting = PERMISSION_SETTINGS[permission] ?: return
+        val requirement = GUEST_REQUIREMENTS[permission]
+        val setting = PERMISSION_SETTINGS[permission]
+        if (requirement == null && setting == null) {
+            return
+        }
         val rank = clan.rankOf(player)
         if (rank < clan.permission(PERMISSION_ACCESS)) {
             mes("You do not have permission to change this setting.")
+            return
+        }
+        if (requirement != null) {
+            editGuestRequirement(permission, requirement)
             return
         }
         if (setting == GUESTS_LISTEN_KEY) {
@@ -373,6 +428,23 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
         if (onInfo) {
             player.drawInfo(live)
         }
+    }
+
+    private suspend fun ProtectedAccess.editGuestRequirement(permission: Int, requirement: GuestRequirement) {
+        val clan = clan() ?: return
+        val requirements = clan.guestRequirements()
+        val value =
+            if (requirement === GUEST_IRON) {
+                (requirement.of(requirements) + 1) % (requirement.max + 1)
+            } else {
+                val name = ServerCacheManager.getStruct(permission)?.params?.get(
+                    "param.clan_permission_name".asRSCM(RSCMType.PARAM)
+                ) as? String ?: ""
+                countDialog("${name.replace("<br>", " ").replace(Regex("<[^>]*>"), "")}:")
+                    .coerceAtMost(requirement.max)
+            }
+        val live = clan() ?: return
+        clans.setIntSetting(live, GUEST_REQUIREMENTS_SETTING, requirement.with(live.guestRequirements(), value))
     }
 
     private fun ProtectedAccess.toggleGuestsListen() {
@@ -579,11 +651,6 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
 
     private fun Clan.permission(permission: Int): Int = permissionRank(permission)
 
-    private fun Player.totalLevel(): Int =
-        ServerCacheManager.getStats().values.sumOf {
-            val stat = dev.openrune.rscm.RSCM.getReverseMapping(RSCMType.STAT, it.id)
-            if (stat == "stat.unreleased") 0 else statBase(stat)
-        }
 
     private fun Player.setVar(name: String, value: Int) = VarPlayerIntMapSetter.set(this, name, value)
 
@@ -594,6 +661,8 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
         const val GUESTS_LISTEN_KEY = -3
         const val WIPE_OP = 10
         const val MAX_MEMBERS = 500
+        const val MAX_BANS = 500
+        const val GUEST_REQUIREMENTS_SETTING = 26
         const val PERMISSION_SLOTS = 50
         const val INTEREST_BITS = 16
         const val TITLE_COUNT = 265
@@ -618,6 +687,11 @@ internal fun Clan.permissionRank(permission: Int): Int {
         else -> intSettings[setting]?.minus(2) ?: ClanRank.OWNER
     }
 }
+internal fun Player.totalLevel(): Int =
+    ServerCacheManager.getStats().values.sumOf {
+        val stat = dev.openrune.rscm.RSCM.getReverseMapping(RSCMType.STAT, it.id)
+        if (stat == "stat.unreleased") 0 else statBase(stat)
+    }
 
 internal fun validClanName(name: String): Boolean =
     name.length in 1..MAX_CLAN_NAME && name.all { it.isLetterOrDigit() || it == ' ' || it == '-' || it == '_' }

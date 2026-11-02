@@ -11,6 +11,8 @@ public class ClanMember(
     public var lastSeenDay: Int = 0,
 )
 
+public class ClanBan(public val characterId: Int, public val name: String)
+
 public class Clan(
     public val id: Int,
     public var name: String,
@@ -18,10 +20,12 @@ public class Clan(
     public var resignAt: Long,
 ) {
     public val members: MutableList<ClanMember> = mutableListOf()
+    public val banned: MutableList<ClanBan> = mutableListOf()
     public val intSettings: MutableMap<Int, Int> = HashMap()
     public val stringSettings: MutableMap<Int, String> = HashMap()
     public val channel: MutableList<Player> = mutableListOf()
     public val online: MutableSet<Player> = LinkedHashSet()
+    public val listeners: MutableSet<Player> = LinkedHashSet()
     public var settingsUpdateNum: Int = 0
     public var channelUpdateNum: Long = System.currentTimeMillis()
 
@@ -37,6 +41,12 @@ public class Clan(
 
     public fun kickRank(): Int = intSettings[KICK_RANK_KEY] ?: DEFAULT_KICK_RANK
 
+    public fun banRank(): Int = intSettings[BAN_RANK_SETTING]?.minus(2) ?: ClanRank.OWNER
+
+    public fun guestRequirements(): Int = intSettings[GUEST_REQUIREMENTS_SETTING] ?: 0
+
+    public fun bannedFrom(characterId: Int): Boolean = banned.any { it.characterId == characterId }
+
     public fun allowUnaffined(): Boolean = (intSettings[ALLOW_UNAFFINED_KEY] ?: 1) == 1
 
     internal companion object {
@@ -44,6 +54,8 @@ public class Clan(
         const val KICK_RANK_KEY = -2
         const val ALLOW_UNAFFINED_KEY = -3
         const val OWNER_ACTIVE_DAY_KEY = -4
+        const val BAN_RANK_SETTING = 18
+        const val GUEST_REQUIREMENTS_SETTING = 26
         const val DEFAULT_TALK_RANK = ClanRank.GUEST
         const val DEFAULT_KICK_RANK = ClanRank.ADMINISTRATOR
     }

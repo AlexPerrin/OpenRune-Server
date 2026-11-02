@@ -26,6 +26,11 @@ internal object ClanStore {
                 "int_value INT NOT NULL DEFAULT 0, " +
                 "string_value TEXT, " +
                 "PRIMARY KEY (clan_id, setting))",
+            "CREATE TABLE IF NOT EXISTS clan_bans (" +
+                "clan_id INT NOT NULL REFERENCES clans(id) ON DELETE CASCADE, " +
+                "character_id INT NOT NULL, " +
+                "name TEXT NOT NULL, " +
+                "PRIMARY KEY (clan_id, character_id))",
         )
 
     fun createTables(connection: DatabaseConnection) {
@@ -45,6 +50,22 @@ internal object ClanStore {
             it.setString(1, nameKey(name))
             it.executeQuery().use { rs -> rs.next() }
         }
+
+    fun clanIdByName(connection: DatabaseConnection, name: String): Int? =
+        connection.prepareStatement("SELECT id FROM clans WHERE name_key = ?").use {
+            it.setString(1, nameKey(name))
+            it.executeQuery().use { rs -> if (rs.next()) rs.getInt(1) else null }
+        }
+
+    fun characterByName(connection: DatabaseConnection, name: String): ClanBan? =
+        connection
+            .prepareStatement(
+                "SELECT id, display_name FROM account_characters WHERE LOWER(TRIM(display_name)) = LOWER(TRIM(?))"
+            )
+            .use {
+                it.setString(1, name)
+                it.executeQuery().use { rs -> if (rs.next()) ClanBan(rs.getInt(1), rs.getString(2)) else null }
+            }
 
     fun load(connection: DatabaseConnection, clanId: Int): Clan? {
         val clan =
@@ -94,6 +115,16 @@ internal object ClanStore {
                         } else {
                             clan.intSettings[rs.getInt(1)] = rs.getInt(2)
                         }
+                    }
+                }
+            }
+        connection
+            .prepareStatement("SELECT character_id, name FROM clan_bans WHERE clan_id = ? ORDER BY name")
+            .use {
+                it.setInt(1, clanId)
+                it.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        clan.banned += ClanBan(rs.getInt(1), rs.getString(2))
                     }
                 }
             }
@@ -169,6 +200,26 @@ internal object ClanStore {
             it.setInt(2, setting)
             it.setInt(3, int)
             it.setString(4, string)
+            it.executeUpdate()
+        }
+    }
+
+    fun saveBan(connection: DatabaseConnection, clanId: Int, ban: ClanBan) {
+        val sql =
+            "INSERT INTO clan_bans (clan_id, character_id, name) VALUES (?, ?, ?) " +
+                "ON CONFLICT (clan_id, character_id) DO UPDATE SET name = EXCLUDED.name"
+        connection.prepareStatement(sql).use {
+            it.setInt(1, clanId)
+            it.setInt(2, ban.characterId)
+            it.setString(3, ban.name)
+            it.executeUpdate()
+        }
+    }
+
+    fun deleteBan(connection: DatabaseConnection, clanId: Int, characterId: Int) {
+        connection.prepareStatement("DELETE FROM clan_bans WHERE clan_id = ? AND character_id = ?").use {
+            it.setInt(1, clanId)
+            it.setInt(2, characterId)
             it.executeUpdate()
         }
     }

@@ -64,3 +64,8 @@ valueType = "INT"
 6242 = 107
 6243 = 108
 6244 = 109
+
+[[varp]]
+id = "varp.clan_guest_channel"
+scope = "Perm"
+transmit = "Never"
