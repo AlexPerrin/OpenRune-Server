@@ -52,7 +52,7 @@ central:
   postgres:
     pool-size: 10
 
-# Token login (auth type 7): tokens <account>.<expiry>.<HMAC-SHA256> signed by the issuer with this base64 secret.
+# Token login (auth type 2): tokens <account>.<expiry>.<HMAC-SHA256> signed by the issuer with this base64 secret.
 #token-login:
   #secret: ""
 
