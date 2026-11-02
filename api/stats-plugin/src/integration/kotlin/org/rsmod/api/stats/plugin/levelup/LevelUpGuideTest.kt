@@ -15,17 +15,17 @@ import org.rsmod.api.testing.scope.GameTestScope
 
 class LevelUpGuideTest {
     @Test
-    fun GameTestState.`unlock level marks the guide list and hints two cycles later`() =
-        runGameTest(LevelUpScript::class) {
+    fun GameTestState.`unlock level marks the guide list on its tick and hints two cycles later`() =
+        runLevelUpTest {
             player.statAdvance("stat.attack", XP_TO_LEVEL_5, rate = 1.0, globalRate = 1.0)
-            advance()
+            it.onPostTick(player)
             assertEquals(2, player.vars[ATTACK_LIST])
             assertEquals(2, player.vars[FLASHSIDE])
-            assertTrue(player.ui.containsModal(LEVELUP_DISPLAY))
-            client.clearOutgoing()
 
             advance()
+            assertTrue(player.ui.containsModal(LEVELUP_DISPLAY))
             assertEquals(emptyList<String>(), guideMessages())
+            client.clearOutgoing()
 
             advance()
             assertEquals(
@@ -61,8 +61,9 @@ class LevelUpGuideTest {
 
     @Test
     fun GameTestState.`opening the skills tab stops the flash`() =
-        runGameTest(LevelUpScript::class) {
+        runLevelUpTest {
             player.statAdvance("stat.attack", XP_TO_LEVEL_5, rate = 1.0, globalRate = 1.0)
+            it.onPostTick(player)
             advance()
             check(player.vars[FLASHSIDE] == 2)
 
@@ -76,23 +77,28 @@ class LevelUpGuideTest {
 
     @Test
     fun GameTestState.`an unread guide list keeps its earliest level`() =
-        runGameTest(LevelUpScript::class) {
+        runLevelUpTest {
             VarPlayerIntMapSetter.set(player, ATTACK_LIST, 3)
             player.statAdvance("stat.attack", XP_TO_LEVEL_5, rate = 1.0, globalRate = 1.0)
-            advance()
+            it.onPostTick(player)
             assertEquals(3, player.vars[ATTACK_LIST])
+            assertEquals(2, player.vars[FLASHSIDE])
         }
 
     @Test
     fun GameTestState.`level without unlocks sends no guide prompt`() =
-        runGameTest(LevelUpScript::class) {
+        runLevelUpTest {
             player.statAdvance("stat.attack", XP_TO_LEVEL_2, rate = 1.0, globalRate = 1.0)
+            it.onPostTick(player)
             repeat(4) { advance() }
             assertEquals(0, player.vars[ATTACK_LIST])
             assertEquals(0, player.vars[FLASHSIDE])
             assertEquals(emptyList<String>(), guideMessages())
             assertEquals(0, client.count { it is RunClientScript })
         }
+
+    private fun GameTestState.runLevelUpTest(testBody: GameTestScope.(LevelUpScript) -> Unit) =
+        runInjectedGameTest(LevelUpScript::class, null, LevelUpScript::class, testBody = testBody)
 
     private fun GameTestScope.guideMessages(): List<String> =
         client.filterIsInstance<MessageGame>().filter { it.type == LEVEL_UP_MESSAGE }.map { it.message }
