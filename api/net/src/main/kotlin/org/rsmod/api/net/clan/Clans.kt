@@ -118,7 +118,10 @@ constructor(
             response = { result ->
                 val clan = if (result.isOk()) result.value else null
                 if (clan == null || player !in sessions) {
-                    if (result.isOk()) VarPlayerIntMapSetter.set(player, AFFINITY_VARBIT, NO_CLAN)
+                    if (result.isOk()) {
+                        VarPlayerIntMapSetter.set(player, AFFINITY_VARBIT, NO_CLAN)
+                        VarPlayerIntMapSetter.set(player, HOME_WORLD_VARBIT, 0)
+                    }
                     return@request
                 }
                 attach(player, loaded[clan.id] ?: clan.also { loaded[it.id] = it })
@@ -132,10 +135,7 @@ constructor(
         clanOf[player] = clan
         sendSettingsFull(player, clan)
         VarPlayerIntMapSetter.set(player, AFFINITY_VARBIT, LOADED)
-        val homeWorld = clan.intSettings[HOME_WORLD_SETTING] ?: 0
-        if (homeWorld > 0) {
-            VarPlayerIntMapSetter.set(player, HOME_WORLD_VARBIT, homeWorld)
-        }
+        VarPlayerIntMapSetter.set(player, HOME_WORLD_VARBIT, clan.intSettings[HOME_WORLD_SETTING] ?: 0)
         val today = runeDay()
         val seen = player.vars[DISABLE_LAST_SEEN_VARBIT] == 0
         if (member.name != player.displayName || seen) {
@@ -304,6 +304,7 @@ constructor(
             player.client.write(ClanSettingsFull(CLAN_TYPE, ClanSettingsFull.LeaveUpdate))
             VarPlayerIntMapSetter.set(player, AFFINITY_VARBIT, NO_CLAN)
             VarPlayerIntMapSetter.set(player, CHANNEL_LEFT_VARBIT, 0)
+            VarPlayerIntMapSetter.set(player, HOME_WORLD_VARBIT, 0)
             eventBus.publish(ClanAccessChanged(player))
         }
         clan.members.removeAt(slot)
