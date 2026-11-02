@@ -140,7 +140,7 @@ def inventory(port):
     """LOGGED_IN when the inventory widget's slots show container 93's items, else FAILED naming both (an empty widget over
     a full container leaves every item_action unfound); waits until the logged-in client has built the widget's slots, and
     FAILED once TICKS game ticks pass without them (the server sent no inventory)."""
-    first = None
+    base = first = None
     while True:
         try:
             slots = json.loads(call(port, "get_widget", componentId=INVENTORY_ITEMS)).get("dynamicChildren") or []
@@ -149,8 +149,9 @@ def inventory(port):
         if slots:
             break
         if (t := tick(port)) is not None:
-            first = t if first is None or t < first else first   # a lower tick: the client counts again from a new login
-            if t - first >= TICKS:
+            base = t if base is None else base   # the newest event may be from an earlier login (the tick goes on across logins): count from the first one after it
+            first = t if first is None and t != base else first
+            if first is not None and t - first >= TICKS:
                 return f"FAILED: {TICKS} game ticks after LOGGED_IN the inventory widget has no slots: the server sent no inventory (container 93)"
         time.sleep(1)
     shown = {c["childIndex"]: (c["itemId"], c["itemQuantity"]) for c in slots if not c.get("selfHidden") and c.get("itemId", -1) > 0}
@@ -175,14 +176,22 @@ def keep(port, act, ready):
     """A run's desktop that is logged out (a disconnect, a server restart, any logout) is logged in again by act: it waits
     for LOGGED_IN, then for LOGIN_SCREEN, then logs in. A failed login is tried again once the server is ready after it
     (ready(since): a server that was down or restarting), and never while the same server refuses it; a login made by
-    another waits for the next logout. Ends when the endpoint is gone (the desktop stopped)."""
+    another waits for the next logout. A failed login that left the client logged in (no inventory) is logged out first:
+    it is tried again at once, the second time like any failure. Ends when the endpoint is gone (the desktop stopped)."""
     while True:
         wait(port, ("LOGGED_IN",)); wait(port, ("LOGIN_SCREEN",))
+        again = True
         while True:
             since = time.time()
             with locked(port):
                 r = act()
+                out = r != "LOGGED_IN" and state(port).get("gameState") == "LOGGED_IN" and logout(port)
             print(r, flush=True)
+            if out:
+                print(f"keep: logged in without the inventory, logged out ({out}): {'logs in again' if again else 'waits for the server to be ready again'}", flush=True)
+                if again:
+                    again = False
+                    continue
             while r != "LOGGED_IN" and not ready(since) and state(port).get("gameState") != "LOGGED_IN":
                 time.sleep(2)
             if r == "LOGGED_IN" or not ready(since):

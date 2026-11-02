@@ -564,7 +564,11 @@ class DesktopLogin(unittest.TestCase):
     def test_no_inventory_widget_ticks_after_logged_in_fails_not_hangs(s):  # sweep-43: LOGGED_IN, container 93 never arrived, the restart waited 20 min
         d, sent = s.fake(["LOGGED_IN"], widgets=[None])
         s.assertEqual(d.token(1), f"FAILED: {d.TICKS} game ticks after LOGGED_IN the inventory widget has no slots: the server sent no inventory (container 93)")
-        s.assertEqual(sum(n == "get_timeline" for n, _ in sent), d.TICKS + 1)
+        s.assertEqual(sum(n == "get_timeline" for n, _ in sent), d.TICKS + 2)   # the first read's event may be an earlier login's: counted from the next
+        coins = [{"childIndex": 0, "itemId": 995, "itemQuantity": 5, "selfHidden": False}]
+        d, _ = s.fake(["LOGGED_IN"], widgets=[None, None, None, coins], inv=[{"slot": 0, "itemId": 995, "quantity": 5}])
+        ticks = iter([5, 97, 98]); s.addCleanup(setattr, d, "tick", d.tick); d.tick = lambda port: next(ticks)
+        s.assertEqual(d.token(1), "LOGGED_IN")   # sweep-46: the tick goes on across logins (0 -> 5 -> 97); an earlier login's event at 5 is no start
 
     def test_a_refused_call_raises(s):  # press_key BACK_SPACE was refused as an unknown key and the login went on
         import desktop_login as d, io
@@ -618,8 +622,11 @@ class DesktopLogin(unittest.TestCase):
                 d.keep(1, lambda: acts.append(1) or next(results), lambda since: next(readies))
             return len(acts)
         s.assertEqual(run(["LOGIN_SCREEN", "LOGGED_IN", "LOADING", "LOGGED_IN", "LOGIN_SCREEN", "LOGGED_IN", "LOGIN_SCREEN"], ["LOGGED_IN"] * 2, []), 2)   # each logout
-        s.assertEqual(run(["LOGGED_IN", "LOGIN_SCREEN", "LOGIN_SCREEN", "LOGIN_SCREEN"], ["FAILED", "LOGGED_IN"], [False, False, True, True]), 2)   # the server was restarting: tried again once it is ready
+        s.assertEqual(run(["LOGGED_IN"] + ["LOGIN_SCREEN"] * 4, ["FAILED", "LOGGED_IN"], [False, False, True, True]), 2)   # the server was restarting: tried again once it is ready
         s.assertEqual(run(["LOGGED_IN", "LOGIN_SCREEN", "LOGIN_SCREEN", "LOGIN_SCREEN", "LOGGED_IN"], ["FAILED"], [False] * 9), 1)   # the same server refused it: no retry; another's login waits for the next logout
+        out = ["LOGGED_IN", "Logout", "LOGIN_SCREEN"]   # act's FAILED left it logged in (sweep-46: no inventory, the keeper then waited for a logout forever); the logout's call, its wait
+        s.assertEqual(run(["LOGGED_IN", "LOGIN_SCREEN"] + out, ["FAILED", "LOGGED_IN"], []), 2)   # logged out and in again at once
+        s.assertEqual(run(["LOGGED_IN", "LOGIN_SCREEN"] + out * 2 + ["LOGIN_SCREEN"] * 3, ["FAILED"] * 2, [False] * 9), 2)   # twice: it waits for the server like any failure
         up = SRC.split("\nup() {")[1].split("\n}")[0]; down = SRC.split("\ndown() {")[1].split("\n}")[0]
         s.assertGreater(up.index("keep \""), up.rindex('login "$(cut -d: -f2'))   # after up's own logout and login
         s.assertLess(down.index("unkeep"), down.index("desktops_remove"))   # down stops them first
