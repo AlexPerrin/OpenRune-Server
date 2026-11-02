@@ -46,7 +46,7 @@ build_locked() {
   if docker image inspect "or:$T" >/dev/null 2>&1; then echo "cached or:$T"; record true build <<< "cached"; return; fi
   n=1; while [ -e "$state/build-$T-$n.log" ]; do n=$((n + 1)); done; log=$state/build-$T-$n.log   # each attempt its own log (under the lock)
   if [ -d "$copy" ]; then git -C "$copy" reset -q --hard "$tc" && git -C "$copy" clean -fdq; else git -C "$repo" worktree add -q --detach "$copy" "$tc"; fi
-  [ -f "$copy/game.yml" ] || cp "$copy/game.example.yml" "$copy/game.yml"
+  cp "$copy/game.example.yml" "$copy/game.yml"   # every build renders T's config: game.yml is ignored, so clean keeps an older tree's
   if grep -q '\.m2-rsprot' "$copy/settings.gradle.kts"; then  # local/android pins an rsprot published only to the clone's .m2-rsprot
     [ -d "$repo/.m2-rsprot" ] || { echo "no $repo/.m2-rsprot: the tree pins a locally published rsprot" | tee "$log" | record false build; echo "build failed: $log"; return 1; }
     cp -a "$repo/.m2-rsprot" "$copy/"

@@ -168,6 +168,13 @@ class BuildAttempts(unittest.TestCase):
         s.assertIn("--init", next(l for l in c if "--name build-x" in l))         # the container's init takes the SIGTERM docker run proxies
         s.assertEqual(c[-1], "rm -f build-x")                                     # and the build removes its container as it ends
 
+    def test_an_image_holds_the_game_yml_of_its_tree(s):  # server-token-auth-17: or:2cdbf708b held an older tree's game.yml, kept by clean in the build copy
+        (s.root / "bin/docker").write_text('#!/bin/bash\ncase "$*" in "image inspect"*) exit 1;; *"--name build-x"*) while [ "$1" != -w ]; do shift; done; mkdir -p "$2/server/app/build/install/app" "$2/.data";; esac\n')
+        (s.repo / ".gitignore").write_text("game.yml\n"); git(s.repo, "add", "-A"); git(s.repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "i"); s.tc = git(s.repo, "rev-parse", "HEAD")   # upstream ignores game.yml
+        s.build(); (s.root / "repo/.worktrees/x-build/game.yml").write_text("old: tree\n")
+        r = s.build(); s.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        s.assertEqual((s.root / "repo/.worktrees/x-build/.image/game.yml").read_text(), "game: {}\n")
+
     def test_two_attempts_keep_two_logs_each_named_in_the_output(s):  # a deploy's retry overwrote the first attempt's log: its failure was gone
         outs = [s.build(), s.build()]
         T = git(s.repo, "rev-parse", f"{s.tc}^{{tree}}"); logs = [s.root / f"state/x/build-{T}-{n}.log" for n in (1, 2)]
