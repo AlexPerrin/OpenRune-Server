@@ -4,6 +4,8 @@ from pathlib import Path
 SUITE_TMP = tempfile.TemporaryDirectory(prefix="tools-suite-", ignore_cleanup_errors=True)   # every temp dir of these tests and of each process they
 tempfile.tempdir = os.environ["TMPDIR"] = SUITE_TMP.name                          # start (mktemp) is under it, removed at the end, a failed test's too
 
+for k in ("SLUG", "HEAD", "T", "G", "TCOMMIT", "BASE", "EVIDENCE", "BUILD", "CLONE", "TRACK", "PUBLIC_BRANCH", "PR", "PINS", "HD_ROOT", "CENTRAL", "TOOLS", "NAMES", "ROWS", "TOOLS_ROOT", "TOOLS_SRC"):
+    os.environ.pop(k, None)   # hd's env of the gate that runs these tests is not the tests': a T it set named every build log
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 SRC = "\n".join((HERE.parent / f).read_text() for f in ("track.sh", "build/build.sh", "gate/gate.sh"))   # the track script and the code a build and a gate run
