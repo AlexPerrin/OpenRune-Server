@@ -65,6 +65,21 @@ class ClanItemTransactionsTest {
         assertEquals(1, f.count(ClanItem.Cloak))
     }
 
+    @Test
+    fun `a motif change recolours each copy in place and keeps the totals`() {
+        val f = Fixture()
+        assertTrue(f.take(ClanItem.Cloak))
+        assertTrue(f.take(ClanItem.Vexillum))
+        f.clan.intSettings[OUTFIT] = (RED + 1) shl 20
+        repeat(2) {
+            f.player.recolourClanItems(f.clan)
+            assertEquals(1, f.player.inv.count(ClanItem.Cloak.objs[RED]))
+            assertEquals(1, f.player.inv.count(ClanItem.Vexillum.objs[RED]))
+            assertEquals(1, f.count(ClanItem.Cloak))
+            assertEquals(1, f.count(ClanItem.Vexillum))
+        }
+    }
+
     private class Fixture {
         val clan = Clan(1, "Test", 0, 0)
         val player =
@@ -77,6 +92,7 @@ class ClanItemTransactionsTest {
                 currentMapClock = 100
                 processedMapClock = 100
                 inv = inventory("inv.inv", INV_SIZE)
+                worn = inventory("inv.worn", WORN_SIZE)
             }
         private val access =
             ProtectedAccess(
@@ -110,6 +126,9 @@ class ClanItemTransactionsTest {
 
     companion object {
         private const val INV_SIZE = 28
+        private const val WORN_SIZE = 14
+        private const val OUTFIT = 11
+        private const val RED = 3
         private const val FILLER = "obj.bronze_dagger"
         private val restored = mutableListOf<() -> Unit>()
 
