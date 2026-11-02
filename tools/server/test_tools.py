@@ -463,6 +463,13 @@ class DesktopInstance(unittest.TestCase):
         src = (HERE / "OsrsTestLauncher.java").read_text()
         s.assertIn("catch (Throwable e)", src); s.assertIn('die("launcher failed: " + e)', src)   # the launcher exits on any start exception
 
+    def test_a_desktop_whose_devtools_plugin_cannot_bind_fails_up_with_the_bind_error(s):  # server-clan-guest-3: the client lived on without its endpoint on 7790 and up waited forever
+        java = s.t / "desk/jdk/bin/java.exe"
+        java.write_text(f'#!/bin/bash\necho "$$ OsrsTestLauncher $*" > {s.t}/win/$$.jvm; mkdir -p home/.runelite/logs; printf "ERROR Failed to start MCP server on port 7780; pick a free port\\njava.net.BindException: Address already in use\\n\\tat x\\n" > home/.runelite/logs/client.log; exec sleep 30\n')
+        p = s.sh("a", "desktop_start", stderr=subprocess.PIPE)
+        err = p.communicate(timeout=60)[1]
+        s.assertEqual(p.returncode, 1); s.assertIn("could not bind 7780", err); s.assertIn("BindException: Address already in use", err); s.assertNotIn("at x", err)
+
     def test_the_desktop_takes_jav_config_from_openrune_endpoint_alone(s):  # the user's word: one variable points every Jagex endpoint at our server
         java = s.t / "desk/jdk/bin/java.exe"
         java.write_text(java.read_text().replace("#!/bin/bash\n", f'#!/bin/bash\necho "$OPENRUNE_ENDPOINT $WSLENV" > {s.t}/env; ', 1))   # before its port: desktop_start returns once the port answers

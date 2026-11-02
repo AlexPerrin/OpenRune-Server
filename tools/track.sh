@@ -88,7 +88,7 @@ marked() { "$desk/jdk/bin/jps.exe" -v | tr -d '\r' | awk -v m="-Dosrstest.marker
 # moved up by skip_base + N-1. Every JVM of instance N carries -Dosrstest.marker=osrs-test-runN;
 # nothing without it is ever stopped (the user's own RuneLite). down stops and removes the instances its slug owns.
 desktop_start() {  # sets inst dt (desktopN, its devtools port)
-  local i d dp w t l o busy ex base ep p
+  local i d dp w t l o busy ex base ep p b
   need "$sys32/netstat.exe" WINDOWS_SYSTEM32; need "$sys32/netsh.exe" WINDOWS_SYSTEM32; need "$sys32/robocopy.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/java.exe" DESKTOP_DIR; need "$desk/jdk/bin/jps.exe" DESKTOP_DIR; [ -f "$desk/home/.rlcustom/settings.properties" ] || { echo "no staged home in $desk/home" >&2; return 1; }
   mkdir -p "$desk/run"; until busy=$(tcp); do sleep 1; done; busy=$(cut -d' ' -f1 <<< "$busy")
   until ex=$(timeout 20 "$sys32/netsh.exe" interface ipv4 show excludedportrange protocol=tcp); do sleep 1; done
@@ -132,8 +132,10 @@ desktop_start() {  # sets inst dt (desktopN, its devtools port)
     exec setsid "$desk/jdk/bin/java.exe" "-Dosrstest.marker=osrs-test-run$i" "-Dosrstest.portskip=$((base + i - 1))" "-Dosrstest.target=OpenRune Test - $slug" \
     "-Dosrstest.token=${tok:-false}" -cp "$t\\rsprox\\$l;$t\\rsprox\\lib\\*" OsrsTestLauncher) < /dev/null > "$state/desktop$i.log" 2>&1 &   # nothing may hold the caller's pipe
   w=$!
-  until tcp | grep -q "^$dp "; do   # the devtools endpoint answers, or the desktop died
+  until tcp | grep -q "^$dp "; do   # the devtools endpoint answers, the desktop died, or its plugin could not bind the port (the client lives on without it)
     kill -0 "$w" 2>/dev/null || { echo "desktop $i exited: $(grep -m1 -E 'REFUSING|Exception' "$state/desktop$i.log" || tail -3 "$state/desktop$i.log")" >&2; return 1; }
+    b=$(grep -m1 -A1 "Failed to start MCP server on port $dp" "$d/home/.runelite/logs/client.log" 2>/dev/null | tr '\n' ' ') || true   # logs/ is never copied into a claim: the line is this start's
+    [ -z "$b" ] || { echo "desktop $i: its devtools plugin could not bind $dp: $b" >&2; return 1; }
     for p in $(marked "$i" | cut -d' ' -f1); do winpid "$p" "java.exe"; done; sleep 2
   done
   for p in $(marked "$i" | cut -d' ' -f1); do winpid "$p" "java.exe"; done
