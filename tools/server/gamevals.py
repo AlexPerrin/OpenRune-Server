@@ -4,10 +4,12 @@ open dev head.
   gamevals.py check [<ref>]      ids of <ref> (default $TCOMMIT) that another member holds under another name; exit 1 if any.
                                  Upstream main never renumbers; between two of ours the earlier taker keeps the id.
   gamevals.py assign <worktree>  every `name = -1` in <worktree> gets the highest id free in every member.
-Env: CLONE (the fork clone, remotes origin = upstream and fork), PINS (fork branches, space-separated), SLUG.
+Env: CLONE (the fork clone, remotes origin = upstream and fork), HD_ROOT (the harness: its hd.yaml `pins`), SLUG.
+The pins are read from hd.yaml, so a hand-run assign and the gate's check see one member list.
 The official ids are the cache's (.data/gamevals-binary/max-ids.toml); every id above a table's max is ours.
 """
 import os, re, subprocess, sys
+import yaml
 from collections import defaultdict
 
 SECTION = re.compile(r"^\s*\[gamevals\.([^.\]]+)\]\s*$")
@@ -57,7 +59,8 @@ def ids(ref, mx):
 
 def members():
     own = f"dev/{os.environ.get('SLUG', '')}"
-    out = [("upstream main", "origin/main")] + [(p, f"fork/{p}") for p in os.environ.get("PINS", "").split()]
+    cfg = os.path.join(os.environ.get("HD_ROOT") or os.path.expanduser("~/osrs-harness"), "hd.yaml")
+    out = [("upstream main", "origin/main")] + [(p, f"fork/{p}") for p in yaml.safe_load(open(cfg)).get("pins") or []]
     for r in git("for-each-ref", "--format=%(refname:short)", "refs/remotes/fork/dev/").split():
         b = r[len("fork/"):]
         if b != own and subprocess.run(["git", "-C", CLONE, "merge-base", "--is-ancestor", r, "origin/main"]).returncode:

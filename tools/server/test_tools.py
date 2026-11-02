@@ -609,10 +609,12 @@ class Repo(unittest.TestCase):
         s.commit("feat: base")
         git(s.repo, "update-ref", "refs/remotes/origin/main", "HEAD")
         s.base = git(s.repo, "rev-parse", "HEAD")
-        s.env = {"CLONE": s.repo, "PINS": "x", "SLUG": "s1", "BASE": s.base}
+        s.hd = tempfile.mkdtemp()
+        Path(s.hd, "hd.yaml").write_text("pins:\n  - x\n")   # the pins come from hd.yaml alone, never the env
+        s.env = {"CLONE": s.repo, "HD_ROOT": s.hd, "SLUG": "s1", "BASE": s.base}
 
     def tearDown(s):
-        shutil.rmtree(s.repo, ignore_errors=True)
+        shutil.rmtree(s.repo, ignore_errors=True); shutil.rmtree(s.hd, ignore_errors=True)
 
     def write(s, path, text):
         p = Path(s.repo) / path

@@ -39,7 +39,7 @@ name it in the PR notes as unsourced.
 
 ## Gameval ids
 Use the official id when the cache has one (`gameval_search`). For new state write `name = -1`, run
-`tools/server/gamevals.py assign <clone>` (the highest id free in upstream main, every pin and every open dev head)
+`tools/server/gamevals.py assign <clone>` (the highest id free in upstream main, every pin of hd.yaml and every open dev head)
 and push at once. The gate runs `gamevals.py check`: of two branches holding one id under two names, the later taker
 renumbers.
 

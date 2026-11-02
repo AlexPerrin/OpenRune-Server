@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tools/track.sh <verb> <slug> [arg]: the server track (docs/ARCHITECTURE.md of osrs-harness). Env from hd: SLUG HEAD T
-# TCOMMIT BASE CLONE EVIDENCE PINS HD_ROOT CENTRAL G (HEADS NAMES for ship). build and tree are tools/build/build.sh's (the code a
+# TCOMMIT BASE CLONE EVIDENCE HD_ROOT CENTRAL G (HEADS NAMES for ship). build and tree are tools/build/build.sh's (the code a
 # build runs, keyed alone), test, spotless, gate, gate-ci and ci-step tools/gate/gate.sh's (the code a gate runs). Verbs:
 #   up [N]            server-<slug> and http-<slug> from or:<T> on the change's ports (quest mode: QUEST_MODE, else the change's front
 #                     matter quest-mode, else respect-progress; or assume-completed), N desktops logged in,
