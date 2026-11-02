@@ -651,7 +651,6 @@ class ClanScript @Inject constructor(private val clans: Clans, private val event
 
     private fun Clan.permission(permission: Int): Int = permissionRank(permission)
 
-
     private fun Player.setVar(name: String, value: Int) = VarPlayerIntMapSetter.set(this, name, value)
 
     private fun String.script(): Int = asRSCM(RSCMType.CLIENTSCRIPT)
@@ -687,6 +686,7 @@ internal fun Clan.permissionRank(permission: Int): Int {
         else -> intSettings[setting]?.minus(2) ?: ClanRank.OWNER
     }
 }
+
 internal fun Player.totalLevel(): Int =
     ServerCacheManager.getStats().values.sumOf {
         val stat = dev.openrune.rscm.RSCM.getReverseMapping(RSCMType.STAT, it.id)
