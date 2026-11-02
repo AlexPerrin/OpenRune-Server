@@ -82,11 +82,12 @@ winpid() { local sl; sl=$(grep -o 'hd-[^/]*\.slice' /proc/self/cgroup) || return
 marked() { "$desk/jdk/bin/jps.exe" -v | tr -d '\r' | awk -v m="-Dosrstest.marker=osrs-test-run$1" '{for (f = 3; f <= NF; f++) if ($f == m) {print $1, $2; next}}'; }   # "<Windows PID> <main class>" of instance N's JVMs: only desktop_start sets the marker
 # The desktops: each up creates its own instances. DESKTOP_DIR is the template (JDK, RSProx and its launcher, a staged
 # home); instance N is the dir DESKTOP_DIR/run/N, claimed by its mkdir and naming its up's slug in run/N/owner, with its
-# own home copied from the template's (devtools plugin: the live client's build), devtools port 7779+N and RSProx ports
+# own home copied from the template's (devtools plugin: the live client's build), devtools port 7779+N answering only the up's
+# token (up.json "token", sent as Authorization: Bearer <token>) and RSProx ports
 # moved up by skip_base + N-1. Every JVM of instance N carries -Dosrstest.marker=osrs-test-runN;
 # nothing without it is ever stopped (the user's own RuneLite). down stops and removes the instances its slug owns.
 desktop_start() {  # sets inst dt (desktopN, its devtools port)
-  local i d dp w t l busy ex base ep p
+  local i d dp w t l o busy ex base ep p
   need "$sys32/netstat.exe" WINDOWS_SYSTEM32; need "$sys32/netsh.exe" WINDOWS_SYSTEM32; need "$sys32/robocopy.exe" WINDOWS_SYSTEM32; need "$desk/jdk/bin/java.exe" DESKTOP_DIR; need "$desk/jdk/bin/jps.exe" DESKTOP_DIR; [ -f "$desk/home/.rlcustom/settings.properties" ] || { echo "no staged home in $desk/home" >&2; return 1; }
   mkdir -p "$desk/run"; until busy=$(tcp); do sleep 1; done; busy=$(cut -d' ' -f1 <<< "$busy")
   until ex=$(timeout 20 "$sys32/netsh.exe" interface ipv4 show excludedportrange protocol=tcp); do sleep 1; done
@@ -108,11 +109,19 @@ desktop_start() {  # sets inst dt (desktopN, its devtools port)
   [ -f "$desk/rsprox/$l/OsrsTestLauncher.class" ] || { rm -rf "$desk/rsprox/$l.$$" && mkdir -p "$desk/rsprox/$l.$$" \
     && "$desk/jdk/bin/javac.exe" -nowarn -cp "$t\\rsprox\\lib\\*" -d "$t\\rsprox\\$l.$$" "$(wslpath -w "$self/server/OsrsTestLauncher.java")" >&2 \
     && { mv -T "$desk/rsprox/$l.$$" "$desk/rsprox/$l" 2>/dev/null || rm -rf "$desk/rsprox/$l.$$"; }; }   # a concurrent up may have placed it first
-  jx=JAVA_TOOL_OPTIONS:OPENRUNE_ENDPOINT; jo=
+  o=owner-$(sha1sum < "$self/server/DevtoolsOwner.java" | cut -c1-12)   # the endpoint's owner check, its jar built once into the template
+  [ -f "$desk/rsprox/$o.jar" ] || { rm -rf "$desk/rsprox/$o.$$" && mkdir -p "$desk/rsprox/$o.$$/c" && printf 'Premain-Class: DevtoolsOwner\n' > "$desk/rsprox/$o.$$/m" \
+    && "$desk/jdk/bin/javac.exe" -nowarn --add-exports jdk.httpserver/sun.net.httpserver=ALL-UNNAMED -d "$t\\rsprox\\$o.$$\\c" "$(wslpath -w "$self/server/DevtoolsOwner.java")" >&2 \
+    && "$desk/jdk/bin/jar.exe" cfm "$t\\rsprox\\$o.$$\\o.jar" "$t\\rsprox\\$o.$$\\m" -C "$t\\rsprox\\$o.$$\\c" . \
+    && mv -f "$desk/rsprox/$o.$$/o.jar" "$desk/rsprox/$o.jar"; rm -rf "$desk/rsprox/$o.$$"; }   # a concurrent up may have placed the same jar first
+  [ -f "$desk/rsprox/$o.jar" ] || { echo "no devtools owner check $desk/rsprox/$o.jar" >&2; return 1; }
+  # every JVM of the instance: the devtools endpoint on $dp answers only a request carrying this up's token (server/DevtoolsOwner.java)
+  jo=" -javaagent:$t\\rsprox\\$o.jar -Dcom.sun.net.httpserver.HttpServerProvider=DevtoolsOwner --add-exports=jdk.httpserver/sun.net.httpserver=ALL-UNNAMED -Dosrstest.devtools=$dp:$devtoken"
+  jx=JAVA_TOOL_OPTIONS:OPENRUNE_ENDPOINT
   if [ -n "${tok:-}" ]; then  # the client's Jagex session variables; the JDK's CAs plus the issuer's certificate (RSProx fetches RuneLite over public https)
     jx+=:JX_SESSION_ID:JX_CHARACTER_ID:JX_DISPLAY_NAME; cp "$desk/jdk/lib/security/cacerts" "$d/home/token-trust.p12"; cp "$state/token/tls.pem" "$d/home/token-tls.pem"
     "$desk/jdk/bin/keytool.exe" -importcert -noprompt -alias harness-issuer -storepass changeit -keystore "$w\\home\\token-trust.p12" -file "$w\\home\\token-tls.pem" >/dev/null
-    jo=" -Djavax.net.ssl.trustStore=$w\\home\\token-trust.p12 -Djavax.net.ssl.trustStorePassword=changeit"
+    jo+=" -Djavax.net.ssl.trustStore=$w\\home\\token-trust.p12 -Djavax.net.ssl.trustStorePassword=changeit"
   fi
   (cd "$d" && JAVA_TOOL_OPTIONS="-Duser.home=$w\\home -Dosrstest.marker=osrs-test-run$i$jo" WSLENV=${WSLENV:+$WSLENV:}$jx \
     OPENRUNE_ENDPOINT=$ep JX_SESSION_ID=harness JX_CHARACTER_ID=1 JX_DISPLAY_NAME="$(account 1)" \
@@ -178,11 +187,11 @@ up() {
   if [ -n "$(sql "update realms set dev_mode = 0, player_xp_rate_in_hundreds = 100, global_xp_rate_in_hundreds = 100 where dev_mode <> 0 or player_xp_rate_in_hundreds <> 100 or global_xp_rate_in_hundreds <> 100 returning 1")" ]; then since=$(date -u +%FT%TZ); docker restart "server-$slug" >/dev/null; ready "server-$slug" "$since"; fi
   python3 "$self/server/javcheck.py" "http://127.0.0.1:$http/jav_config.ws"   # no desktop is pointed at a foreign host
   modulus=$(openssl rsa -in "$state/key/game.key" -noout -modulus | cut -d= -f2 | tr A-F a-f)
-  desktops=(); accounts=()
+  desktops=(); accounts=(); devtoken=$(openssl rand -hex 16)   # the up's devtools token: its desktops' endpoints answer no other caller (desktop_start)
   for i in $(seq 1 "$n"); do
     desktop_start
     desktops+=("$inst:$dt"); accounts+=("$(account "$i")")
-    printf '{"game": %s, "http": %s, "desktops": "%s", "accounts": "%s"}\n' "$game" "$http" "${desktops[*]}" "${accounts[*]}" | atomic "$state/up.json"   # before the login: restart and the devtools tools find each desktop
+    printf '{"game": %s, "http": %s, "desktops": "%s", "accounts": "%s", "token": "%s"}\n' "$game" "$http" "${desktops[*]}" "${accounts[*]}" "$devtoken" | atomic "$state/up.json"   # before the login: restart and the devtools tools find each desktop
     login "$dt" "$(account "$i")"      # creates the account on first login; prints LOGGED_IN or FAILED: reason
   done
   # members and rights are read at login and members written by the save at logout: log out, wait until no character of this up is online, update, log in

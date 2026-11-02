@@ -91,7 +91,9 @@ One up, restart or down of a slug runs at a time (`state/<slug>/desktops.lock`):
 reservation of the Linux ephemeral range, which moves each boot, and Windows' excluded port ranges), and a launcher whose
 start throws exits, so up fails with its exception. Every JVM
 of instance N carries `-Dosrstest.marker=osrs-test-runN`, and only such a JVM is ever stopped (never the user's own
-RuneLite). up lists each desktop in `up.json` (field `desktops`: `desktopN:port`) before its login; `down` stops the
+RuneLite). up lists each desktop in `up.json` (field `desktops`: `desktopN:port`) before its login, with the up's `token`:
+each desktop's devtools endpoint answers only a request carrying `Authorization: Bearer <token>` (server/DevtoolsOwner.java,
+loaded into every JVM of the instance), so a script that calls it directly sends its own change's token; `down` stops the
 JVMs of every instance its slug owns until none is alive and none holds a file (jps can miss a live one), then removes those instances, each owner file last so a failed down re-runs; each JVM up starts is recorded, its Windows pid and image, in `state/winpids/<the run's slice>/` of osrs-harness, which ends it with the run, and down drops the record of each JVM it stops; The server logs out a desktop that sends no input
 for a while, as live does: a script that only reads (a sampler) presses a key now and then, and reads `gameState`
 from `get_client_state`; the `osrs-devtools-desktop` answers name a session that dropped. A dropped desktop logs in

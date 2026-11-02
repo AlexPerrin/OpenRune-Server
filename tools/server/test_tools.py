@@ -1,5 +1,6 @@
 """The contract's script rows against a throwaway git repo: python3 -m unittest tools/server/test_tools.py"""
 import json, os, shutil, subprocess, sys, tempfile, threading, unittest
+from unittest import mock
 from pathlib import Path
 SUITE_TMP = tempfile.TemporaryDirectory(prefix="tools-suite-", ignore_cleanup_errors=True)   # every temp dir of these tests and of each process they
 tempfile.tempdir = os.environ["TMPDIR"] = SUITE_TMP.name                          # start (mktemp) is under it, removed at the end, a failed test's too
@@ -336,8 +337,9 @@ class DesktopInstance(unittest.TestCase):
         exe(t / "bin/wslpath", 'sleep 0.5; echo "$2"\n')   # widens the window between picking an instance and claiming it
         d = t / "desk"; (d / "home/.rsprox").mkdir(parents=True); (d / "home/.rlcustom/profiles2").mkdir(parents=True); (d / "jdk/bin").mkdir(parents=True)
         (d / "home/.rlcustom/settings.properties").write_text("a=1\n"); (d / "home/.rlcustom/profiles2/p.properties").write_text("openrunedevtools.port=7780\n")
-        exe(d / "jdk/bin/java.exe", f'echo "$$ OsrsTestLauncher $*" > {t}/win/$$.jvm; echo $((7779 + ${{1##*run}})) > {t}/win/$$.port; pwd > {t}/win/$$.dir; mkdir held; touch held/f; chmod 555 held; exec sleep 30\n')   # a live JVM holds its files
+        exe(d / "jdk/bin/java.exe", f'echo "$$ OsrsTestLauncher $*" > {t}/win/$$.jvm; echo "$JAVA_TOOL_OPTIONS" > {t}/win/$$.opts; echo $((7779 + ${{1##*run}})) > {t}/win/$$.port; pwd > {t}/win/$$.dir; mkdir held; touch held/f; chmod 555 held; exec sleep 30\n')   # a live JVM holds its files
         exe(d / "jdk/bin/javac.exe", f'echo "$*" >> {t}/javac; touch "${{5//\\\\//}}/OsrsTestLauncher.class"\n')
+        exe(d / "jdk/bin/jar.exe", f'echo "$*" >> {t}/jar; touch "${{2//\\\\//}}"\n')
         exe(d / "jdk/bin/jps.exe", f'for f in {t}/win/*.jvm; do [ -e "$f" ] || continue; if [ -e "${{f%.jvm}}.flaky" ]; then rm "${{f%.jvm}}.flaky"; echo "${{f##*/}} -- process information unavailable"; else cat "$f"; fi; done\n')
         (t / "devtools.jar").write_text("jar")
         src = SRC
@@ -354,7 +356,7 @@ class DesktopInstance(unittest.TestCase):
         if port: (s.t / f"win/{pid}.port").write_text(f"{port}\n")
 
     def sh(s, slug, body, **kw):
-        return subprocess.Popen(["bash", "-c", f"set -euo pipefail; root={s.t}; slug={slug}; self={HERE.parent}; state={s.t}/state/{slug}; mkdir -p $state; http=1; game=2; modulus=3; jar={s.t}/devtools.jar\n{s.fns}\n{body}"], stdout=subprocess.PIPE, text=True, env=s.env, **kw)
+        return subprocess.Popen(["bash", "-c", f"set -euo pipefail; root={s.t}; slug={slug}; self={HERE.parent}; state={s.t}/state/{slug}; mkdir -p $state; http=1; game=2; modulus=3; jar={s.t}/devtools.jar; devtoken=tk\n{s.fns}\n{body}"], stdout=subprocess.PIPE, text=True, env=s.env, **kw)
 
     def killed(s):
         return sorted((s.t / "killed").read_text().split()) if (s.t / "killed").exists() else []
@@ -368,6 +370,10 @@ class DesktopInstance(unittest.TestCase):
             s.assertEqual((s.t / f"desk/run/{n}/home/.rlcustom/profiles2/p.properties").read_text(), f"openrunedevtools.port={port}\n")
             s.assertTrue((s.t / f"desk/run/{n}/home/.rlcustom/sideloaded-plugins/OpenRune-Developer-Tools.jar").exists())
         owners = [(s.t / "desk/run" / g[len("desktop"):].split(":")[0] / "owner").read_text().split() for g in got]
+        opts = [f.read_text() for f in s.t.glob("win/*.opts")]
+        s.assertEqual(sorted(o.split("-Dosrstest.devtools=")[1].split()[0] for o in opts), sorted(g.split(":")[1] + ":tk" for g in got))   # each desktop's endpoint answers its up's token alone
+        s.assertTrue(all("-javaagent:" in o and "HttpServerProvider=DevtoolsOwner" in o for o in opts))
+        s.assertEqual(len(list(s.t.glob("desk/rsprox/owner-*.jar"))), 1)   # the owner check's jar in the template, the same for every up
         s.assertEqual(sorted(o[0] for o in owners), ["s0", "s0", "s1", "s1", "s2", "s2"]); s.assertEqual(len({o[1] for o in owners}), 6)   # each claim its own: a process that started on one never acts on the next
 
     def test_one_up_restart_or_down_of_a_slug_at_a_time(s):  # sweep-42: three overlapping ups and downs of server-clan-channels-4 left a login on an instance it no longer owned
@@ -406,7 +412,7 @@ class DesktopInstance(unittest.TestCase):
     @unittest.skipUnless(shutil.which("systemd-run") and subprocess.run(["systemctl", "--user", "is-system-running"], capture_output=True).stdout.strip() in (b"running", b"degraded"), "no systemd user manager")
     def test_each_desktop_jvm_is_recorded_under_the_runs_slice_until_down(s):  # osrs-harness R5: a run's end stops its Linux processes; a Windows JVM outlives them
         sl = f"hd-t{os.getpid()}.slice"
-        p = subprocess.Popen(["systemd-run", "--user", "--scope", "-q", f"--slice={sl}", "bash", "-c", f"set -euo pipefail; root={s.t}; slug=a; self={HERE.parent}; state={s.t}/state/a; mkdir -p $state; http=1; game=2; modulus=3; jar={s.t}/devtools.jar\n{s.fns}\ndesktop_start"], env=s.env)
+        p = subprocess.Popen(["systemd-run", "--user", "--scope", "-q", f"--slice={sl}", "bash", "-c", f"set -euo pipefail; root={s.t}; slug=a; self={HERE.parent}; state={s.t}/state/a; mkdir -p $state; http=1; game=2; modulus=3; jar={s.t}/devtools.jar; devtoken=tk\n{s.fns}\ndesktop_start"], env=s.env)
         p.wait(timeout=60)
         mine = sorted(f.stem for f in s.t.glob("win/*.jvm"))
         s.assertEqual((p.returncode, sorted(f.name for f in (s.t / "state/winpids" / sl).iterdir())), (0, mine))
@@ -473,6 +479,41 @@ class DesktopInstance(unittest.TestCase):
         up = SRC.split("\nup() {")[1].split("\n}")[0]
         s.assertLess(up.index('| atomic "$state/up.json"'), up.index('login "$dt"'))
         s.assertLess(up.index("down >/dev/null"), up.index("desktop_start"))
+
+
+@unittest.skipUnless(shutil.which("javac") and shutil.which("jar"), "no JDK")
+class DevtoolsOwner(unittest.TestCase):
+    def test_the_endpoint_answers_only_its_ups_token(s):  # sweep-43: a run's helper with a default port drove another run's desktop on 7780
+        import socket, urllib.error, urllib.request
+        t = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, t, True); (t / "c").mkdir(); (t / "app").mkdir()
+        (t / "Plug.java").write_text("""import com.sun.net.httpserver.HttpServer; import java.net.*;
+public class Plug { public static void main(String[] a) throws Exception {   // as the devtools plugin binds its endpoint
+  for (String p : a) { HttpServer s = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), Integer.parseInt(p)), 0);
+    s.createContext("/mcp", x -> { byte[] b = "{}".getBytes(); x.sendResponseHeaders(200, b.length); x.getResponseBody().write(b); x.close(); }); s.start(); }
+  System.out.println("up"); System.out.flush(); Thread.sleep(60000); System.exit(0); } }""")
+        subprocess.run(["javac", "-nowarn", "--add-exports", "jdk.httpserver/sun.net.httpserver=ALL-UNNAMED", "-d", str(t / "c"), str(HERE / "DevtoolsOwner.java")], check=True)
+        subprocess.run(["javac", "-d", str(t / "app"), str(t / "Plug.java")], check=True)
+        (t / "m").write_text("Premain-Class: DevtoolsOwner\n"); subprocess.run(["jar", "cfm", str(t / "o.jar"), str(t / "m"), "-C", str(t / "c"), "."], check=True)
+        ports = []
+        for _ in range(2):
+            with socket.socket() as k: k.bind(("127.0.0.1", 0)); ports.append(k.getsockname()[1])
+        opts = f"-javaagent:{t / 'o.jar'} -Dcom.sun.net.httpserver.HttpServerProvider=DevtoolsOwner --add-exports=jdk.httpserver/sun.net.httpserver=ALL-UNNAMED -Dosrstest.devtools={ports[0]}:tk"
+        p = subprocess.Popen(["java", "-cp", str(t / "app"), "Plug", *map(str, ports)], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, env={**os.environ, "JAVA_TOOL_OPTIONS": opts})
+        s.addCleanup(p.stdout.close); s.addCleanup(p.wait); s.addCleanup(p.kill); s.assertEqual(p.stdout.readline().strip(), "up")
+        def code(port, auth=None):
+            try:
+                with urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{port}/mcp", b"{}", {"Authorization": auth} if auth else {}), timeout=10) as r:
+                    return r.status
+            except urllib.error.HTTPError as e:
+                return e.code
+        s.assertEqual([code(ports[0]), code(ports[0], "Bearer other"), code(ports[0], "Bearer tk"), code(ports[1])], [401, 401, 200, 200])   # another port is the JDK's own
+
+    def test_a_login_sends_the_token_of_the_up_owning_the_port(s):
+        import desktop_login as d
+        t = Path(tempfile.mkdtemp()); s.addCleanup(shutil.rmtree, t); (t / "run/2").mkdir(parents=True); (t / "state/a").mkdir(parents=True)
+        (t / "run/2/owner").write_text("a 1-2\n"); (t / "state/a/up.json").write_text(json.dumps({"desktops": "desktop2:7781", "token": "tk"}))
+        with mock.patch.dict(os.environ, {"DESKTOP_DIR": str(t), "HD_ROOT": str(t)}):
+            s.assertEqual((d.devtoken(7781), d.devtoken(7782)), ("tk", ""))
 
 
 class DesktopLogin(unittest.TestCase):

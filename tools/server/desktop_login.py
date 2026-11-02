@@ -4,7 +4,7 @@ client in, by its login form or (token) by the token login its Jagex session var
 FAILED: <reason>; LOGGED_IN only once the inventory widget shows container 93, FAILED when TICKS game ticks pass with no slot in it), or out through the logout tab's button (prints LOGIN_SCREEN) through its devtools endpoint; keep: logs it in again after each logout, until the desktop is gone. Keys only:
 the login screen's place on the canvas changes with the window, so no point on it is clicked. It acts only on the instance
 that owns the port when it starts (DESKTOP_DIR/run/<port - 7779>/owner, its up's slug and claim): no call is sent once that
-instance changes hands, and keep ends then.
+instance changes hands, and keep ends then. Each call carries that up's devtools token (its up.json), which the endpoint requires.
 """
 import contextlib, fcntl, json, os, subprocess, sys, tempfile, time, urllib.error, urllib.request
 
@@ -33,9 +33,18 @@ def owner(port):  # the text of the owner file of the instance on that devtools 
         return None
 
 
+def devtoken(port):  # the devtools token of the up owning the instance on that port (its state/<slug>/up.json): the endpoint answers no other caller
+    try:
+        with open(f"{os.environ.get('HD_ROOT', os.path.expanduser('~/osrs-harness'))}/state/{(owner(port) or '').split(' ')[0]}/up.json") as f:
+            return json.load(f).get("token", "")
+    except (OSError, ValueError):
+        return ""
+
+
 def call(port, name, **args):
     req = urllib.request.Request(f"http://127.0.0.1:{port}/mcp", json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-                                 "params": {"name": name, "arguments": args}}).encode(), {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"})
+                                 "params": {"name": name, "arguments": args}}).encode(), {"Content-Type": "application/json", "Accept": "application/json, text/event-stream",
+                                 "Authorization": f"Bearer {devtoken(port)}"})
     while True:
         if claim is not None and owner(port) != claim:
             raise Gone(f"the instance on {port} changed hands")
