@@ -62,24 +62,55 @@ private constructor(
         responseHandler: GameLoginResponseHandler<Player>,
         block: LoginBlock<AuthenticationType>,
     ) {
+        val auth = block.authentication
+        val tokenLogin =
+            (auth as? AuthenticationType.TokenAuthentication)?.let {
+                val verified = tokenVerifier?.verify(it.token.asString())
+                it.token.clear()
+                verified
+            }
+        val logTokenRefusal = tokenLogin?.let { token -> { cause: Any -> logger.info { token.refused(cause) } } }
+
+        fun refuse(response: LoginResponse, cause: Any = response) {
+            logTokenRefusal?.invoke(cause)
+            responseHandler.writeFailedResponse(response)
+        }
+
         if (!scriptBootGate.isReady()) {
-            responseHandler.writeFailedResponse(LoginResponse.LoginServerOffline)
+            refuse(LoginResponse.LoginServerOffline)
             return
         }
 
         if (accountManager.isLoaderShuttingDown()) {
-            responseHandler.writeFailedResponse(LoginResponse.LoginServerOffline)
+            refuse(LoginResponse.LoginServerOffline)
             return
         }
 
         if (accountManager.isLoaderRejectingRequests()) {
-            responseHandler.writeFailedResponse(LoginResponse.LoginServerNoReply)
+            refuse(LoginResponse.LoginServerNoReply)
             return
         }
 
-        when (val auth = block.authentication) {
+        when (auth) {
             is AuthenticationType.PasswordAuthentication -> passLogin(responseHandler, block, auth)
-            is AuthenticationType.TokenAuthentication -> tokenLogin(responseHandler, block, auth)
+            is AuthenticationType.TokenAuthentication ->
+                when {
+                    tokenLogin == null -> {
+                        logger.warn { "Unhandled login authentication for: $block" }
+                        responseHandler.writeFailedResponse(LoginResponse.InvalidLoginPacket)
+                    }
+                    tokenLogin.refusal != null ->
+                        refuse(LoginResponse.InvalidUsernameOrPassword, tokenLogin.refusal.name.lowercase())
+                    else ->
+                        login(
+                            responseHandler,
+                            block,
+                            auth.otpAuthentication,
+                            checkNotNull(tokenLogin.account),
+                            null,
+                            logTokenRefusal,
+                        )
+                }
         }
     }
 
@@ -112,7 +143,7 @@ private constructor(
             responseHandler.writeFailedResponse(LoginResponse.InvalidUsernameOrPassword)
             return
         }
-        login(responseHandler, block, auth.otpAuthentication, block.username, password)
+        login(responseHandler, block, auth.otpAuthentication, block.username, password, null)
     }
 
     private fun login(
@@ -121,6 +152,7 @@ private constructor(
         otpAuthentication: OtpAuthenticationType,
         username: String,
         password: CharArray?,
+        logTokenRefusal: ((cause: Any) -> Unit)?,
     ) {
         // Capture a local snapshot, as `realm.config` is mutable and may change.
         val realmConfig = realm.config
@@ -130,6 +162,7 @@ private constructor(
                     "Set `central` in game.yml (`host` + `world-key`, or `same-instance: true` for embedded), " +
                     "or env OPENRUNE_CENTRAL_HOST and OPENRUNE_WORLD_KEY."
             }
+            logTokenRefusal?.invoke(LoginResponse.LoginServerOffline)
             responseHandler.writeFailedResponse(LoginResponse.LoginServerOffline)
             return
         }
@@ -153,6 +186,7 @@ private constructor(
                 openRuneCentral = openRuneCentral,
                 database = gameDatabase,
                 characterRepository = characterAccountRepository,
+                logTokenRefusal = logTokenRefusal,
             )
 
         // Central auth runs after the account row exists (see AccountLoadResponseHook) so character id
@@ -183,6 +217,7 @@ private constructor(
 
         if (!requestSubmitted) {
             passwordForLocalCreate?.fill('\u0000')
+            logTokenRefusal?.invoke(LoginResponse.LoginServerLoadError)
             responseHandler.writeFailedResponse(LoginResponse.LoginServerLoadError)
         }
     }
@@ -204,26 +239,6 @@ private constructor(
             logger.error { "Totp verification error: ${e::class.simpleName}" }
             false
         }
-    }
-
-    private fun tokenLogin(
-        responseHandler: GameLoginResponseHandler<Player>,
-        block: LoginBlock<AuthenticationType>,
-        auth: AuthenticationType.TokenAuthentication,
-    ) {
-        val verifier = tokenVerifier
-        if (verifier == null) {
-            logger.warn { "Unhandled login authentication for: $block" }
-            responseHandler.writeFailedResponse(LoginResponse.InvalidLoginPacket)
-            return
-        }
-        val username = verifier.accountName(auth.token.asString())
-        auth.token.clear()
-        if (username == null) {
-            responseHandler.writeFailedResponse(LoginResponse.InvalidUsernameOrPassword)
-            return
-        }
-        login(responseHandler, block, auth.otpAuthentication, username, null)
     }
 
     private fun OtpAuthenticationType.toAccountLoadAuth(): AccountLoadAuth =

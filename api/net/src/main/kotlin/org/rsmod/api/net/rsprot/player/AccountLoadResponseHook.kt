@@ -51,6 +51,7 @@ class AccountLoadResponseHook(
     private val openRuneCentral: OpenRuneCentralWorldLink,
     private val database: GameDatabase,
     private val characterRepository: CharacterAccountRepository,
+    private val logTokenRefusal: ((cause: Any) -> Unit)?,
 ) : AccountLoadCallback {
     private var pendingCentralSessionToken: ByteArray? = null
 
@@ -116,7 +117,7 @@ class AccountLoadResponseHook(
                 validateAndQueueLogin(response)
             }
             is AccountLoadResponse.Err.AccountNotFound -> {
-                writeErrorResponse(LoginResponse.InvalidUsernameOrPassword)
+                writeErrorResponse(LoginResponse.InvalidUsernameOrPassword, "no account")
             }
             is AccountLoadResponse.Err.Timeout -> {
                 writeErrorResponse(LoginResponse.Timeout)
@@ -496,7 +497,8 @@ class AccountLoadResponseHook(
         }
     }
 
-    private fun writeErrorResponse(response: LoginResponse) {
+    private fun writeErrorResponse(response: LoginResponse, cause: Any = response) {
+        logTokenRefusal?.invoke(cause)
         clearLoginSecrets()
         channelResponses.writeFailedResponse(response)
     }
@@ -524,7 +526,7 @@ class AccountLoadResponseHook(
                 true
             }
             is CentralAuthResult.Denied -> {
-                writeErrorResponse(result.response)
+                writeErrorResponse(result.response, "Central ${result.response}")
                 false
             }
         }
