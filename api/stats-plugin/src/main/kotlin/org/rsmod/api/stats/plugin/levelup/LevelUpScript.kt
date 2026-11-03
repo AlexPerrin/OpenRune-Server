@@ -55,7 +55,7 @@ constructor(private val worldRepo: WorldRepository, private val worldQueues: Wor
 
         val guideUnlocked = guideUnlocks.between(stat.guide, advance.previousLevel, level)
         if (guideUnlocked.isNotEmpty()) {
-            skillGuidePrompt(stat, advance.previousLevel, guideUnlocked, guideList)
+            skillGuidePrompt(stat, guideUnlocked, guideList)
         }
         mes(LevelUpText.message(stat.label, level, maxed = level >= type.maxLevel))
         fireworks(fireworksSpotanim(level, type.maxLevel))
@@ -72,27 +72,22 @@ constructor(private val worldRepo: WorldRepository, private val worldQueues: Wor
 
     private fun ProtectedAccess.skillGuidePrompt(
         stat: LevelUpStat,
-        previousLevel: Int,
         unlocked: List<Int>,
         guideList: Boolean,
     ) {
-        // UNVERIFIED: the guide list setting turning off the list, flash and hint (guess)
-        if (guideList) {
-            if (player.vars[stat.listVarbit] == 0) {
-                vars[stat.listVarbit] = previousLevel + 1
-            }
-            vars[FLASHSIDE_VARBIT] = FLASHSIDE_STATS
-        }
-        val chatboxList = vars[CHATBOX_LIST_VARBIT] == 1
         val player = player
-        worldQueues.add(GUIDE_PROMPT_DELAY) {
-            if (!player.isSlotAssigned) {
-                return@add
-            }
-            if (!chatboxList) {
-                if (guideList) {
-                    player.mes(LevelUpText.guideUnlocks(stat.guide, stat.label), ChatType.LevelUpMessage)
+        if (vars[CHATBOX_LIST_VARBIT] == 0) {
+            if (guideList) {
+                worldQueues.add(GUIDE_PROMPT_DELAY) {
+                    if (player.isSlotAssigned) {
+                        player.mes(LevelUpText.guideUnlocks(stat.guide, stat.label), ChatType.LevelUpMessage)
+                    }
                 }
+            }
+            return
+        }
+        worldQueues.add(CHATBOX_LIST_DELAY) {
+            if (!player.isSlotAssigned) {
                 return@add
             }
             player.chatboxList(stat.guide, unlocked)
@@ -174,11 +169,11 @@ constructor(private val worldRepo: WorldRepository, private val worldQueues: Wor
         const val GUIDE_LIST_DISABLED_VARBIT = "varbit.option_level_up_guide_list_disabled"
         const val CHATBOX_LIST_VARBIT = "varbit.option_level_up_chatbox_list"
         const val FLASHSIDE_VARBIT = "varbit.flashside"
-        const val FLASHSIDE_STATS = 2
         const val STATS_STONE = "component.toplevel_osrs_stretch:stone1"
         const val CHATBOX_LIST_SCRIPT = "clientscript.[clientscript,script7781]"
         const val CHATBOX_LIST_SLOTS = 4
         const val CHATBOX_LIST_SHOWN = 3
-        const val GUIDE_PROMPT_DELAY = 2
+        const val GUIDE_PROMPT_DELAY = 1
+        const val CHATBOX_LIST_DELAY = 2
     }
 }
