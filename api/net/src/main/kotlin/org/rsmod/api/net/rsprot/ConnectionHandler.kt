@@ -51,6 +51,9 @@ private constructor(
     private val world: Int
         get() = config.world
 
+    private val tokenVerifier: TokenLoginVerifier? =
+        config.tokenLogin?.secret?.takeIf { it.isNotBlank() }?.let(::TokenLoginVerifier)
+
     private companion object {
         private const val PASSWORD_HASH_TIMING_INFO_MS = 50L
     }
@@ -109,6 +112,16 @@ private constructor(
             responseHandler.writeFailedResponse(LoginResponse.InvalidUsernameOrPassword)
             return
         }
+        login(responseHandler, block, auth.otpAuthentication, block.username, password)
+    }
+
+    private fun login(
+        responseHandler: GameLoginResponseHandler<Player>,
+        block: LoginBlock<AuthenticationType>,
+        otpAuthentication: OtpAuthenticationType,
+        username: String,
+        password: CharArray?,
+    ) {
         // Capture a local snapshot, as `realm.config` is mutable and may change.
         val realmConfig = realm.config
         if (!openRuneCentral.isEnabled) {
@@ -120,8 +133,7 @@ private constructor(
             responseHandler.writeFailedResponse(LoginResponse.LoginServerOffline)
             return
         }
-        val loadAuth = auth.otpAuthentication.toAccountLoadAuth()
-        val username = block.username
+        val loadAuth = otpAuthentication.toAccountLoadAuth()
 
         val responseHook =
             AccountLoadResponseHook(
@@ -135,7 +147,7 @@ private constructor(
                 playerRegistry = playerReg,
                 loginBlock = block,
                 channelResponses = responseHandler,
-                inputPassword = password.copyOf(),
+                inputPassword = password?.copyOf(),
                 verifyTotp = ::verifyTotp,
                 resolveTotpSecret = twoFactorSecretResolver::resolveStoredSecret,
                 openRuneCentral = openRuneCentral,
@@ -145,12 +157,15 @@ private constructor(
 
         // Central auth runs after the account row exists (see AccountLoadResponseHook) so character id
         // and password are available; do not kick off here with a null character id.
-        val passwordForLocalCreate = password.copyOf()
+        val passwordForLocalCreate = password?.copyOf()
         val requestSubmitted =
             accountManager.loadOrCreate(
                 loadAuth,
                 username,
                 {
+                    if (passwordForLocalCreate == null) {
+                        return@loadOrCreate ""
+                    }
                     try {
                         val hashStart = System.nanoTime()
                         val hash = computePasswordHash(passwordForLocalCreate)
@@ -167,7 +182,7 @@ private constructor(
             )
 
         if (!requestSubmitted) {
-            passwordForLocalCreate.fill('\u0000')
+            passwordForLocalCreate?.fill('\u0000')
             responseHandler.writeFailedResponse(LoginResponse.LoginServerLoadError)
         }
     }
@@ -191,14 +206,24 @@ private constructor(
         }
     }
 
-    // TODO: Token authentication handling.
     private fun tokenLogin(
         responseHandler: GameLoginResponseHandler<Player>,
         block: LoginBlock<AuthenticationType>,
-        @Suppress("unused") auth: AuthenticationType.TokenAuthentication,
+        auth: AuthenticationType.TokenAuthentication,
     ) {
-        logger.warn { "Unhandled login authentication for: $block" }
-        responseHandler.writeFailedResponse(LoginResponse.InvalidLoginPacket)
+        val verifier = tokenVerifier
+        if (verifier == null) {
+            logger.warn { "Unhandled login authentication for: $block" }
+            responseHandler.writeFailedResponse(LoginResponse.InvalidLoginPacket)
+            return
+        }
+        val username = verifier.accountName(auth.token.asString())
+        auth.token.clear()
+        if (username == null) {
+            responseHandler.writeFailedResponse(LoginResponse.InvalidUsernameOrPassword)
+            return
+        }
+        login(responseHandler, block, auth.otpAuthentication, username, null)
     }
 
     private fun OtpAuthenticationType.toAccountLoadAuth(): AccountLoadAuth =

@@ -32,6 +32,11 @@ public data class CentralPostgresYaml(
 }
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+public data class TokenLoginYaml(val secret: String = "") {
+    override fun toString(): String = "TokenLoginYaml(secret=${redactSecret(secret)})"
+}
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public data class GameDatabaseYaml(
     val postgres: PostgresDbYaml? = null,
 )
@@ -93,6 +98,7 @@ public data class ServerConfig(
     val gameplay: GameplayConfig = GameplayConfig(),
     val database: GameDatabaseYaml? = null,
     val central: OpenRuneCentralGameConfig? = null,
+    @JsonProperty("token-login") val tokenLogin: TokenLoginYaml? = null,
     @JsonProperty("login-timing-logs") val loginTimingLogs: Boolean = false,
     @JsonProperty("social-pm-trace-logs") val socialPmTraceLogs: Boolean = false,
 )
