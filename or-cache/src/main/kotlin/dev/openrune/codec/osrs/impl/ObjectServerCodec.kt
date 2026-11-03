@@ -5,16 +5,13 @@ import dev.openrune.definition.opcode.OpcodeDefinitionCodec
 import dev.openrune.definition.opcode.OpcodeList
 import dev.openrune.definition.opcode.OpcodeType
 import dev.openrune.definition.opcode.impl.DefinitionOpcodeEntityOps
-import dev.openrune.definition.opcode.impl.DefinitionOpcodeParams
 import dev.openrune.definition.opcode.impl.DefinitionOpcodeTransforms
 import dev.openrune.definition.type.ObjectType
-import dev.openrune.revision
-import dev.openrune.types.NpcServerType
 import dev.openrune.types.ObjectServerType
 import dev.openrune.util.DefinitionOpcodeParamMap
 
 class ObjectServerCodec(
-    val rev : Int,
+    val rev: Int,
     val objects: Map<Int, ObjectType>? = null,
     val custom: Map<Int, ObjectServerType>? = emptyMap(),
     val examines: Map<Int, String> = emptyMap(),
@@ -68,9 +65,9 @@ class ObjectServerCodec(
         actions = obj.actions
 
         val customData = custom?.get(id)
+        desc = customData?.desc?.takeIf { it.isNotEmpty() } ?: examines[obj.id] ?: ""
 
         if (customData != null) {
-            desc = customData.desc.takeIf { it.isNotEmpty() } ?: examines[obj.id] ?: ""
             contentGroup = customData.contentGroup
         }
     }
