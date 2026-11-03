@@ -4435,24 +4435,19 @@ index 00000000..b4e15043
 +    }
 +}
 diff --git a/protocol/osrs-241/osrs-241-shared/src/main/kotlin/net/rsprot/protocol/common/loginprot/incoming/codec/GameLoginDecoder.kt b/protocol/osrs-241/osrs-241-shared/src/main/kotlin/net/rsprot/protocol/common/loginprot/incoming/codec/GameLoginDecoder.kt
-index 52030dc7..e6a8e59b 100644
+index 52030dc7..3cd28eea 100644
 --- a/protocol/osrs-241/osrs-241-shared/src/main/kotlin/net/rsprot/protocol/common/loginprot/incoming/codec/GameLoginDecoder.kt
 +++ b/protocol/osrs-241/osrs-241-shared/src/main/kotlin/net/rsprot/protocol/common/loginprot/incoming/codec/GameLoginDecoder.kt
-@@ -62,6 +62,13 @@ public class GameLoginDecoder(
-                     Token(buffer.gjstr().toByteArray()),
+@@ -57,7 +57,7 @@ public class GameLoginDecoder(
+                     Password(buffer.gjstr().toByteArray()),
                      otp,
                  )
-+            // Sent by the Android client for Jagex-account logins. The layout of the token data
-+            // has not been reverse engineered, so the remainder of the RSA block is kept as is.
-+            MOBILE_TOKEN_AUTHENTICATION -> {
-+                val rest = ByteArray(buffer.readableBytes())
-+                buffer.buffer.readBytes(rest)
-+                AuthenticationType.TokenAuthentication(Token(rest), otp)
-+            }
-             else -> {
-                 throw IllegalStateException("Unknown authentication type: $authenticationType")
-             }
-@@ -102,5 +109,6 @@ public class GameLoginDecoder(
+-            TOKEN_AUTHENTICATION ->
++            TOKEN_AUTHENTICATION, MOBILE_TOKEN_AUTHENTICATION ->
+                 AuthenticationType.TokenAuthentication(
+                     Token(buffer.gjstr().toByteArray()),
+                     otp,
+@@ -102,5 +102,6 @@ public class GameLoginDecoder(
          private const val PASSWORD_AUTHENTICATION = 0
          private const val TOKEN_AUTHENTICATION = 2
          private const val MOBILE_PASSWORD_AUTHENTICATION = 5
