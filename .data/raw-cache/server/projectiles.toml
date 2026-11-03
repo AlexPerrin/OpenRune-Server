@@ -228,3 +228,14 @@ angle = 8
 lengthAdjustment = 20
 progress = 128
 stepMultiplier = 3
+
+[[projectile]]
+isServerOnly = true
+id = "projanim.rune_essence_teleport"
+startHeight = 31
+endHeight = 31
+delay = 61
+angle = 16
+lengthAdjustment = 39
+progress = 128
+stepMultiplier = 0

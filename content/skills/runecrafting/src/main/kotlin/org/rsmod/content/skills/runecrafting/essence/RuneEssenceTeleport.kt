@@ -6,10 +6,12 @@ import org.rsmod.api.enums.NamedEnums.essence_mine_teleporter_exits
 import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.player.output.soundSynth
 import org.rsmod.api.player.protect.ProtectedAccess
+import org.rsmod.api.repo.world.WorldRepository
 import org.rsmod.api.script.onOpLoc1
 import org.rsmod.content.skills.runecrafting.essenceMineTeleporter
 import org.rsmod.game.entity.Npc
 import org.rsmod.game.entity.Player
+import org.rsmod.game.proj.ProjAnim
 import org.rsmod.map.CoordGrid
 import org.rsmod.plugin.scripts.PluginScript
 import org.rsmod.plugin.scripts.ScriptContext
@@ -57,28 +59,35 @@ class EssencePortals : PluginScript() {
     }
 }
 
-suspend fun ProtectedAccess.teleportToRuneEssenceMine(npc: Npc) {
-    startDialogue(npc) { teleportToRuneEssenceMine() }
+suspend fun ProtectedAccess.teleportToRuneEssenceMine(npc: Npc, worldRepo: WorldRepository) {
+    startDialogue(npc) { teleportToRuneEssenceMine(worldRepo) }
 }
 
 suspend fun ProtectedAccess.teleportToMainLand() {
     startDialogue { teleportToMainLand() }
 }
 
-suspend fun Dialogue.teleportToRuneEssenceMine() {
+suspend fun Dialogue.teleportToRuneEssenceMine(worldRepo: WorldRepository) {
     val npc = checkNotNull(npc) { "Rune essence mine teleport requires an npc dialogue context." }
     EssencePortals.checkTeleporter(npc)
     val dest = EssencePortals.randomEssenceMineDest(access)
 
-    npc.say("Seventior Disthine Molenko!")
+    npc.say("Senventior Disthine Molenko!")
     npc.spotanim("spotanim.curse_casting", height = 92)
-    player.soundSynth("synth.curse_cast_and_fire")
+    worldRepo.soundArea(npc, "synth.curse_cast_and_fire", radius = 10)
+    worldRepo.projAnim(
+        ProjAnim.fromBoundsToPlayer(
+            npc.bounds(),
+            player,
+            "spotanim.curse_travel".asRSCM(RSCMType.SPOTANIM),
+            "projanim.rune_essence_teleport",
+        )
+    )
+    worldRepo.soundArea(player.coords, "synth.curse_hit", delay = 100, radius = 10)
     delay(1)
     npc.facePlayer(player)
     delay(1)
     npc.resetFaceEntity()
-    access.spotanim("spotanim.curse_impact", delay = 15, height = 124)
-    player.soundSynth("synth.curse_hit", delay = 15)
     delay(1)
     player.essenceMineTeleporter = npc.type.id
     access.telejump(dest)

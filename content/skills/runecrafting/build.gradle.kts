@@ -10,6 +10,7 @@ dependencies {
     implementation(projects.api.player)
     implementation(projects.api.pluginCommons)
     implementation(projects.api.registry)
+    implementation(projects.api.repo)
     implementation(projects.api.script)
     implementation(projects.api.scriptAdvanced)
     implementation(projects.api.spells)

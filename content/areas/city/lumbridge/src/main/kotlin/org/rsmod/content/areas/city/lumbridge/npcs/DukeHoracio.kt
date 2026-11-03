@@ -9,6 +9,7 @@ import org.rsmod.api.script.onOpNpc1
 import org.rsmod.content.quest.area.lumbridge.RuneMysteriesQuest
 import org.rsmod.content.quest.area.lumbridge.idesofmilk.IdesOfMilkQuest
 import org.rsmod.content.quest.area.lumbridge.rmTalisman
+import org.rsmod.content.quest.area.lumbridge.rmTalismanGiven
 import org.rsmod.game.entity.Npc
 import org.rsmod.game.entity.Player
 import org.rsmod.plugin.scripts.PluginScript
@@ -42,12 +43,8 @@ constructor(
 
         val hasShield = player.inv.contains(ANTI_DRAGON_SHIELD)
         val showShieldOption = !hasShield && player.dragonQuest >= 1
-        val stage = quest.getQuestStage(player)
         val questOption =
-            when {
-                stage == RuneMysteriesQuest.STAGE_TALISMAN -> "What did you want me to do again?"
-                else -> "Have you any quests for me?"
-            }
+            if (talismanOwed(player)) "What did you want me to do again?" else "Have you any quests for me?"
 
         val choice =
             if (showShieldOption) {
@@ -86,9 +83,8 @@ constructor(
         val stage = quest.getQuestStage(player)
         when {
             stage == 0 -> dukeStartQuest(npc)
-            stage == RuneMysteriesQuest.STAGE_TALISMAN && !hasAirTalisman(player) ->
-                dukeReplaceTalisman(npc)
-            stage == RuneMysteriesQuest.STAGE_TALISMAN -> {
+            talismanOwed(player) && !hasAirTalisman() -> dukeReplaceTalisman(npc)
+            talismanOwed(player) -> {
                 chatPlayer(quiz, "What did you want me to do again?")
                 chatNpc(
                     happy,
@@ -97,7 +93,7 @@ constructor(
                 )
                 chatPlayer(happy, "Okay, will do.")
             }
-            stage in RuneMysteriesQuest.STAGE_TALISMAN_GIVEN until RuneMysteriesQuest.STAGE_COMPLETE -> {
+            !quest.isQuestCompleted(player) -> {
                 chatPlayer(quiz, "Have you any quests for me?")
                 chatNpc(happy, "The only job I had was the delivery of that talisman, so I'm afraid not.")
             }
@@ -120,7 +116,7 @@ constructor(
             "We were recently sorting through some of the things stored down in the cellar, and we " +
                 "found this old talisman.",
         )
-        mesbox("The Duke shows you a talisman.")
+        objbox(RuneMysteriesQuest.AIR_TALISMAN, "The Duke shows you a talisman.")
         chatNpc(
             happy,
             "The Order of Wizards over at the Wizards' Tower have been on the hunt for magical " +
@@ -130,9 +126,9 @@ constructor(
 
         when (
             choice2(
-                "Sure, no problem.",
+                "Yes.",
                 1,
-                "Not right now.",
+                "No.",
                 2,
                 title = "Start the Rune Mysteries quest?",
             )
@@ -288,8 +284,12 @@ constructor(
         }
     }
 
-    private fun hasAirTalisman(player: Player): Boolean =
-        player.inv.contains(RuneMysteriesQuest.AIR_TALISMAN)
+    private fun talismanOwed(player: Player): Boolean =
+        quest.getQuestStage(player) in RuneMysteriesQuest.STAGE_TALISMAN..RuneMysteriesQuest.STAGE_MET_SEDRIDOR &&
+            !player.rmTalismanGiven
+
+    private fun Dialogue.hasAirTalisman(): Boolean =
+        RuneMysteriesQuest.AIR_TALISMAN in player.inv || RuneMysteriesQuest.AIR_TALISMAN in access.bank
 
     private companion object {
         const val ANTI_DRAGON_SHIELD = "obj.antidragonbreathshield"
