@@ -394,9 +394,6 @@ constructor(
         }
         val loc = cannon.loc ?: return
         findTarget(this, cannon)?.let { shoot(cannon, loc, it) }
-        if (cannon.destroyed) {
-            return
-        }
         cannon.direction = (cannon.direction + 1) % cannon.kit.turnSeqs.size
         worldRepo.soundArea(cannon.origin, TURN_SYNTH, radius = SOUND_RADIUS)
         worldRepo.locAnim(loc, cannon.kit.turnSeqs[cannon.direction])
@@ -463,7 +460,7 @@ constructor(
             cannon.destroyer = by
         }
         removeLoc(cannon)
-        stopFiring(this, cannon)
+        cannon.firing = false
         cannon.destroyed = true
         cannon.destroyedAt = gameClock.cycle
         mes(DESTROYED_MESSAGE)
@@ -617,6 +614,7 @@ constructor(
         }
         if (cannon.destroyed) {
             decay(cannon)
+            cannonFiring = 0
             return
         }
         stopFiring(this, cannon)
