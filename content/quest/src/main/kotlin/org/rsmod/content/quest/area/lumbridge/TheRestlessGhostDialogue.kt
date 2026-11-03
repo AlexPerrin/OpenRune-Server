@@ -4,6 +4,7 @@ import dev.openrune.util.Wearpos
 import org.rsmod.api.config.constants
 import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.script.onOpNpc1
+import org.rsmod.content.other.gravestones.deathOffice
 import org.rsmod.content.quest.manager.Quest
 import org.rsmod.game.inv.isType
 import org.rsmod.plugin.scripts.ScriptContext
@@ -258,7 +259,7 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
             choice2(
                 "Repeated failure on mortgage repayments.",
                 1,
-                "I don't know, I just wanted this house.",
+                "I don't know. I just wanted this house.",
                 2,
             )
         if (grounds != 1) {
@@ -310,13 +311,16 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
 
         chatNpc(
             angry,
-            "Well, I can't go back and exorcise it. I vowed not to leave this place until I had " +
+            "Well, I can't go back and exorcise it. I vowed not to leave this place. Until I had " +
                 "done a full two years of prayer and meditation.",
         )
         chatNpc(neutral, "Tell you what I can do though; take this amulet.")
 
+        if (!giveAmulet()) {
+            return
+        }
         quest.setQuestStage(access, TheRestlessGhostStage.HasAmulet)
-        giveAmulet("Father Urhney hands you an amulet.")
+        mesbox("Father Urhney hands you an amulet.")
 
         chatNpc(neutral, "It is an Amulet of Ghostspeak.")
         chatNpc(
@@ -343,7 +347,7 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
             return
         }
 
-        if (access.bank.contains(Amulet)) {
+        if (access.bank.contains(Amulet) || player.deathOffice.contains(Amulet)) {
             chatNpc(
                 angry,
                 "You come here wasting my time... Has it even occurred to you that you've got it " +
@@ -366,20 +370,28 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
             "How careless can you get? Those things aren't easy to come by you know! It's a good " +
                 "job I've got a spare.",
         )
-        giveAmulet("Father Urhney hands you an amulet of ghostspeak.")
+        if (!giveAmulet()) {
+            return
+        }
+        objbox(Amulet, "Father Urhney hands you an amulet of ghostspeak.")
         chatNpc(angry, "Be more careful this time.")
         chatPlayer(neutral, "Okay, I'll try to be.")
     }
 
-    private suspend fun Dialogue.giveAmulet(announcement: String) {
+    private fun Dialogue.giveAmulet(): Boolean {
         if (access.invAdd(access.inv, Amulet, 1).failure) {
             access.mes(constants.dm_take_invspace)
-            return
+            return false
         }
-        mesbox(announcement)
+        return true
     }
 
     private suspend fun Dialogue.ghost() {
+        if (quest.isQuestCompleted(player)) {
+            access.mes("The ghost doesn't seem interested in talking to you.")
+            return
+        }
+
         chatPlayer(neutral, "Hello ghost, how are you?")
 
         val wearingAmulet = player.worn[Wearpos.Front.slot]?.isType(Amulet) == true
@@ -388,26 +400,10 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
             return
         }
 
-        when {
-            quest.isQuestCompleted(player) -> {
-                chatNpcSpecific(
-                    GhostTitle,
-                    Ghost,
-                    happy,
-                    "Hello again, adventurer. I am doing much better now that my skull is back " +
-                        "where it belongs.",
-                )
-                chatNpcSpecific(
-                    GhostTitle,
-                    Ghost,
-                    happy,
-                    "Thank you again for helping me. I can finally rest in peace.",
-                )
-            }
-
-            quest.getQuestStage(player) >= TheRestlessGhostStage.GhostSpoken -> ghostSkullProgress()
-
-            else -> ghostFirstMeeting()
+        if (quest.getQuestStage(player) >= TheRestlessGhostStage.GhostSpoken) {
+            ghostSkullProgress()
+        } else {
+            ghostFirstMeeting()
         }
     }
 
@@ -461,7 +457,7 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
                     "I'm impressed. You must be very powerful. I don't suppose you can stop me " +
                         "being a ghost?",
                 )
-                ghostOfferHelp()
+                ghostOfferHelp("Yes, ok. Do you know WHY you're a ghost?")
             }
 
             else -> {
@@ -471,13 +467,13 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
                     "Oh! It's your amulet that's doing it! I did wonder. I don't suppose you can " +
                         "help me? I don't like being a ghost.",
                 )
-                ghostOfferHelp()
+                ghostOfferHelp("Yes, ok. Do you know why you're a ghost?")
             }
         }
     }
 
-    private suspend fun Dialogue.ghostOfferHelp() {
-        val help = choice2("Yes, ok. Do you know why you're a ghost?", 1, "No, you're scary!", 2)
+    private suspend fun Dialogue.ghostOfferHelp(yes: String) {
+        val help = choice2(yes, 1, "No, you're scary!", 2)
         if (help != 1) {
             chatPlayer(worried, "No, you're scary!")
             chatNpc(angry, "Great.")
@@ -536,7 +532,7 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
         chatNpc(
             happy,
             "Hurrah! Now I can stop being a ghost! You just need to put it in my coffin there, " +
-                "and I will be free!",
+                "then I'll be free!",
         )
     }
 
@@ -670,7 +666,6 @@ internal class TheRestlessGhostDialogue(private val quest: Quest) {
         const val Aereck = "npc.father_aereck"
         const val Urhney = "npc.father_urhney"
         const val Ghost = "npc.ghostx"
-        const val GhostTitle = "Restless ghost"
 
         const val Amulet = "obj.amulet_of_ghostspeak"
         const val GhostSkull = "obj.ghostskull"
