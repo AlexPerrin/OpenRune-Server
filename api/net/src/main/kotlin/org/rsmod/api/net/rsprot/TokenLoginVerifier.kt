@@ -9,7 +9,8 @@ import javax.crypto.spec.SecretKeySpec
 internal class TokenLoginVerifier(secret: String) {
     private val key = SecretKeySpec(Base64.getDecoder().decode(secret), "HmacSHA256")
 
-    fun accountName(token: String): String? {
+    fun accountName(credential: String): String? {
+        val token = credential.substringBefore('\u0000')
         val macStart = token.lastIndexOf('.')
         val expiryStart = token.lastIndexOf('.', macStart - 1)
         if (expiryStart <= 0) {

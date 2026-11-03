@@ -18,6 +18,12 @@ class TokenLoginVerifierTest {
     }
 
     @Test
+    fun `an android token ends at its string terminator`() {
+        assertEquals("tester", verifier.accountName(token() + "\u0000"))
+        assertNull(verifier.accountName(token(secret = OTHER_SECRET) + "\u0000" + token()))
+    }
+
+    @Test
     fun `a token signed by another secret is refused`() {
         assertNull(verifier.accountName(token(secret = OTHER_SECRET)))
     }
