@@ -18,6 +18,8 @@ if (centralServerBuild.isPresent) {
 dependencyResolutionManagement {
     includeBuild("build-logic")
     repositories {
+        // osrs-plugins-reverse: our patched RSProt (Android module), from openrune/scripts/openrune.sh rsprot
+        maven { url = uri(".m2-rsprot") }
         gradlePluginPortal()
         mavenCentral()
         mavenLocal()
