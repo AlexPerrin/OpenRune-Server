@@ -16,6 +16,7 @@ import org.rsmod.content.quest.manager.ItemRewardDisplay
 import org.rsmod.content.quest.manager.QuestScript
 import org.rsmod.content.quest.manager.rewards
 import org.rsmod.content.quest.manager.startQuestPrompt
+import org.rsmod.game.entity.Npc
 import org.rsmod.game.entity.Player
 import org.rsmod.plugin.scripts.ScriptContext
 
@@ -40,8 +41,8 @@ class SheepShearer @Inject constructor(private val objRepo: ObjRepository) :
         }
 
         onOpNpc1("npc.fred_the_farmer") { startDialogue(it.npc) { fredDialogue() } }
-        onOpNpc1("npc.sheep_shearer_the_thing") { shearTheThing() }
-        onNpcUseObj("npc.sheep_shearer_the_thing", SHEARS) { shearTheThing() }
+        onOpNpc1("npc.sheep_shearer_the_thing") { shearTheThing(it.npc) }
+        onNpcUseObj("npc.sheep_shearer_the_thing", SHEARS) { shearTheThing(it.npc) }
         onOpNpc3("npc.sheep_shearer_the_thing") {
             startDialogue(it.npc) { chatPlayer(confused, "That's a sheep...I think. I can't talk to sheep.") }
         }
@@ -77,14 +78,22 @@ class SheepShearer @Inject constructor(private val objRepo: ObjRepository) :
 
     private fun ballsText(n: Int): String = if (n == 1) "1 ball" else "$n balls"
 
-    private suspend fun ProtectedAccess.shearTheThing() {
+    private suspend fun ProtectedAccess.shearTheThing(npc: Npc) {
         if (SHEARS !in inv) {
             mes("You need a set of shears to do this.")
             return
         }
+        faceEntitySquare(npc)
         anim("seq.human_shearing")
+        soundSynth("synth.shear_the_thing")
+        delay(1)
+        npcPlayerFaceClose(npc)
+        npc.anim("seq.the_thing_shear")
+        soundSynth("synth.the_thing_shear")
+        delay(2)
         mes("The... whatever it is... manages to get away from you!")
         player.sawTheThing = true
+        npcPlayerEscape(npc)
     }
 
     private suspend fun Dialogue.fredDialogue() {
