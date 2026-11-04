@@ -18,6 +18,7 @@ import net.rsprot.protocol.game.outgoing.map.RebuildRegionV2
 import net.rsprot.protocol.game.outgoing.map.RebuildWorldEntityV4
 import net.rsprot.protocol.game.outgoing.map.util.RebuildRegionZone
 import net.rsprot.protocol.game.outgoing.map.util.ReferenceZone
+import net.rsprot.protocol.game.outgoing.misc.client.PacketGroupStart
 import net.rsprot.protocol.message.OutgoingGameMessage
 import org.rsmod.api.config.refs.params
 import org.rsmod.api.net.rsprot.ext.setFaceTarget
@@ -107,26 +108,29 @@ class RspCycle(
     override fun flush(player: Player) {
         val infoPackets = infos.getPackets()
         val rootPackets = infoPackets.rootWorldInfoPackets
+        var group = ArrayList<OutgoingGameMessage>()
 
-        session.queue(rootPackets.activeWorld)
-        session.queue(rootPackets.npcUpdateOrigin)
-        session.queuePacketResult(rootPackets.worldEntityInfo)
-        session.queuePacketResult(rootPackets.playerInfo)
-        session.queueNpcInfoPacket(rootPackets.npcInfo)
+        group += rootPackets.activeWorld
+        group += rootPackets.npcUpdateOrigin
+        group += rootPackets.worldEntityInfo.getOrThrow()
+        group += rootPackets.playerInfo.getOrThrow()
+        group.addNpcInfoPacket(rootPackets.npcInfo)
 
         for (world in infoPackets.activeWorlds) {
-            session.queue(world.activeWorld)
-            session.queue(world.npcUpdateOrigin)
+            group += world.activeWorld
+            group += world.npcUpdateOrigin
             if (world.added) {
-                TestWorldEntities.regions[world.worldId]?.let { session.queue(rebuildWorldEntity(it)) }
+                TestWorldEntities.regions[world.worldId]?.let {
+                    session.queue(PacketGroupStart(group))
+                    group = arrayListOf(rebuildWorldEntity(it))
+                }
             }
-            session.queueNpcInfoPacket(world.npcInfo)
+            group.addNpcInfoPacket(world.npcInfo)
         }
 
-        session.queue(rootPackets.activeWorld)
-        if (player.lastMapBuildComplete != Int.MIN_VALUE) {
-            infos.worldEntityInfo.updateRenderDistance(WORLD_ENTITY_RENDER_DISTANCE)
-        }
+        group += rootPackets.activeWorld
+        session.queue(PacketGroupStart(group))
+        infos.worldEntityInfo.updateRenderDistance(WORLD_ENTITY_RENDER_DISTANCE)
     }
 
     override fun release() {
@@ -141,18 +145,14 @@ class RspCycle(
         }
     }
 
-    private fun <T : OutgoingGameMessage> Session<Player>.queuePacketResult(
-        result: PacketResult<T>
+    private fun MutableList<OutgoingGameMessage>.addNpcInfoPacket(
+        result: PacketResult<NpcInfoPacket>
     ) {
-        queue(result.getOrThrow())
-    }
-
-    private fun Session<Player>.queueNpcInfoPacket(result: PacketResult<NpcInfoPacket>) {
         if (result.isEmpty()) {
             result.safeReleaseOrThrow()
             return
         }
-        queuePacketResult(result)
+        add(result.getOrThrow())
     }
 
     private fun <T : OutgoingGameMessage> releasePacketResult(result: PacketResult<T>) {
