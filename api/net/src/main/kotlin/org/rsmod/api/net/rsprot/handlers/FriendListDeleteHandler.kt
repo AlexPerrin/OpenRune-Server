@@ -6,6 +6,7 @@ import org.rsmod.api.db.gateway.GameDbManager
 import org.rsmod.api.db.gateway.model.fold
 import org.rsmod.api.net.central.CentralSocialResult
 import org.rsmod.api.net.central.CentralSocialService
+import org.rsmod.api.net.friendchat.FriendChats
 import org.rsmod.api.social.writeSocialMessage
 import org.rsmod.game.entity.Player
 import org.rsmod.game.entity.PlayerList
@@ -16,6 +17,7 @@ constructor(
     private val playerList: PlayerList,
     private val db: GameDbManager,
     private val social: CentralSocialService,
+    private val friendChats: FriendChats,
 ) : MessageHandler<FriendListDel> {
     override fun handle(player: Player, message: FriendListDel) {
         val uid = player.uid
@@ -40,7 +42,7 @@ constructor(
                 result.fold(
                     onOk = { socialResult ->
                         when (socialResult) {
-                            CentralSocialResult.Ok -> Unit
+                            CentralSocialResult.Ok -> friendChats.friendDeleted(current, requestedName)
 
                             CentralSocialResult.Ignored -> Unit
 

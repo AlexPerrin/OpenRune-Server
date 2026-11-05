@@ -9,10 +9,15 @@ import net.rsprot.protocol.game.incoming.buttons.IfButtonD
 import net.rsprot.protocol.game.incoming.buttons.IfButtonT
 import net.rsprot.protocol.game.incoming.buttons.IfScriptTrigger
 import net.rsprot.protocol.game.incoming.buttons.IfSubOp
+import net.rsprot.protocol.game.incoming.clan.ClanChannelFullRequest
+import net.rsprot.protocol.game.incoming.clan.ClanSettingsFullRequest
 import net.rsprot.protocol.game.incoming.events.EventKeyboard
 import net.rsprot.protocol.game.incoming.events.EventMouseClickV1
 import net.rsprot.protocol.game.incoming.events.EventMouseClickV2
 import net.rsprot.protocol.game.incoming.events.EventMouseScroll
+import net.rsprot.protocol.game.incoming.friendchat.FriendChatJoinLeave
+import net.rsprot.protocol.game.incoming.friendchat.FriendChatKick
+import net.rsprot.protocol.game.incoming.friendchat.FriendChatSetRank
 import net.rsprot.protocol.game.incoming.locs.OpLoc6
 import net.rsprot.protocol.game.incoming.locs.OpLocT
 import net.rsprot.protocol.game.incoming.locs.OpLocV2
@@ -46,9 +51,15 @@ import net.rsprot.protocol.game.incoming.social.IgnoreListAdd
 import net.rsprot.protocol.game.incoming.social.IgnoreListDel
 import net.rsprot.protocol.message.codec.incoming.GameMessageConsumerRepositoryBuilder
 import net.rsprot.protocol.message.codec.incoming.provider.DefaultGameMessageConsumerRepositoryProvider
+import org.rsmod.api.net.rsprot.handlers.ClanChannelFullRequestHandler
+import org.rsmod.api.net.rsprot.handlers.ClanMessagePublicHandler
+import org.rsmod.api.net.rsprot.handlers.ClanSettingsFullRequestHandler
 import org.rsmod.api.net.rsprot.handlers.ClickWorldMapHandler
 import org.rsmod.api.net.rsprot.handlers.ClientCheatHandler
 import org.rsmod.api.net.rsprot.handlers.CloseModalHandler
+import org.rsmod.api.net.rsprot.handlers.FriendChatJoinLeaveHandler
+import org.rsmod.api.net.rsprot.handlers.FriendChatKickHandler
+import org.rsmod.api.net.rsprot.handlers.FriendChatSetRankHandler
 import org.rsmod.api.net.rsprot.handlers.FriendListAddHandler
 import org.rsmod.api.net.rsprot.handlers.FriendListDeleteHandler
 import org.rsmod.api.net.rsprot.handlers.IdleHandler
@@ -63,7 +74,6 @@ import org.rsmod.api.net.rsprot.handlers.IgnoreListDeleteHandler
 import org.rsmod.api.net.rsprot.handlers.InputEventHandler
 import org.rsmod.api.net.rsprot.handlers.MapBuildCompleteHandler
 import org.rsmod.api.net.rsprot.handlers.MessagePrivateHandler
-import org.rsmod.api.net.rsprot.handlers.MessagePublicHandler
 import org.rsmod.api.net.rsprot.handlers.MoveGameClickHandler
 import org.rsmod.api.net.rsprot.handlers.MoveMinimapClickHandler
 import org.rsmod.api.net.rsprot.handlers.OpLoc6Handler
@@ -104,13 +114,15 @@ constructor(
     private val opNpc6: OpNpc6Handler,
     private val opPlayer: OpPlayerHandler,
     private val opPlayerT: OpPlayerTHandler,
-    private val messagePublic: MessagePublicHandler,
     private val messagePrivate: MessagePrivateHandler,
     private val friendListAdd: FriendListAddHandler,
     private val friendListDelete: FriendListDeleteHandler,
     private val ignoreListAdd: IgnoreListAddHandler,
     private val ignoreListDelete: IgnoreListDeleteHandler,
     private val setChatFilterSettings: SetChatFilterSettingsHandler,
+    private val friendChatJoinLeave: FriendChatJoinLeaveHandler,
+    private val friendChatKick: FriendChatKickHandler,
+    private val friendChatSetRank: FriendChatSetRankHandler,
     private val if1Button: If1ButtonHandler,
     private val if3Button: If3ButtonHandler,
     private val closeModal: CloseModalHandler,
@@ -128,6 +140,9 @@ constructor(
     private val ifButtonT: IfButtonTHandler,
     private val mapBuildComplete: MapBuildCompleteHandler,
     private val scriptTriggerHandler: IfScriptTriggerHandler,
+    private val clanChannelFullRequest: ClanChannelFullRequestHandler,
+    private val clanSettingsFullRequest: ClanSettingsFullRequestHandler,
+    private val clanMessagePublic: ClanMessagePublicHandler,
     private val eventBus: EventBus,
 ) {
     fun get(): DefaultGameMessageConsumerRepositoryProvider<Player> {
@@ -145,13 +160,16 @@ constructor(
         builder.addListener(OpNpc6::class.java, opNpc6)
         builder.addListener(OpPlayer::class.java, opPlayer)
         builder.addListener(OpPlayerT::class.java, opPlayerT)
-        builder.addListener(MessagePublic::class.java, messagePublic)
+        builder.addListener(MessagePublic::class.java, clanMessagePublic)
         builder.addListener(MessagePrivate::class.java, messagePrivate)
         builder.addListener(FriendListAdd::class.java, friendListAdd)
         builder.addListener(FriendListDel::class.java, friendListDelete)
         builder.addListener(IgnoreListAdd::class.java, ignoreListAdd)
         builder.addListener(IgnoreListDel::class.java, ignoreListDelete)
         builder.addListener(SetChatFilterSettings::class.java, setChatFilterSettings)
+        builder.addListener(FriendChatJoinLeave::class.java, friendChatJoinLeave)
+        builder.addListener(FriendChatKick::class.java, friendChatKick)
+        builder.addListener(FriendChatSetRank::class.java, friendChatSetRank)
         builder.addListener(If1Button::class.java, if1Button)
         builder.addListener(If3Button::class.java, if3Button)
         builder.addListener(CloseModal::class.java, closeModal)
@@ -169,6 +187,8 @@ constructor(
         builder.addListener(IfButtonT::class.java, ifButtonT)
         builder.addListener(MapBuildComplete::class.java, mapBuildComplete)
         builder.addListener(IfScriptTrigger::class.java, scriptTriggerHandler)
+        builder.addListener(ClanChannelFullRequest::class.java, clanChannelFullRequest)
+        builder.addListener(ClanSettingsFullRequest::class.java, clanSettingsFullRequest)
         builder.addListener(EventMouseClickV1::class.java, InputEventHandler(eventBus))
         builder.addListener(EventMouseClickV2::class.java, InputEventHandler(eventBus))
         builder.addListener(EventMouseScroll::class.java, InputEventHandler(eventBus))

@@ -3,6 +3,7 @@ package org.rsmod.api.net.rsprot.handlers
 import com.github.michaelbull.logging.InlineLogger
 import jakarta.inject.Inject
 import net.rsprot.protocol.game.incoming.players.OpPlayer
+import org.rsmod.api.net.clan.Clans
 import org.rsmod.api.player.interact.PlayerInteractions
 import org.rsmod.api.player.output.clearMapFlag
 import org.rsmod.api.player.protect.clearPendingAction
@@ -20,6 +21,7 @@ constructor(
     private val eventBus: EventBus,
     private val playerList: PlayerList,
     private val playerInteractions: PlayerInteractions,
+    private val clans: Clans,
 ) : MessageHandler<OpPlayer> {
     private val logger = InlineLogger()
 
@@ -44,6 +46,10 @@ constructor(
         if (target == null) {
             player.clearMapFlag()
             player.clearPendingAction(eventBus)
+            return
+        }
+
+        if (message.op == 1 && clans.acceptFounderInvite(player, target)) {
             return
         }
 
