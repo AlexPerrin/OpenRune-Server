@@ -55,6 +55,10 @@ central:
   postgres:
     pool-size: 10
 
+# Token login (auth type 2): tokens <account>.<expiry>.<HMAC-SHA256> signed by the issuer with this base64 secret.
+#token-login:
+  #secret: ""
+
 
 # Central server connection settings (used when connecting to a different instance)
     #central:

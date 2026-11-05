@@ -17,11 +17,11 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
 import net.rsprot.protocol.loginprot.outgoing.LoginResponse
+import org.rsmod.api.net.central.netty.WorldLinkNettyBlockingClient
+import org.rsmod.api.net.central.netty.WorldLinkNettyBlockingSession
 import org.rsmod.api.player.output.ChatType
 import org.rsmod.api.player.output.MiscOutput
 import org.rsmod.api.player.output.mes
-import org.rsmod.api.net.central.netty.WorldLinkNettyBlockingClient
-import org.rsmod.api.net.central.netty.WorldLinkNettyBlockingSession
 import org.rsmod.api.registry.player.PlayerRegistry
 import org.rsmod.api.server.config.OpenRuneCentralGameConfig
 import org.rsmod.api.server.config.ServerConfig
@@ -96,20 +96,20 @@ constructor(
      */
     public fun beginAuthenticate(
         loginUsername: String,
-        password: CharArray,
+        password: CharArray?,
         loginCharacterId: Int? = null,
     ): InflightCentralAuth? {
         if (settings == null) {
             return null
         }
-        val passwordCopy = password.copyOf()
+        val passwordCopy = password?.copyOf()
         val future =
             CompletableFuture.supplyAsync(
                 {
                     try {
                         authenticate(loginUsername, passwordCopy, loginCharacterId)
                     } finally {
-                        passwordCopy.fill('\u0000')
+                        passwordCopy?.fill('\u0000')
                     }
                 },
                 authExecutor,
@@ -121,7 +121,7 @@ constructor(
 
     public fun authenticate(
         loginUsername: String,
-        password: CharArray,
+        password: CharArray?,
         loginCharacterId: Int? = null,
     ): CentralAuthResult {
         val cfg = settings ?: return CentralAuthResult.Skipped
@@ -593,7 +593,7 @@ constructor(
     private fun openCentralAuthSession(
         cfg: CentralSettings,
         loginUsername: String,
-        password: CharArray,
+        password: CharArray?,
         loginCharacterId: Int?,
     ): CentralAuthResult {
         val connectStart = System.nanoTime()
@@ -653,10 +653,16 @@ constructor(
     private fun sendLogin(
         session: WorldLinkNettyBlockingSession,
         username: String,
-        password: CharArray,
+        password: CharArray?,
         loginCharacterId: Int?,
     ): CentralAuthResult {
-        session.send(WorldLinkPackets.login(username, password, loginCharacterId))
+        session.send(
+            if (password == null) {
+                WorldLinkPackets.tokenLogin(username, loginCharacterId)
+            } else {
+                WorldLinkPackets.login(username, password, loginCharacterId)
+            },
+        )
         val response = session.recvInbound(SOCKET_TIMEOUT_MS.toLong())
         val invalid = WorldLinkFrameSpecs.validateCentralToGameFrame(response)
         if (invalid != null) {
