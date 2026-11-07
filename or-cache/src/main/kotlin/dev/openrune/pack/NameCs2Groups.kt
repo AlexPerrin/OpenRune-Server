@@ -11,13 +11,18 @@ class NameCs2Groups(private val clientscripts: List<String>) : CacheTask() {
 
     override fun init(cache: Cache) {
         val index = (cache as CacheDelegate).library.index(CLIENTSCRIPTS)
-        for (line in clientscripts) {
-            val id = line.substringBefore('\t').toIntOrNull() ?: continue
-            val name = line.substringAfter('\t').substringBefore('\t').substringBefore(' ')
+        val names = clientscripts.mapNotNull { line ->
+            line.substringBefore('\t').toIntOrNull()?.let {
+                it to line.substringAfter('\t').substringBefore('\t').substringBefore(' ')
+            }
+        }.toMap()
+        for ((id, name) in names) {
             if (index.contains(id)) {
                 index.add(id, name.hashCode())
             }
         }
+        val maxCustom = names.keys.maxOrNull() ?: return
+        index.archiveIds().filter { it > maxCustom }.forEach(index::remove)
     }
 
     private companion object {
