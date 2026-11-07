@@ -55,6 +55,7 @@ constructor(
      */
     public fun queue(request: AccountLoadRequest): Boolean {
         if (activeRequests.get() >= MAX_REQUEST_SOFT_CAP) {
+            logger.warn { "Account load queue full, rejected: '${request.accountName}'" }
             return false
         }
         pendingRequests.add(request)

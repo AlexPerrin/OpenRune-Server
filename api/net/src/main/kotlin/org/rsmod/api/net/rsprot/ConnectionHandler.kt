@@ -172,7 +172,7 @@ private constructor(
 
         if (!requestSubmitted) {
             passwordForLocalCreate.fill('\u0000')
-            responseHandler.refuse(block.username, LoginResponse.LoginServerLoadError)
+            responseHandler.writeFailedResponse(LoginResponse.LoginServerLoadError)
         }
     }
 
@@ -202,7 +202,7 @@ private constructor(
         @Suppress("unused") auth: AuthenticationType.TokenAuthentication,
     ) {
         logger.warn { "Unhandled login authentication for: $block" }
-        responseHandler.refuse(block.username, LoginResponse.InvalidLoginPacket)
+        responseHandler.writeFailedResponse(LoginResponse.InvalidLoginPacket)
     }
 
     private fun OtpAuthenticationType.toAccountLoadAuth(): AccountLoadAuth =
