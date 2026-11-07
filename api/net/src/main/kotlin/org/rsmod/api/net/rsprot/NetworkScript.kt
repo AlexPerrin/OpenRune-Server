@@ -156,10 +156,11 @@ constructor(
     @Suppress("UNCHECKED_CAST")
     private fun SessionReconnect.resumeSession() {
         val infos = (player.client as RspClient).infos
+        val client = RspClient(session, infos)
         val cycle = RspCycle(session, infos, regionReg)
-        player.client = RspClient(session, infos) as Client<Any, Any>
+        player.client = client as Client<Any, Any>
         player.clientCycle = cycle
-        cycle.reconnect(player)
+        cycle.reconnect(player, client)
     }
 
     private fun SessionStateEvent.Delete.closeSession() {

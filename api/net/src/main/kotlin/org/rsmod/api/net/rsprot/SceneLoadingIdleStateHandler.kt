@@ -10,11 +10,16 @@ import java.util.concurrent.TimeUnit
 import net.rsprot.protocol.api.handlers.idlestate.DefaultIdleStateHandlerSupplier
 import net.rsprot.protocol.api.handlers.idlestate.IdleStateHandlerSupplier
 
-private val SCENE_LOADING: AttributeKey<Boolean> = AttributeKey.valueOf("scene_loading")
+private val SCENE_LOADING_SINCE: AttributeKey<Long> = AttributeKey.valueOf("scene_loading_since")
+
+private val MAX_SCENE_LOAD_NANOS = TimeUnit.MINUTES.toNanos(2)
 
 var Channel.sceneLoading: Boolean
-    get() = attr(SCENE_LOADING).get() == true
-    set(value) = attr(SCENE_LOADING).set(value)
+    get() {
+        val since = attr(SCENE_LOADING_SINCE).get() ?: return false
+        return System.nanoTime() - since < MAX_SCENE_LOAD_NANOS
+    }
+    set(value) = attr(SCENE_LOADING_SINCE).set(if (value) System.nanoTime() else null)
 
 class SceneLoadingIdleStateHandler(idleTime: Long) :
     IdleStateHandler(true, idleTime, idleTime, 0, TimeUnit.SECONDS) {

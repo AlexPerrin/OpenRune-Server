@@ -7,12 +7,14 @@ import dev.openrune.rscm.RSCMType
 import dev.openrune.types.StatType
 import jakarta.inject.Inject
 import net.rsprot.protocol.game.outgoing.clan.VarClanDisable
+import net.rsprot.protocol.game.outgoing.friendchat.UpdateFriendChatChannelFullV2
 import net.rsprot.protocol.game.outgoing.misc.client.HideLocOps
 import net.rsprot.protocol.game.outgoing.misc.client.HideNpcOps
 import net.rsprot.protocol.game.outgoing.misc.client.HideObjOps
 import net.rsprot.protocol.game.outgoing.misc.client.MinimapToggle
 import net.rsprot.protocol.game.outgoing.misc.client.ResetAnims
 import net.rsprot.protocol.game.outgoing.misc.player.ChatFilterSettings
+import net.rsprot.protocol.game.outgoing.misc.player.UpdateTradingPostV1
 import org.rsmod.api.inv.weight.InvWeight
 import org.rsmod.api.net.central.OpenRuneCentralWorldLink
 import org.rsmod.api.net.central.writeCentralSocialSnapshot
@@ -75,7 +77,9 @@ constructor(
         sendRun()
         client.write(ResetAnims)
         client.write(MinimapToggle(0))
-        sendSocial()
+        client.write(UpdateFriendChatChannelFullV2(UpdateFriendChatChannelFullV2.LeaveUpdate))
+        sendSocial(reconnect = true)
+        client.write(UpdateTradingPostV1(UpdateTradingPostV1.ResetTradingPost))
     }
 
     private fun Player.sendHighPriority() {
@@ -92,25 +96,25 @@ constructor(
         client.write(ChatFilterSettings(0, 0))
     }
 
-    private fun Player.sendSocial() {
+    private fun Player.sendSocial(reconnect: Boolean = false) {
         if (!openRuneCentral.isEnabled) {
             return
         }
 
         if (characterId <= 0) {
             mes("Social list did not load: missing character.")
-            writeCentralSocialSnapshotEmpty()
+            writeCentralSocialSnapshotEmpty(reconnect)
             return
         }
 
         when (val result = openRuneCentral.socialSnapshot(characterId)) {
             is OpenRuneCentralWorldLink.CentralSocialSnapshotResult.Ok -> {
-                writeCentralSocialSnapshot(result.snapshot)
+                writeCentralSocialSnapshot(result.snapshot, reconnect)
             }
 
             is OpenRuneCentralWorldLink.CentralSocialSnapshotResult.Failed -> {
                 mes("Social list did not load: ${result.message}")
-                writeCentralSocialSnapshotEmpty()
+                writeCentralSocialSnapshotEmpty(reconnect)
             }
         }
     }
