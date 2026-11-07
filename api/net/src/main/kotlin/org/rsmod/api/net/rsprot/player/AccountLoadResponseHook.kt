@@ -45,7 +45,7 @@ class AccountLoadResponseHook(
     private val playerRegistry: PlayerRegistry,
     private val loginBlock: LoginBlock<AuthenticationType>,
     private val channelResponses: GameLoginResponseHandler<Player>,
-    private val inputPassword: CharArray,
+    private val inputPassword: CharArray?,
     private val verifyTotp: (CharArray, String) -> Boolean,
     private val resolveTotpSecret: (String) -> CharArray?,
     private val openRuneCentral: OpenRuneCentralWorldLink,
@@ -503,7 +503,7 @@ class AccountLoadResponseHook(
     }
 
     private fun clearLoginSecrets() {
-        inputPassword.fill('\u0000')
+        inputPassword?.fill('\u0000')
         inflightCentralAuth = null
     }
 
