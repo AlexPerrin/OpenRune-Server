@@ -1,5 +1,6 @@
 package org.rsmod.api.registry.player
 
+import com.github.michaelbull.logging.InlineLogger
 import jakarta.inject.Inject
 import java.time.Instant
 import java.time.LocalDateTime
@@ -170,6 +171,7 @@ constructor(
             if (characterId != 0 && player.characterId != characterId) {
                 continue
             }
+            logger.info { "Central revoked the session: player=${player.username}" }
             player.forceDisconnect = true
         }
     }
@@ -190,6 +192,7 @@ constructor(
             if (characterId != 0 && player.characterId != characterId) {
                 continue
             }
+            logger.info { "Central kicked the session: player=${player.username}" }
             player.forceDisconnect = true
         }
     }
@@ -245,5 +248,9 @@ constructor(
         for (player in playerList) {
             action(player)
         }
+    }
+
+    private companion object {
+        private val logger = InlineLogger()
     }
 }
