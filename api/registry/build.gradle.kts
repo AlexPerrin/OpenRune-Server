@@ -9,6 +9,7 @@ kotlin {
 dependencies {
     implementation(libs.guice)
     implementation(libs.fastutil)
+    implementation(libs.kotlin.inline.logger)
     implementation(libs.rsprot.api)
     implementation(projects.api.account)
     implementation(projects.api.playerOutput)
