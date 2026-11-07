@@ -39,9 +39,14 @@ private fun nextPrivateMessageCounter(worldId: Int): Int {
  * Packet order matches the original OpenRune-Central integration (commit bbf8e6a31):
  * [FriendListLoaded] first, then private chat filter, then bulk friend/ignore lists.
  */
-fun Player.writeCentralSocialSnapshot(snapshot: WorldLinkFrameSpecs.CentralSocialSnapshot) {
-    client.write(FriendListLoaded)
-    client.write(ChatFilterSettingsPrivateChat(snapshot.privateChat))
+fun Player.writeCentralSocialSnapshot(
+    snapshot: WorldLinkFrameSpecs.CentralSocialSnapshot,
+    reconnect: Boolean = false,
+) {
+    if (!reconnect) {
+        client.write(FriendListLoaded)
+        client.write(ChatFilterSettingsPrivateChat(snapshot.privateChat))
+    }
 
     val friendEntries =
         snapshot.friends.map { friend ->
@@ -85,9 +90,11 @@ fun Player.writeCentralSocialSnapshot(snapshot: WorldLinkFrameSpecs.CentralSocia
     client.write(UpdateIgnoreList(ignoreEntries))
 }
 
-fun Player.writeCentralSocialSnapshotEmpty() {
-    client.write(FriendListLoaded)
-    client.write(ChatFilterSettingsPrivateChat(0))
+fun Player.writeCentralSocialSnapshotEmpty(reconnect: Boolean = false) {
+    if (!reconnect) {
+        client.write(FriendListLoaded)
+        client.write(ChatFilterSettingsPrivateChat(0))
+    }
     client.write(UpdateFriendList(emptyList()))
     client.write(UpdateIgnoreList(emptyList()))
 }
