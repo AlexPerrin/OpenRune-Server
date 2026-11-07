@@ -6,6 +6,7 @@ import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import dev.openrune.types.StatType
 import jakarta.inject.Inject
+import net.rsprot.protocol.game.outgoing.clan.VarClanDisable
 import net.rsprot.protocol.game.outgoing.misc.client.HideLocOps
 import net.rsprot.protocol.game.outgoing.misc.client.HideNpcOps
 import net.rsprot.protocol.game.outgoing.misc.client.HideObjOps
@@ -25,6 +26,7 @@ import org.rsmod.api.player.output.mes
 import org.rsmod.api.player.output.runClientScript
 import org.rsmod.api.player.startInvTransmit
 import org.rsmod.api.player.stat.stat
+import org.rsmod.api.player.ui.ifResync
 import org.rsmod.api.player.vars.VarPlayerIntMapSetter
 import org.rsmod.api.player.vars.boolVarBit
 import org.rsmod.api.player.vars.resyncAllVars
@@ -55,12 +57,25 @@ constructor(
 
     override fun ScriptContext.startup() {
         onEvent<SessionStateEvent.EngineLogin>(0L) { player.engineLogin() }
+        onEvent<SessionStateEvent.Reconnect> { player.reconnect() }
     }
 
     private fun Player.engineLogin() {
         sendHighPriority()
         sendLowPriority()
         VarPlayerIntMapSetter.set(this, "varbit.player_in_instance", 0)
+    }
+
+    private fun Player.reconnect() {
+        resyncAllVars()
+        client.write(VarClanDisable)
+        sendInvs()
+        ifResync()
+        sendStats()
+        sendRun()
+        client.write(ResetAnims)
+        client.write(MinimapToggle(0))
+        sendSocial()
     }
 
     private fun Player.sendHighPriority() {

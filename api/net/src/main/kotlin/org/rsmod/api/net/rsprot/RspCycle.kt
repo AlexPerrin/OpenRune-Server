@@ -72,6 +72,13 @@ class RspCycle(
         player.queueRebuildLogin()
     }
 
+    fun reconnect(player: Player) {
+        player.updateCoords()
+        knownBuildArea = player.buildArea
+        forceSceneRebuild()
+        player.regionRebuildPending = true
+    }
+
     override fun forceSceneRebuild() {
         // A flag, not a cleared `knownBuildArea`: `NULL` there means "login rebuild already sent".
         pendingSceneRebuild = true
@@ -81,6 +88,11 @@ class RspCycle(
 
     private fun Player.queueRebuildLogin() {
         val rebuild = RebuildLoginV2(x shr 3, z shr 3, worldId, playerInfo)
+        queueRebuild(rebuild)
+    }
+
+    private fun queueRebuild(rebuild: OutgoingGameMessage) {
+        session.ctx.channel().sceneLoading = true
         session.queue(rebuild)
     }
 
@@ -224,7 +236,7 @@ class RspCycle(
             knownBuildArea = buildArea
             knownRegionUid = null
             cachedRegionZoneProvider = null
-            session.queue(rebuild)
+            queueRebuild(rebuild)
             return
         }
 
@@ -247,7 +259,7 @@ class RspCycle(
         val rebuild = RebuildRegionV2(x shr 3, z shr 3, true, zoneProvider)
         knownBuildArea = buildArea
         cachedRegionZoneProvider = zoneProvider
-        session.queue(rebuild)
+        queueRebuild(rebuild)
     }
 
     private fun Player.syncNpcViewDistance() {

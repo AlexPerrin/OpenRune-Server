@@ -10,6 +10,7 @@ import org.rsmod.api.db.jdbc.GameDatabase
 import org.rsmod.api.game.process.GameLifecycle
 import org.rsmod.api.net.central.OpenRuneCentralWorldLink
 import org.rsmod.api.net.central.logging.CentralActivityLogWriter
+import org.rsmod.api.net.rsprot.player.SessionReconnect
 import org.rsmod.api.net.rsprot.player.SessionStart
 import org.rsmod.api.player.events.interact.HeldDropEvents
 import org.rsmod.api.registry.player.PlayerRegistry
@@ -76,6 +77,7 @@ constructor(
             maybeHeartbeatCentralSessions()
         }
         onEvent<SessionStart> { startSession() }
+        onEvent<SessionReconnect> { resumeSession() }
         onEvent<SessionStateEvent.Delete> {
             closeSession()
             finalizeCentralSessionIfNeeded()
@@ -149,6 +151,15 @@ constructor(
         player.clientCycle = cycle
 
         cycle.init(player)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun SessionReconnect.resumeSession() {
+        val infos = (player.client as RspClient).infos
+        val cycle = RspCycle(session, infos, regionReg)
+        player.client = RspClient(session, infos) as Client<Any, Any>
+        player.clientCycle = cycle
+        cycle.reconnect(player)
     }
 
     private fun SessionStateEvent.Delete.closeSession() {
