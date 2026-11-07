@@ -17,7 +17,12 @@ import net.rsprot.protocol.game.outgoing.map.RebuildNormalV2
 import net.rsprot.protocol.game.outgoing.map.RebuildRegionV2
 import net.rsprot.protocol.game.outgoing.map.util.RebuildRegionZone
 import net.rsprot.protocol.game.outgoing.map.util.ReferenceZone
+import net.rsprot.protocol.game.outgoing.misc.client.PacketGroupStart
+import net.rsprot.protocol.game.outgoing.zone.header.UpdateZoneFullFollows
+import net.rsprot.protocol.game.outgoing.zone.header.UpdateZonePartialEnclosed
+import net.rsprot.protocol.game.outgoing.zone.header.UpdateZonePartialFollows
 import net.rsprot.protocol.message.OutgoingGameMessage
+import net.rsprot.protocol.message.ZoneProt
 import org.rsmod.api.config.refs.params
 import org.rsmod.api.net.rsprot.ext.setFaceTarget
 import org.rsmod.api.player.righthand
@@ -58,6 +63,10 @@ class RspCycle(
 
     private var knownNpcViewDistance: Int? = null
 
+    private var reconnectClient: RspClient? = null
+
+    private var reconnectRebuild: OutgoingGameMessage? = null
+
     private val playerInfo
         get() = infos.playerInfo
 
@@ -72,6 +81,14 @@ class RspCycle(
         player.queueRebuildLogin()
     }
 
+    fun reconnect(player: Player, client: RspClient) {
+        reconnectClient = client
+        player.updateCoords()
+        knownBuildArea = player.buildArea
+        forceSceneRebuild()
+        player.regionRebuildPending = true
+    }
+
     override fun forceSceneRebuild() {
         // A flag, not a cleared `knownBuildArea`: `NULL` there means "login rebuild already sent".
         pendingSceneRebuild = true
@@ -81,10 +98,20 @@ class RspCycle(
 
     private fun Player.queueRebuildLogin() {
         val rebuild = RebuildLoginV2(x shr 3, z shr 3, worldId, playerInfo)
+        queueRebuild(rebuild)
+    }
+
+    private fun queueRebuild(rebuild: OutgoingGameMessage) {
+        if (reconnectClient != null) {
+            reconnectRebuild = rebuild
+            return
+        }
+        session.ctx.channel().sceneLoading = true
         session.queue(rebuild)
     }
 
     override fun update(player: Player) {
+        reconnectClient?.group = ArrayList()
         player.updateMoveSpeed()
         player.updateCoords()
         player.rebuildArea()
@@ -103,6 +130,11 @@ class RspCycle(
     }
 
     override fun flush(player: Player) {
+        val client = reconnectClient
+        if (client != null) {
+            flushReconnect(client)
+            return
+        }
         val infoPackets = infos.getPackets()
         val rootPackets = infoPackets.rootWorldInfoPackets
 
@@ -121,7 +153,55 @@ class RspCycle(
         session.queue(rootPackets.activeWorld)
     }
 
+    private fun flushReconnect(client: RspClient) {
+        val written = client.group.orEmpty()
+        client.group = null
+        reconnectClient = null
+        val (zoneUpdates, others) = written.partition { it.isZoneUpdate() }
+
+        val infoPackets = infos.getPackets()
+        val rootPackets = infoPackets.rootWorldInfoPackets
+        val group = ArrayList<OutgoingGameMessage>()
+        group += rootPackets.activeWorld
+        reconnectRebuild?.let { group += it }
+        reconnectRebuild = null
+        group += rootPackets.npcUpdateOrigin
+        group += rootPackets.worldEntityInfo.getOrThrow()
+        group += rootPackets.playerInfo.getOrThrow()
+        group.addNpcInfo(rootPackets.npcInfo)
+        for (world in infoPackets.activeWorlds) {
+            group += world.activeWorld
+            group += world.npcUpdateOrigin
+            group.addNpcInfo(world.npcInfo)
+        }
+        if (infoPackets.activeWorlds.isNotEmpty()) {
+            group += rootPackets.activeWorld
+        }
+        group += zoneUpdates
+        session.queue(PacketGroupStart(group))
+        for (message in others) {
+            session.queue(message)
+        }
+    }
+
+    private fun MutableList<OutgoingGameMessage>.addNpcInfo(result: PacketResult<NpcInfoPacket>) {
+        if (result.isEmpty()) {
+            result.safeReleaseOrThrow()
+            return
+        }
+        add(result.getOrThrow())
+    }
+
+    private fun OutgoingGameMessage.isZoneUpdate(): Boolean =
+        this is ZoneProt ||
+            this is UpdateZoneFullFollows ||
+            this is UpdateZonePartialFollows ||
+            this is UpdateZonePartialEnclosed
+
     override fun release() {
+        reconnectClient?.group = null
+        reconnectClient = null
+        reconnectRebuild = null
         val infoPackets = infos.getPackets()
         val rootPackets = infoPackets.rootWorldInfoPackets
 
@@ -224,7 +304,7 @@ class RspCycle(
             knownBuildArea = buildArea
             knownRegionUid = null
             cachedRegionZoneProvider = null
-            session.queue(rebuild)
+            queueRebuild(rebuild)
             return
         }
 
@@ -247,7 +327,7 @@ class RspCycle(
         val rebuild = RebuildRegionV2(x shr 3, z shr 3, true, zoneProvider)
         knownBuildArea = buildArea
         cachedRegionZoneProvider = zoneProvider
-        session.queue(rebuild)
+        queueRebuild(rebuild)
     }
 
     private fun Player.syncNpcViewDistance() {

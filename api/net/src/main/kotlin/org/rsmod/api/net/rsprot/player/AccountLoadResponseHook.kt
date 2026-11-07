@@ -424,8 +424,7 @@ class AccountLoadResponseHook(
         val session = channelResponses.writeSuccessfulResponse(response, loginBlock)
         val responseMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - responseStart)
 
-        val disconnectionHook = Runnable { player.clientDisconnected.set(true) }
-        session.setDisconnectionHook(disconnectionHook)
+        session.setDisconnectionHook(disconnectionHook(player, session))
 
         // `setDisconnectionHook` will invoke the disconnection hook instantly if the session
         // is not active at this point. Since the channel is no longer connected, we can no-op
@@ -499,7 +498,7 @@ class AccountLoadResponseHook(
 
     private fun writeErrorResponse(response: LoginResponse) {
         clearLoginSecrets()
-        channelResponses.writeFailedResponse(response)
+        channelResponses.refuse(loginBlock.username, response)
     }
 
     private fun clearLoginSecrets() {

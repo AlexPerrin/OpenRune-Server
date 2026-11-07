@@ -18,6 +18,8 @@ public class SessionStateEvent {
     public data class EngineLogin(override val player: Player, override val id: Long = 0L) :
         KeyedEvent, PlayerEvent
 
+    public data class Reconnect(override val player: Player) : UnboundEvent, PlayerEvent
+
     /** Fired before the player's account data is queued for saving. */
     public data class Logout(override val player: Player) : UnboundEvent, PlayerEvent
 

@@ -35,6 +35,14 @@ public class ComponentEventMap(
         eventList.add(event)
     }
 
+    public fun forEach(action: (interfaceId: Int, event: Event) -> Unit) {
+        for (entry in interfaces.int2ObjectEntrySet()) {
+            for (event in entry.value) {
+                action(entry.intKey, event)
+            }
+        }
+    }
+
     public fun clear(interf: UserInterface) {
         interfaces.remove(interf.id)
     }

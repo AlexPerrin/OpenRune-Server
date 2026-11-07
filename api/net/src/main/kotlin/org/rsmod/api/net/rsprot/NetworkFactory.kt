@@ -13,6 +13,7 @@ import net.rsprot.protocol.api.AbstractNetworkServiceFactory
 import net.rsprot.protocol.api.GameConnectionHandler
 import net.rsprot.protocol.api.bootstrap.BootstrapBuilder
 import net.rsprot.protocol.api.handlers.ExceptionHandlers
+import net.rsprot.protocol.api.handlers.idlestate.IdleStateHandlerSuppliers
 import net.rsprot.protocol.api.js5.Js5GroupProvider
 import net.rsprot.protocol.api.suppliers.NpcInfoSupplier
 import net.rsprot.protocol.api.suppliers.WorldEntityInfoSupplier
@@ -69,6 +70,9 @@ constructor(
     override fun getNpcInfoSupplier(): NpcInfoSupplier {
         return npcSupplier
     }
+
+    override fun getIdleStateHandlerSuppliers(): IdleStateHandlerSuppliers =
+        IdleStateHandlerSuppliers(gameSupplier = SceneLoadingIdleStateHandler.Supplier)
 
     override fun getRsaKeyPair(): RsaKeyPair {
         return RsaProvider.from(Paths.get(".data", "game.key"))

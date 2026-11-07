@@ -13,6 +13,7 @@ import net.rsprot.protocol.game.outgoing.interfaces.IfCloseSub
 import net.rsprot.protocol.game.outgoing.interfaces.IfMoveSub
 import net.rsprot.protocol.game.outgoing.interfaces.IfOpenSub
 import net.rsprot.protocol.game.outgoing.interfaces.IfOpenTop
+import net.rsprot.protocol.game.outgoing.interfaces.IfResyncV2
 import net.rsprot.protocol.game.outgoing.interfaces.IfSetAnim
 import net.rsprot.protocol.game.outgoing.interfaces.IfSetColour
 import net.rsprot.protocol.game.outgoing.interfaces.IfSetEventsV2
@@ -250,6 +251,33 @@ public fun Player.ifOpenTop(topLevel: String) {
     val userInterface = UserInterface(interfaceID)
     ui.topLevel = userInterface
     client.write(IfOpenTop(interfaceID))
+}
+
+public fun Player.ifResync() {
+    val subs = ArrayList<IfResyncV2.SubInterfaceMessage>()
+    for ((target, interf) in ui.overlays) {
+        val translated = ui.translate(Component(target))
+        subs += IfResyncV2.SubInterfaceMessage(translated.parent, translated.child, interf, IfSubType.Overlay.id)
+    }
+    for ((target, interf) in ui.modals) {
+        val translated = ui.translate(Component(target))
+        subs += IfResyncV2.SubInterfaceMessage(translated.parent, translated.child, interf, IfSubType.Modal.id)
+    }
+    val events = ArrayList<IfResyncV2.InterfaceEventsMessage>()
+    ui.events.forEach { interfaceId, event ->
+        val target = ui.translate(Component(interfaceId, event.component))
+        val end = if (event.end == Int.MAX_VALUE) -1 else event.end
+        events +=
+            IfResyncV2.InterfaceEventsMessage(
+                target.parent,
+                target.child,
+                event.start,
+                end,
+                event.events.toInt(),
+                (event.events shr 32).toInt(),
+            )
+    }
+    client.write(IfResyncV2(ui.topLevel.id, subs, events))
 }
 
 public fun Player.ifMoveTop(dest: String, eventBus: EventBus) {
