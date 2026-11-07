@@ -1,12 +1,11 @@
 package org.rsmod.api.registry.player
 
+import com.github.michaelbull.logging.InlineLogger
 import jakarta.inject.Inject
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
-import org.rsmod.api.player.output.ChatType
 import org.rsmod.api.player.output.mes
-import org.rsmod.api.player.output.runClientScript
 import org.rsmod.api.registry.zone.ZonePlayerActivityBitSet
 import org.rsmod.events.EventBus
 import org.rsmod.game.entity.PathingEntity.Companion.INVALID_SLOT
@@ -149,7 +148,7 @@ constructor(
             if (characterId != 0 && player.characterId != characterId) {
                 continue
             }
-            //TODO MUTED
+            // TODO MUTED
         }
     }
 
@@ -170,6 +169,7 @@ constructor(
             if (characterId != 0 && player.characterId != characterId) {
                 continue
             }
+            logger.info { "Central revoked the session: player=${player.username}" }
             player.forceDisconnect = true
         }
     }
@@ -190,6 +190,7 @@ constructor(
             if (characterId != 0 && player.characterId != characterId) {
                 continue
             }
+            logger.info { "Central kicked the session: player=${player.username}" }
             player.forceDisconnect = true
         }
     }
@@ -245,5 +246,9 @@ constructor(
         for (player in playerList) {
             action(player)
         }
+    }
+
+    private companion object {
+        private val logger = InlineLogger()
     }
 }

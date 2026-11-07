@@ -1,5 +1,6 @@
 package org.rsmod.api.game.process.player
 
+import com.github.michaelbull.logging.InlineLogger
 import jakarta.inject.Inject
 import org.rsmod.api.player.forceDisconnect
 import org.rsmod.api.player.isLogoutBlocked
@@ -47,7 +48,7 @@ constructor(
             if (closeClient) {
                 closeClient()
             }
-            queueLogout()
+            queueLogout("server shutdown")
             clientDisconnected.set(false)
             forceDisconnect = false
         }
@@ -55,7 +56,7 @@ constructor(
 
     private fun Player.processForcedDisconnect() {
         if (forceDisconnect && !loggingOut) {
-            queueLogout()
+            queueLogout("forced disconnect")
             closeClient()
             forceDisconnect = false
         }
@@ -81,7 +82,7 @@ constructor(
             val preventLogout = isLogoutBlocked()
             val bypassPrevention = preventLogoutCounter++ >= PREVENT_LOGOUT_HARD_CAP_PERIOD
             if (!preventLogout || bypassPrevention) {
-                queueLogout()
+                queueLogout("client disconnected")
                 clientDisconnectedCycles = RECONNECT_GRACE_PERIOD + 1
             }
             return
@@ -102,14 +103,15 @@ constructor(
             return
         }
 
-        queueLogout()
+        queueLogout(if (idleLogout) "idle" else "requested")
         closeClient()
     }
 
-    private fun Player.queueLogout() {
+    private fun Player.queueLogout(cause: String) {
         check(!pendingLogout) { "`queueLogout` has already been called." }
         check(!loggingOut) { "`loggingOut` flag has already been set." }
         pendingLogout = true
+        logger.info { "Logout: player=$username cause=$cause" }
     }
 
     private fun Player.closeClient() {
@@ -173,6 +175,8 @@ constructor(
         }
 
     private companion object {
+        private val logger = InlineLogger()
+
         /**
          * The grace period (in server cycles) during which a disconnected player is allowed to
          * remain in the world before their logout is queued. This gives them a chance to reconnect
