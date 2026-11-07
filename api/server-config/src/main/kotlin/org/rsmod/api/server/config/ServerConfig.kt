@@ -62,6 +62,8 @@ public data class GameplayConfig(
     val idleLogout: Boolean = true,
     @JsonProperty("home-teleport-cooldown")
     val homeTeleportCooldown: Int = 30,
+    @JsonProperty("random-events")
+    val randomEvents: Boolean = true,
     val gravestones: GravestonesYaml = GravestonesYaml(),
 )
 
