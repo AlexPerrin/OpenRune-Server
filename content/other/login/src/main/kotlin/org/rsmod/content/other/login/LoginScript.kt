@@ -6,12 +6,15 @@ import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import dev.openrune.types.StatType
 import jakarta.inject.Inject
+import net.rsprot.protocol.game.outgoing.clan.VarClanDisable
+import net.rsprot.protocol.game.outgoing.friendchat.UpdateFriendChatChannelFullV2
 import net.rsprot.protocol.game.outgoing.misc.client.HideLocOps
 import net.rsprot.protocol.game.outgoing.misc.client.HideNpcOps
 import net.rsprot.protocol.game.outgoing.misc.client.HideObjOps
 import net.rsprot.protocol.game.outgoing.misc.client.MinimapToggle
 import net.rsprot.protocol.game.outgoing.misc.client.ResetAnims
 import net.rsprot.protocol.game.outgoing.misc.player.ChatFilterSettings
+import net.rsprot.protocol.game.outgoing.misc.player.UpdateTradingPostV1
 import org.rsmod.api.inv.weight.InvWeight
 import org.rsmod.api.net.central.OpenRuneCentralWorldLink
 import org.rsmod.api.net.central.writeCentralSocialSnapshot
@@ -25,6 +28,7 @@ import org.rsmod.api.player.output.mes
 import org.rsmod.api.player.output.runClientScript
 import org.rsmod.api.player.startInvTransmit
 import org.rsmod.api.player.stat.stat
+import org.rsmod.api.player.ui.ifResync
 import org.rsmod.api.player.vars.VarPlayerIntMapSetter
 import org.rsmod.api.player.vars.boolVarBit
 import org.rsmod.api.player.vars.resyncAllVars
@@ -55,12 +59,27 @@ constructor(
 
     override fun ScriptContext.startup() {
         onEvent<SessionStateEvent.EngineLogin>(0L) { player.engineLogin() }
+        onEvent<SessionStateEvent.Reconnect> { player.reconnect() }
     }
 
     private fun Player.engineLogin() {
         sendHighPriority()
         sendLowPriority()
         VarPlayerIntMapSetter.set(this, "varbit.player_in_instance", 0)
+    }
+
+    private fun Player.reconnect() {
+        resyncAllVars()
+        client.write(VarClanDisable)
+        sendInvs()
+        ifResync()
+        sendStats()
+        sendRun()
+        client.write(ResetAnims)
+        client.write(MinimapToggle(0))
+        client.write(UpdateFriendChatChannelFullV2(UpdateFriendChatChannelFullV2.LeaveUpdate))
+        sendSocial(reconnect = true)
+        client.write(UpdateTradingPostV1(UpdateTradingPostV1.ResetTradingPost))
     }
 
     private fun Player.sendHighPriority() {
@@ -77,25 +96,25 @@ constructor(
         client.write(ChatFilterSettings(0, 0))
     }
 
-    private fun Player.sendSocial() {
+    private fun Player.sendSocial(reconnect: Boolean = false) {
         if (!openRuneCentral.isEnabled) {
             return
         }
 
         if (characterId <= 0) {
             mes("Social list did not load: missing character.")
-            writeCentralSocialSnapshotEmpty()
+            writeCentralSocialSnapshotEmpty(reconnect)
             return
         }
 
         when (val result = openRuneCentral.socialSnapshot(characterId)) {
             is OpenRuneCentralWorldLink.CentralSocialSnapshotResult.Ok -> {
-                writeCentralSocialSnapshot(result.snapshot)
+                writeCentralSocialSnapshot(result.snapshot, reconnect)
             }
 
             is OpenRuneCentralWorldLink.CentralSocialSnapshotResult.Failed -> {
                 mes("Social list did not load: ${result.message}")
-                writeCentralSocialSnapshotEmpty()
+                writeCentralSocialSnapshotEmpty(reconnect)
             }
         }
     }

@@ -16,6 +16,9 @@ import org.rsmod.api.db.jdbc.GameDatabase
 import org.rsmod.api.game.process.PluginScriptBootGate
 import org.rsmod.api.net.central.OpenRuneCentralWorldLink
 import org.rsmod.api.net.rsprot.player.AccountLoadResponseHook
+import org.rsmod.api.net.rsprot.player.SessionReconnect
+import org.rsmod.api.net.rsprot.player.disconnectionHook
+import org.rsmod.api.net.rsprot.player.refuse
 import org.rsmod.api.realm.Realm
 import org.rsmod.api.registry.account.AccountRegistry
 import org.rsmod.api.registry.player.PlayerRegistry
@@ -27,6 +30,7 @@ import org.rsmod.events.EventBus
 import org.rsmod.game.GameUpdate
 import org.rsmod.game.MapClock
 import org.rsmod.game.entity.Player
+import org.rsmod.game.entity.player.SessionStateEvent
 
 class ConnectionHandler
 @Inject
@@ -60,17 +64,17 @@ private constructor(
         block: LoginBlock<AuthenticationType>,
     ) {
         if (!scriptBootGate.isReady()) {
-            responseHandler.writeFailedResponse(LoginResponse.LoginServerOffline)
+            responseHandler.refuse(block.username, LoginResponse.LoginServerOffline)
             return
         }
 
         if (accountManager.isLoaderShuttingDown()) {
-            responseHandler.writeFailedResponse(LoginResponse.LoginServerOffline)
+            responseHandler.refuse(block.username, LoginResponse.LoginServerOffline)
             return
         }
 
         if (accountManager.isLoaderRejectingRequests()) {
-            responseHandler.writeFailedResponse(LoginResponse.LoginServerNoReply)
+            responseHandler.refuse(block.username, LoginResponse.LoginServerNoReply)
             return
         }
 
@@ -106,7 +110,7 @@ private constructor(
         // This may be filtered earlier at the protocol layer (e.g., rsprot), but we defensively
         // check again to ensure the password is not empty.
         if (password.isEmpty()) {
-            responseHandler.writeFailedResponse(LoginResponse.InvalidUsernameOrPassword)
+            responseHandler.refuse(block.username, LoginResponse.InvalidUsernameOrPassword)
             return
         }
         // Capture a local snapshot, as `realm.config` is mutable and may change.
@@ -117,7 +121,7 @@ private constructor(
                     "Set `central` in game.yml (`host` + `world-key`, or `same-instance: true` for embedded), " +
                     "or env OPENRUNE_CENTRAL_HOST and OPENRUNE_WORLD_KEY."
             }
-            responseHandler.writeFailedResponse(LoginResponse.LoginServerOffline)
+            responseHandler.refuse(block.username, LoginResponse.LoginServerOffline)
             return
         }
         val loadAuth = auth.otpAuthentication.toAccountLoadAuth()
@@ -168,7 +172,7 @@ private constructor(
 
         if (!requestSubmitted) {
             passwordForLocalCreate.fill('\u0000')
-            responseHandler.writeFailedResponse(LoginResponse.LoginServerLoadError)
+            responseHandler.refuse(block.username, LoginResponse.LoginServerLoadError)
         }
     }
 
@@ -198,7 +202,7 @@ private constructor(
         @Suppress("unused") auth: AuthenticationType.TokenAuthentication,
     ) {
         logger.warn { "Unhandled login authentication for: $block" }
-        responseHandler.writeFailedResponse(LoginResponse.InvalidLoginPacket)
+        responseHandler.refuse(block.username, LoginResponse.InvalidLoginPacket)
     }
 
     private fun OtpAuthenticationType.toAccountLoadAuth(): AccountLoadAuth =
@@ -221,7 +225,46 @@ private constructor(
         responseHandler: GameLoginResponseHandler<Player>,
         block: LoginBlock<XteaKey>,
     ) {
-        // TODO: Reconnection.
-        responseHandler.writeFailedResponse(LoginResponse.ConnectFail)
+        if (!scriptBootGate.isReady() || accountManager.isLoaderShuttingDown()) {
+            responseHandler.refuse(block.username, LoginResponse.LoginServerOffline, "reconnect while server offline")
+            return
+        }
+        accountReg.queueReconnect { reconnect(responseHandler, block) }
+    }
+
+    private fun reconnect(responseHandler: GameLoginResponseHandler<Player>, block: LoginBlock<XteaKey>) {
+        val player = findReconnectingPlayer(block.authentication.key)
+        if (player == null) {
+            responseHandler.refuse(block.username, LoginResponse.ConnectFail, "reconnect with no session to resume")
+            return
+        }
+        if (player.loggingOut || player.pendingLogout) {
+            responseHandler.refuse(block.username, LoginResponse.ConnectFail, "reconnect after logout began")
+            return
+        }
+        val client = player.client as RspClient
+        val previous = client.session
+        previous.requestClose()
+        previous.clear()
+        client.infos.playerInfo.onReconnect()
+        client.infos.npcInfo.onReconnect()
+        client.infos.worldEntityInfo.onReconnect()
+        val response = LoginResponse.ReconnectOk(client.infos.playerInfo)
+        val session = responseHandler.writeSuccessfulResponse(response, block, previous)
+        player.clientDisconnected.set(false)
+        session.setDisconnectionHook(disconnectionHook(player, session))
+        eventBus.publish(SessionReconnect(player, session))
+        eventBus.publish(SessionStateEvent.Reconnect(player))
+        logger.info { "Reconnect resumed: user='${player.username}' channel=${session.ctx.channel()}" }
+    }
+
+    private fun findReconnectingPlayer(previousSeed: IntArray): Player? {
+        playerReg.forEachOnline { player ->
+            val session = (player.client as? RspClient)?.session ?: return@forEachOnline
+            if (session.loginBlock.seed.contentEquals(previousSeed)) {
+                return player
+            }
+        }
+        return null
     }
 }
