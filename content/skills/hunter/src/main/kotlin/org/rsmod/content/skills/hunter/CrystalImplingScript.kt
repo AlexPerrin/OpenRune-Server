@@ -3,6 +3,8 @@ package org.rsmod.content.skills.hunter
 import dev.openrune.ServerCacheManager
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
+import dev.openrune.types.NpcServerType
+import dev.openrune.types.enums.enum
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import java.time.Clock
@@ -13,7 +15,7 @@ import org.rsmod.api.random.GameRandom
 import org.rsmod.api.repo.npc.NpcRepository
 import org.rsmod.api.script.onEvent
 import org.rsmod.api.script.onOpNpc1
-import org.rsmod.api.table.CrystalImplingRow
+import org.rsmod.api.table.hunter.HunterCrystalImplingRow
 import org.rsmod.game.entity.Npc
 import org.rsmod.map.CoordGrid
 import org.rsmod.plugin.scripts.PluginScript
@@ -29,7 +31,7 @@ constructor(
 ) : PluginScript() {
     private var current: Npc? = null
     private var lastSlot: Int = -1
-    var clock: Clock = Clock.systemUTC()
+    internal var clock: Clock = Clock.systemUTC()
 
     override fun ScriptContext.startup() {
         for (name in NAMES) {
@@ -42,7 +44,7 @@ constructor(
         onEvent<GameLifecycle.LateCycle> { tick() }
     }
 
-    fun tick() {
+    internal fun tick() {
         val slot = halfHourSlot(LocalTime.now(clock))
         if (slot == lastSlot) return
         if (lastSlot != -1 && !isVisibleTime(LocalTime.now(clock))) return
@@ -50,7 +52,7 @@ constructor(
         spawn()
     }
 
-    fun spawn(): Npc? {
+    internal fun spawn(): Npc? {
         current?.let { remove(it) }
         val type =
             ServerCacheManager.getNpc(NAMES[random.of(NAMES.size)].asRSCM(RSCMType.NPC))
@@ -68,29 +70,30 @@ constructor(
         return statRandom(ImplingScript.HUNTER, low, high, invisibleBoost = 0)
     }
 
-    fun current(): Npc? = current?.takeIf { it.isSlotAssigned }
+    internal fun current(): Npc? = current?.takeIf { it.isSlotAssigned }
 
     private fun remove(npc: Npc) {
         if (npc.isSlotAssigned) npcRepo.del(npc, Int.MAX_VALUE)
         if (current === npc) current = null
     }
 
-    companion object {
-        const val LEVEL = 80
-        const val XP = 280
+    internal companion object {
+        private val ROW by lazy { HunterCrystalImplingRow.getRow("dbrow.hunter_crystal_impling") }
+        val LEVEL: Int get() = ROW.level
+        val XP: Int get() = ROW.xp
         const val JAR = "obj.ii_captured_impling_12"
-        const val VISIBLE_AFTER_MINUTES = 3
+        val VISIBLE_AFTER_MINUTES: Int get() = ROW.visibleAfterMinutes
 
-        const val NET_LOW = 8
-        const val NET_HIGH = 141
-        const val BONUS_LOW = 28
-        const val BONUS_HIGH = 161
+        val NET_LOW: Int get() = ROW.netLow
+        val NET_HIGH: Int get() = ROW.netHigh
+        val BONUS_LOW: Int get() = ROW.bonusLow
+        val BONUS_HIGH: Int get() = ROW.bonusHigh
 
-        private val ROW by lazy { CrystalImplingRow.getRow("dbrow.crystal_impling") }
+        val NAMES: List<String> by lazy {
+            enum<Int, NpcServerType>("crystal_impling_npcs").backing.values.map { checkNotNull(it).internalName }
+        }
 
-        val NAMES: List<String> by lazy { ROW.npcs.map { it.internalName } }
-
-        val SPOTS: List<CoordGrid> by lazy { ROW.spots }
+        val SPOTS: List<CoordGrid> by lazy { enum<Int, CoordGrid>("crystal_impling_spots").backing.values.map { checkNotNull(it) } }
 
         fun halfHourSlot(time: LocalTime): Int =
             ((time.toSecondOfDay() / 60 - VISIBLE_AFTER_MINUTES + 1440) % 1440) / 30

@@ -4,45 +4,52 @@ import dev.openrune.ServerCacheManager
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import jakarta.inject.Inject
+import jakarta.inject.Singleton
+import org.rsmod.api.player.output.ClientScripts
 import org.rsmod.api.player.protect.ProtectedAccess
+import org.rsmod.api.repo.obj.ObjRepository
 import org.rsmod.api.script.onOpHeld1
 import org.rsmod.api.script.onOpHeld2
 import org.rsmod.api.script.onOpHeld3
 import org.rsmod.api.script.onOpHeld4
 import org.rsmod.api.table.ImplingLootRow
+import org.rsmod.api.table.hunter.HunterImplingRulesRow
 import org.rsmod.content.quest.manager.QuestRequirements
+import org.rsmod.content.skills.hunter.HunterClues.clueReward
+import org.rsmod.game.entity.Npc
 import org.rsmod.plugin.scripts.PluginScript
 import org.rsmod.plugin.scripts.ScriptContext
 
 data class ImplingDrop(
-    val obj: String?,
-    val min: Int,
-    val max: Int,
-    val noted: Boolean,
-    val num: Int,
-    val den: Int,
-    val clueTier: String? = null,
+    internal val obj: String?,
+    internal val min: Int,
+    internal val max: Int,
+    internal val noted: Boolean,
+    internal val num: Int,
+    internal val den: Int,
+    internal val clueTier: String? = null,
 ) {
-    val isNothing: Boolean get() = obj == null
+    internal val isNothing: Boolean get() = obj == null
 
-    companion object {
+    internal companion object {
         fun nothing(num: Int, den: Int): ImplingDrop = ImplingDrop(null, 0, 0, false, num, den)
     }
 }
 
 data class ImplingLootTable(
-    val preRoll: List<ImplingDrop>,
-    val main: List<ImplingDrop>,
-    val tertiary: List<ImplingDrop>,
+    internal val preRoll: List<ImplingDrop>,
+    internal val main: List<ImplingDrop>,
+    internal val tertiary: List<ImplingDrop>,
 ) {
-    companion object {
+    internal companion object {
         const val PRE_ROLL = 0
         const val MAIN = 1
         const val TERTIARY = 2
     }
 }
 
-class ImplingLootScript @Inject constructor() : PluginScript() {
+@Singleton
+class ImplingLootScript @Inject constructor(private val objRepo: ObjRepository) : PluginScript() {
     private val tables: Map<String, ImplingLootTable> by lazy {
         ImplingLootRow.all().associate { it.jar.internalName to table(it) }
     }
@@ -59,50 +66,51 @@ class ImplingLootScript @Inject constructor() : PluginScript() {
         }
     }
 
-    suspend fun ProtectedAccess.loot(slot: Int, jar: String) {
-        val table = tables.getValue(jar)
+    internal suspend fun ProtectedAccess.loot(slot: Int, jar: String) {
         if (inv.freeSpace() < 1) {
-            mes("You need some free inventory space to loot the jar.")
+            mes("You'll need to clear some space in your pack before looting the jar.")
             return
         }
-        val mm2 = QuestRequirements.hasCompleted(player, MONKEY_MADNESS_II)
-        val skipped = mutableListOf<String>()
-        val drops =
-            roll(table, mm2Complete = mm2, skipTertiary = { skip(it, skipped) }) { bound -> random.of(bound) }
+        val drops = rollJar(jar)
         if (invDel(inv, jar, slot = slot).failure) return
         if (random.of(JAR_BREAK_DEN) >= JAR_BREAK_NUM) {
             invAdd(inv, ImplingScript.IMPLING_JAR, slot = slot)
         }
+        give(drops)
+    }
+
+    internal fun ProtectedAccess.rollJar(jar: String): List<ImplingDrop> {
+        val table = tables[jar] ?: return emptyList()
+        val mm2 = QuestRequirements.hasCompleted(player, MONKEY_MADNESS_II)
+        return roll(table, mm2Complete = mm2) { bound -> random.of(bound) }
+    }
+
+    private var lootTrackerEventId: Int = 0
+
+    internal fun ProtectedAccess.give(drops: List<ImplingDrop>, from: Npc? = null) {
+        val eventId = from?.let { nextLootTrackerEventId() }
         for (drop in drops) {
+            val obj = checkNotNull(drop.obj)
+            val given = drop.clueTier?.let { clueReward(it, obj) ?: continue } ?: obj
             val count = if (drop.max > drop.min) random.of(drop.min, drop.max) else drop.min
-            if (invAdd(inv, checkNotNull(drop.obj), count, cert = drop.noted).failure) {
-                break
-            }
-        }
-        for (tier in skipped) {
-            mes("You have a sneaking suspicion that you would have received ${article(tier)} $tier clue scroll.")
-        }
-    }
-
-    private fun ProtectedAccess.skip(drop: ImplingDrop, skipped: MutableList<String>): Boolean {
-        val tier = drop.clueTier ?: return false
-        return holdsClue(tier) && skipped.add(tier)
-    }
-
-    fun ProtectedAccess.holdsClue(tier: String): Boolean {
-        val names = setOf("clue scroll ($tier)", "challenge scroll ($tier)")
-        return listOf(inv, inv(BANK)).any { held ->
-            held.objs.any { obj ->
-                obj != null && ServerCacheManager.getItem(obj.id)?.name?.lowercase() in names
+            val type = if (drop.noted) ocCert(given) else checkNotNull(ServerCacheManager.getItem(given.asRSCM(RSCMType.OBJ)))
+            invAddOrDropType(objRepo, type, count)
+            if (from != null && eventId != null) {
+                ClientScripts.lootTrackerAddLoot(player, from.visType.id, eventId, type.id, count)
             }
         }
     }
 
-    companion object {
+    private fun nextLootTrackerEventId(): Int {
+        lootTrackerEventId = if (lootTrackerEventId == Int.MAX_VALUE) 1 else lootTrackerEventId + 1
+        return lootTrackerEventId
+    }
+
+    internal companion object {
         const val LOOT = "Loot"
-        const val JAR_BREAK_NUM = 1
-        const val JAR_BREAK_DEN = 10
-        const val BANK = "inv.bank"
+        private val RULES by lazy { HunterImplingRulesRow.getRow("dbrow.hunter_impling_rules") }
+        val JAR_BREAK_NUM: Int get() = RULES.jarBreakNum
+        val JAR_BREAK_DEN: Int get() = RULES.jarBreakDen
         const val MONKEY_MADNESS_II = "quest_monkeymadness2"
         const val DRAGON_JAVELIN_TIPS = "obj.dragon_javelin_head"
 
@@ -122,12 +130,9 @@ class ImplingLootScript @Inject constructor() : PluginScript() {
             )
         }
 
-        fun article(word: String): String = if (word.first() in "aeiou") "an" else "a"
-
         fun roll(
             table: ImplingLootTable,
             mm2Complete: Boolean = true,
-            skipTertiary: (ImplingDrop) -> Boolean = { false },
             nextInt: (Int) -> Int,
         ): List<ImplingDrop> {
             val drops = mutableListOf<ImplingDrop>()
@@ -139,7 +144,7 @@ class ImplingLootScript @Inject constructor() : PluginScript() {
                     if (mm2Complete) table.main else table.main.filter { it.obj != DRAGON_JAVELIN_TIPS }
                 pick(main, nextInt)?.let { drops += it }
             }
-            drops += table.tertiary.filter { hits(it, nextInt) && !skipTertiary(it) }
+            drops += table.tertiary.filter { hits(it, nextInt) }
             return drops.filterNot(ImplingDrop::isNothing)
         }
 

@@ -8,5 +8,7 @@ class HunterRumourPluginPack : PluginPack() {
         listOf(
             HunterRumourHuntersTable.hunterRumourHunters(),
             HunterRumoursTable.hunterRumours(),
+            HunterLootSackTable.lootSacks(),
+            HunterLootSackTable.cascades(),
         )
 }
