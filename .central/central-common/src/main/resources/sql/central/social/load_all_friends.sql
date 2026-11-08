@@ -1,0 +1,2 @@
+SELECT owner_character_id, friend_character_id
+FROM character_friends
