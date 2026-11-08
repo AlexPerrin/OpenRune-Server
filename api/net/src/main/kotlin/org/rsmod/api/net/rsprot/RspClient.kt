@@ -12,12 +12,12 @@ import org.rsmod.game.entity.Player
 private typealias Service = NetworkService<Player>
 
 @OptIn(ExperimentalUnsignedTypes::class)
-class RspClient(val session: Session<Player>, val infos: Infos) :
+class RspClient(val session: Session<Player>, val infos: Infos, private val username: String) :
     Client<NetworkService<Player>, OutgoingGameMessage> {
     var group: MutableList<OutgoingGameMessage>? = null
 
     override fun close() {
-        logger.info { "Game session closed by the server: user='${session.loginBlock.username}' channel=${session.ctx.channel()}" }
+        logger.info { "Game session closed by the server: user='$username' channel=${session.ctx.channel()}" }
         session.requestClose()
     }
 
