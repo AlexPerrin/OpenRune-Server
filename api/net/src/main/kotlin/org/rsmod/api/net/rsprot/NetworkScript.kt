@@ -148,7 +148,7 @@ constructor(
         player.mobileClient = clientType == OldSchoolClientType.ANDROID
         val infos = service.infoProtocols.alloc(slot, clientType)
 
-        val client = RspClient(session, infos) as Client<Any, Any>
+        val client = RspClient(session, infos, player.username) as Client<Any, Any>
         val cycle = RspCycle(session, infos, regionReg)
 
         player.client = client
@@ -160,7 +160,7 @@ constructor(
     @Suppress("UNCHECKED_CAST")
     private fun SessionReconnect.resumeSession() {
         val infos = (player.client as RspClient).infos
-        val client = RspClient(session, infos)
+        val client = RspClient(session, infos, player.username)
         val cycle = RspCycle(session, infos, regionReg)
         player.client = client as Client<Any, Any>
         player.clientCycle = cycle
