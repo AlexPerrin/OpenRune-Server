@@ -1,0 +1,72 @@
+# Copy to central-config.yaml (or set OPENRUNE_CONFIG to its path).
+#
+# Environment variables use OPENRUNE_* aliases (see CentralConfig.kt).
+
+openrune:
+  serverName: OpenRune
+
+  auth:
+    passwordHasher: bcrypt   # argon2 | bcrypt
+    bcryptCost: 12
+
+  database:
+    host: 127.0.0.1
+    port: 5432
+    name: openrune_central
+    user: openrune
+    password: openrune
+    poolSize: 10
+
+  # Alternative: JDBC URL style
+  # jdbc:
+  #   url: jdbc:postgresql://127.0.0.1:5432/openrune_central
+
+  http:
+    port: 8080
+    trustProxy: false
+    # HTTPS beside http.port (the desktop client reaches jav_config params 11 and 22 over https only).
+    # tls:
+    #   port: 8443
+    #   keystore: central-tls.p12   # PKCS12 with one key entry
+    #   keystorePassword: changeit
+
+  worldLink:
+    port: 9091
+    soBacklog: 512
+    readTimeoutSeconds: 120
+
+  session:
+    ttlMs: 60000
+
+  analytics:
+    onlineSampleIntervalSeconds: 3600
+
+  javConfig:
+    revision: 238
+    remoteUrlTemplate: https://client.blurite.io/jav_local_%d.ws
+    # or a local file, served with no remote fetch: file:///path/to/jav_config.ws
+    # Or env: OPENRUNE_JAV_CONFIG_URL_TEMPLATE (also read by embedded Central)
+    refreshMinutes: 15
+    httpTimeoutSeconds: 20
+    configProps:
+      title: OpenRune Central  # client window title; serverName drives realm login message
+      # param/msg entries keep their index in the key, so each one replaces its own remote line
+      param=17: http://127.0.0.1:8080/worldslist.ws
+
+  # Client sign-in (OIDC + game-session): on when tokenSecret is set; jav_config params 11, 20, 22 and 28 then
+  # name this Central. tokenSecret is the base64 HMAC key the game server's token-login.secret holds.
+  # devAccount signs every sign-in in as that account without a password form.
+  # signIn:
+  #   tokenSecret: ""
+  #   devAccount: ""
+  # Or env: OPENRUNE_SIGN_IN_TOKEN_SECRET / OPENRUNE_SIGN_IN_DEV_ACCOUNT (also read by embedded Central)
+
+  # Inserts development realm/world (id 255) on startup when true (default).
+  devWorld:
+    autoCreate: true
+
+  # Per-phase login timing (Central LOGIN detail, world-link auth). Default off.
+  # diagnostics:
+  #   loginTimingLogs: true
+  #   socialPmTraceLogs: true   # PM_TRACE lines for send/relay/deliver debugging
+  # Or env: OPENRUNE_LOGIN_TIMING_LOGS=true / OPENRUNE_SOCIAL_PM_TRACE_LOGS=true

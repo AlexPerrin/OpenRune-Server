@@ -19,26 +19,37 @@ jobs:
   build:
     name: build & boot
     runs-on: ubuntu-latest
-    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
+        timeout-minutes: 30
         uses: actions/checkout@v7.0.1
 
       - name: Set up JDK 21
+        timeout-minutes: 30
         uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Set up Gradle
+        timeout-minutes: 30
         uses: gradle/actions/setup-gradle@v6
+      - name: Ephemeral ports above the game port (tools/gate/gate.sh gate-ci)
+        timeout-minutes: 30
+        run: sysctl net.ipv4.ip_local_port_range; sudo sysctl -w net.ipv4.ip_local_port_range="49152 65535"
+      - name: Central of the gate tree (tools/gate/gate.sh gate-ci)
+        timeout-minutes: 30
+        run: |
+          mv .central "$RUNNER_TEMP/central"; echo "CDIR=$RUNNER_TEMP/central" >> "$GITHUB_ENV"
+          mkdir -p "${GRADLE_USER_HOME:-$HOME/.gradle}/init.d"; mv .central.init.gradle "${GRADLE_USER_HOME:-$HOME/.gradle}/init.d/central.gradle"
 
       # The downloaded game cache only changes when the revision in
       # game.example.yml bumps (~monthly), so cache it across runs. The
       # gamevals .dat files ride along because buildCache requires them
       # at startup (GameValProvider loads both before any packing).
       - name: Cache game data
+        timeout-minutes: 30
         id: gamecache
         uses: actions/cache@v6
         with:
@@ -55,26 +66,39 @@ jobs:
       # Release Server workflow. On a cache hit the 190 MB openrs2 download
       # is skipped: buildCache repacks and regenerates sources from the
       # restored game data.
-      - name: Generate cache and gameval sources
+      - name: Game data of the gate (tools/gate/gate.sh gate-ci)
+        timeout-minutes: 30
+        id: gamedata
         if: steps.gamecache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: mkdir -p .data && gh release download game-data -R "$GITHUB_REPOSITORY" -p game-data-b6c48b53db6b.tar.gz -O - | tar -xz -C .data
+
+      - name: Generate cache and gameval sources
+        timeout-minutes: 30
+        if: steps.gamecache.outputs.cache-hit != 'true' && steps.gamedata.outcome != 'success'
         run: ./gradlew :or-cache:freshCache :or-cache:mergePluginGamevals
 
       - name: Rebuild sources from cached game data
-        if: steps.gamecache.outputs.cache-hit == 'true'
+        timeout-minutes: 30
+        if: steps.gamecache.outputs.cache-hit == 'true' || steps.gamedata.outcome == 'success'
         run: ./gradlew :or-cache:buildCache :or-cache:mergePluginGamevals
 
       - name: Create game config and RSA keys
+        timeout-minutes: 30
         run: |
           [ -f game.yml ] || cp game.example.yml game.yml
           ./gradlew generateRsa
 
       - name: Compile and run tests
+        timeout-minutes: 30
         run: ./gradlew assemble test integration
 
       # Config errors in a data-driven server surface at boot (unmapped
       # gamevals throw by design), so start the server and require the
       # "Server ready" line within the timeout.
       - name: Boot server to ready
+        timeout-minutes: 30
         run: |
           ./gradlew run -q > boot.log 2>&1 &
           GRADLE_PID=$!
@@ -93,6 +117,7 @@ jobs:
           kill $GRADLE_PID 2>/dev/null || true
 
       - name: Upload boot log
+        timeout-minutes: 30
         if: failure()
         uses: actions/upload-artifact@v7
         with:
