@@ -9,6 +9,7 @@ import dev.or2.central.worldlink.protocol.social.PmTraceLog
 import dev.or2.central.worldlink.protocol.social.SocialPackets
 import dev.or2.central.worldlink.protocol.social.SocialSyncSnapshot
 import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
@@ -28,6 +29,7 @@ import org.rsmod.api.server.config.ServerConfig
 import org.rsmod.game.GameUpdate
 import org.rsmod.game.GameUpdate.Companion.isUpdating
 
+@Singleton
 public class OpenRuneCentralWorldLink
 @Inject
 constructor(
