@@ -1,5 +1,6 @@
 package org.rsmod.api.player.output
 
+import net.rsprot.protocol.game.outgoing.logout.LogoutTransfer
 import net.rsprot.protocol.game.outgoing.logout.LogoutWithReason
 import net.rsprot.protocol.game.outgoing.misc.client.HintArrow
 import net.rsprot.protocol.game.outgoing.misc.client.ServerTickEnd
@@ -63,6 +64,11 @@ public object MiscOutput {
     public fun logoutUpdating(player: Player) {
         resetInteractionMode(player)
         player.client.write(LogoutWithReason(reason = 2))
+    }
+
+    public fun logoutTransfer(player: Player, host: String, world: Int, properties: Int) {
+        resetInteractionMode(player)
+        player.client.write(LogoutTransfer(host, world, properties))
     }
 
     private fun resetInteractionMode(player: Player) {
