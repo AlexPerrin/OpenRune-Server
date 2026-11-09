@@ -6,6 +6,7 @@ import org.rsmod.api.db.gateway.GameDbManager
 import org.rsmod.api.db.gateway.model.fold
 import org.rsmod.api.net.central.CentralSocialResult
 import org.rsmod.api.net.central.CentralSocialService
+import org.rsmod.api.player.vars.VarPlayerIntMapSetter
 import org.rsmod.api.social.writeSocialMessage
 import org.rsmod.game.entity.Player
 import org.rsmod.game.entity.PlayerList
@@ -48,10 +49,10 @@ constructor(
                                         message.tradeChatFilter,
                                     ),
                                 )
-                                current.client.write(
-                                    net.rsprot.protocol.game.outgoing.misc.player.ChatFilterSettingsPrivateChat(
-                                        message.privateChatFilter,
-                                    ),
+                                VarPlayerIntMapSetter.set(
+                                    current,
+                                    "varbit.chat_filter_private",
+                                    message.privateChatFilter,
                                 )
                             }
 
