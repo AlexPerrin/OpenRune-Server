@@ -29,6 +29,7 @@ import org.rsmod.game.damage.DamageContributions
 import org.rsmod.game.entity.player.Appearance
 import org.rsmod.game.entity.player.PlayerUid
 import org.rsmod.game.entity.player.PublicMessage
+import org.rsmod.game.entity.player.WorldTransfer
 import org.rsmod.game.entity.util.EntityFaceAngle
 import org.rsmod.game.entity.util.EntityTinting
 import org.rsmod.game.entity.util.PathingEntityCommon
@@ -266,6 +267,7 @@ public class Player(
     public var loggingOut: Boolean = false
     public var pendingCloseClient: Boolean = false
     public var closeClient: Boolean = false
+    public var worldTransfer: WorldTransfer? = null
 
     /** This flag should only be set when the game server is in the process of shutting down. */
     public var pendingShutdown: Boolean = false

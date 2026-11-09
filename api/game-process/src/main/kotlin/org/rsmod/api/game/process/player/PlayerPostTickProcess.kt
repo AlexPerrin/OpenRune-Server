@@ -131,7 +131,10 @@ constructor(
     }
 
     private fun Player.closeClient() {
-        if (idleLogout) {
+        val transfer = worldTransfer
+        if (transfer != null) {
+            MiscOutput.logoutTransfer(this, transfer.host, transfer.world, transfer.properties)
+        } else if (idleLogout) {
             MiscOutput.logoutKicked(this)
         } else {
             MiscOutput.logout(this)

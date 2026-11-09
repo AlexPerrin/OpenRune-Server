@@ -98,6 +98,7 @@ constructor(
 
         if (isLogoutBlocked()) {
             idleLogout = false
+            worldTransfer = null
             mes(logoutBlockedMessage(), ChatType.Engine)
             return
         }
