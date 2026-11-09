@@ -368,7 +368,8 @@ constructor(
         }
         return when (val result = requestSocialAction(frame)) {
             SocialActionResult.Ok -> CentralSocialResult.Ok
-            is SocialActionResult.Fail -> CentralSocialResult.Failed(socialFailMessage(result.reason))
+            is SocialActionResult.Fail ->
+                CentralSocialResult.Failed(socialFailMessage(result.reason), result.reason)
             SocialActionResult.Unavailable ->
                 CentralSocialResult.Failed("Unable to contact friends service.")
         }
