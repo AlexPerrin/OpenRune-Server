@@ -9,6 +9,7 @@ import dev.or2.central.worldlink.protocol.social.PmTraceLog
 import dev.or2.central.worldlink.protocol.social.SocialPackets
 import dev.or2.central.worldlink.protocol.social.SocialSyncSnapshot
 import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
@@ -17,17 +18,18 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
 import net.rsprot.protocol.loginprot.outgoing.LoginResponse
+import org.rsmod.api.net.central.netty.WorldLinkNettyBlockingClient
+import org.rsmod.api.net.central.netty.WorldLinkNettyBlockingSession
 import org.rsmod.api.player.output.ChatType
 import org.rsmod.api.player.output.MiscOutput
 import org.rsmod.api.player.output.mes
-import org.rsmod.api.net.central.netty.WorldLinkNettyBlockingClient
-import org.rsmod.api.net.central.netty.WorldLinkNettyBlockingSession
 import org.rsmod.api.registry.player.PlayerRegistry
 import org.rsmod.api.server.config.OpenRuneCentralGameConfig
 import org.rsmod.api.server.config.ServerConfig
 import org.rsmod.game.GameUpdate
 import org.rsmod.game.GameUpdate.Companion.isUpdating
 
+@Singleton
 public class OpenRuneCentralWorldLink
 @Inject
 constructor(
