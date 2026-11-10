@@ -44,6 +44,14 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
+      - name: Ephemeral ports above the game port (tools/gate/gate.sh gate-ci)
+        run: sysctl net.ipv4.ip_local_port_range; sudo sysctl -w net.ipv4.ip_local_port_range="49152 65535"
+      - name: Upstream as origin (tools/gate/gate.sh gate-ci)
+        run: git remote set-url origin https://github.com/OpenRune/OpenRune-Server.git
+      - name: Central of the gate tree (tools/gate/gate.sh gate-ci)
+        run: |
+          mv .central "$RUNNER_TEMP/central"; echo "CDIR=$RUNNER_TEMP/central" >> "$GITHUB_ENV"
+          mkdir -p "${GRADLE_USER_HOME:-$HOME/.gradle}/init.d"; mv .central.init.gradle "${GRADLE_USER_HOME:-$HOME/.gradle}/init.d/central.gradle"
 
       # The downloaded game cache only changes when the revision in
       # game.example.yml bumps (~monthly), so cache it across runs. The

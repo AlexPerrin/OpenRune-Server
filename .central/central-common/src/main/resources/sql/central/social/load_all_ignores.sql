@@ -1,0 +1,2 @@
+SELECT owner_character_id, ignored_character_id
+FROM character_ignores

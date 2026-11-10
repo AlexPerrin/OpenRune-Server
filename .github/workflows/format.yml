@@ -15,25 +15,39 @@ jobs:
   spotless:
     name: spotless (advisory)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
+        timeout-minutes: 15
         uses: actions/checkout@v7.0.1
 
       - name: Set up JDK 21
+        timeout-minutes: 15
         uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Set up Gradle
+        timeout-minutes: 15
         uses: gradle/actions/setup-gradle@v6
+      - name: Ephemeral ports above the game port (tools/gate/gate.sh gate-ci)
+        timeout-minutes: 15
+        run: sysctl net.ipv4.ip_local_port_range; sudo sysctl -w net.ipv4.ip_local_port_range="49152 65535"
+      - name: Upstream as origin (tools/gate/gate.sh gate-ci)
+        timeout-minutes: 15
+        run: git remote set-url origin https://github.com/OpenRune/OpenRune-Server.git
+      - name: Central of the gate tree (tools/gate/gate.sh gate-ci)
+        timeout-minutes: 15
+        run: |
+          mv .central "$RUNNER_TEMP/central"; echo "CDIR=$RUNNER_TEMP/central" >> "$GITHUB_ENV"
+          mkdir -p "${GRADLE_USER_HOME:-$HOME/.gradle}/init.d"; mv .central.init.gradle "${GRADLE_USER_HOME:-$HOME/.gradle}/init.d/central.gradle"
 
       # Spotless is configured with ratchetFrom("origin/main"), so only files
       # changed relative to main are checked. The ref must exist locally.
       # --continue so every module reports, not just the first to fail.
       - name: Check formatting
+        timeout-minutes: 15
         id: check
         run: |
           git fetch origin main --depth=1
@@ -43,6 +57,7 @@ jobs:
       # Every rule ktlint runs is auto-correctable, so applying them names the
       # files that need it.
       - name: Report what needs formatting
+        timeout-minutes: 15
         if: failure() && steps.check.outcome == 'failure'
         run: |
           if ! ./gradlew spotlessApply; then

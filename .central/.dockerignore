@@ -1,0 +1,10 @@
+.git
+.github
+**/.gradle
+**/build
+.idea
+*.iml
+**/.kotlin
+**/node_modules
+**/out
+**/*.log
