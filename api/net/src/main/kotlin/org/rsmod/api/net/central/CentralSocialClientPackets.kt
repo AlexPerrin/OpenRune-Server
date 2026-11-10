@@ -96,25 +96,54 @@ fun Player.writeCentralFriendPresence(
     push: ServerFriendPresencePayload,
     serverConfig: ServerConfig,
 ) {
+    writeCentralFriend(
+        added = false,
+        name = push.friendDisplayName,
+        previousName = push.friendPreviousDisplayName,
+        worldId = push.friendWorldId,
+        serverConfig = serverConfig,
+    )
+}
+
+fun Player.writeCentralFriendAdded(
+    friend: WorldLinkFrameSpecs.CentralSocialFriend,
+    serverConfig: ServerConfig,
+) {
+    writeCentralFriend(
+        added = true,
+        name = friend.displayName,
+        previousName = friend.previousDisplayName,
+        worldId = friend.worldId,
+        serverConfig = serverConfig,
+    )
+}
+
+private fun Player.writeCentralFriend(
+    added: Boolean,
+    name: String,
+    previousName: String?,
+    worldId: Int,
+    serverConfig: ServerConfig,
+) {
     val friend =
-        if (push.friendWorldId > 0) {
+        if (worldId > 0) {
             UpdateFriendList.OnlineFriend(
-                added = false,
-                name = push.friendDisplayName,
-                previousName = push.friendPreviousDisplayName,
-                worldId = push.friendWorldId,
+                added = added,
+                name = name,
+                previousName = previousName,
+                worldId = worldId,
                 rank = 0,
                 properties = 0,
                 notes = "",
-                worldName = formatWorldName(push.friendWorldId, serverConfig),
+                worldName = formatWorldName(worldId, serverConfig),
                 platform = OSRS_PLATFORM,
                 worldFlags = 0,
             )
         } else {
             UpdateFriendList.OfflineFriend(
-                added = false,
-                name = push.friendDisplayName,
-                previousName = push.friendPreviousDisplayName,
+                added = added,
+                name = name,
+                previousName = previousName,
                 rank = 0,
                 properties = 0,
                 notes = "",

@@ -196,5 +196,6 @@ sealed class CentralSocialResult {
 
     data class Failed(
         val message: String,
+        val reason: Int = 0,
     ) : CentralSocialResult()
 }
