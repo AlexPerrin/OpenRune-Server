@@ -267,7 +267,7 @@ constructor(
         const val RING_OF_PURSUIT = "obj.ring_of_pursuit"
         const val PURSUIT_USES = "varp.ring_of_pursuit_uses"
         val PURSUIT_CHARGES: Int get() = RULES.pursuitCharges
-        const val NOOSE_SYNTH = "synth.human_unarmedblock"
+        const val NOOSE_SYNTH = "synth.unarmed_punch"
         const val CATCH_SYNTH = "synth.hunting_noose"
         const val KICK_SYNTH = "synth.longbow"
         const val FLEE_SYNTH = "synth.hunting_smokepuff_escape"
