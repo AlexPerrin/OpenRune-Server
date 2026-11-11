@@ -269,8 +269,8 @@ constructor(
         private const val HARVEST_NPC_SEQ = "seq.fossil_npc_herbiboar_wake"
         private const val ESCAPE_NPC_SEQ = "seq.fossil_npc_herbiboar_burrow"
         private const val ESCAPE_SPOTANIM = "spotanim.misty"
-        private const val KICK_SYNTH = "synth.herbiboar_tunnel_kick"
-        private const val ESCAPE_SYNTH = "synth.herbiboar_escape"
+        private const val KICK_SYNTH = "synth.mole_burrow_up"
+        private const val ESCAPE_SYNTH = "synth.mole_burrow_down"
         private const val ESCAPE_TICKS = 3
         const val ANIM = "varbit.fossil_herbiboar_anim"
         const val RING_OF_PURSUIT = "obj.ring_of_pursuit"

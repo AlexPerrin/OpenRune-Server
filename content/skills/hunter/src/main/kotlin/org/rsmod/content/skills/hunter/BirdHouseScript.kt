@@ -325,8 +325,8 @@ constructor(private val objRepo: ObjRepository) : PluginScript() {
         val SEEDS_NEEDED: Int get() = RULES.seedsNeeded
         const val PICKUP_SEQ = "seq.human_pickupfloor"
         const val MAKE_SEQ = "seq.birdhouse_make"
-        const val MAKE_SYNTH = "synth.birdhouse_make"
-        const val PLACE_SYNTH = "synth.birdhouse_place"
+        const val MAKE_SYNTH = "synth.fletch"
+        const val PLACE_SYNTH = "synth.farming_fillplantpot"
         const val SEEDED_MESSAGE = "Your birdhouse trap is now full of seed and will start to catch birds."
         val FULL_MINUTES: Int get() = RULES.fullMinutes
         val BIRDS: Int get() = RULES.birds

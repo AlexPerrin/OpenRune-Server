@@ -104,7 +104,7 @@ constructor(private val objRepo: ObjRepository, private val pets: PetRewards) : 
         const val WOODCUTTING = "stat.woodcutting"
         const val HUNTER_STAT = "stat.hunter"
         const val CASCADE_COUNT = 4
-        const val OPEN_SYNTH = "synth.hunter_loot_sack_open"
+        const val OPEN_SYNTH = "synth.curtain_open"
 
         const val TORN_BLUEPRINTS = "varp.hunter_rumour_torn_blueprints"
         const val TORN_ENHANCED = 1

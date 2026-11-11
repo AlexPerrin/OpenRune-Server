@@ -455,9 +455,9 @@ constructor(
         const val SET_SEQ = "seq.hunting_setting_sapling_trap"
         const val SETTING_LOC_SEQ = "seq.hunting_sapling_setting"
         const val CHECK_SEQ = "seq.human_hunting_dismantle_net"
-        const val SET_SYNTH = "synth.hunting_net_trap_set"
+        const val SET_SYNTH = "synth.hunting_set_twitchnet"
         const val CATCH_SYNTH = "synth.salamander_hit"
-        const val SPRING_SYNTH = "synth.hunting_net_trap_spring"
+        const val SPRING_SYNTH = "synth.hunting_twitchnet"
         private val RULES by lazy { HunterNetTrapRow.getRow("dbrow.hunter_net_trap") }
         val NET_TRAP_LEVEL: Int get() = RULES.level
         const val LURE_RANGE = 2

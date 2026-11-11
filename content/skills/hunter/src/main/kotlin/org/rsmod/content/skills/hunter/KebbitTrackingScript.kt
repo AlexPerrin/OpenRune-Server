@@ -268,9 +268,9 @@ constructor(
         const val PURSUIT_USES = "varp.ring_of_pursuit_uses"
         val PURSUIT_CHARGES: Int get() = RULES.pursuitCharges
         const val NOOSE_SYNTH = "synth.human_unarmedblock"
-        const val CATCH_SYNTH = "synth.hunting_snare_trapping"
-        const val KICK_SYNTH = "synth.hunting_noose_kick"
-        const val FLEE_SYNTH = "synth.hunting_kebbit_flee"
+        const val CATCH_SYNTH = "synth.hunting_noose"
+        const val KICK_SYNTH = "synth.longbow"
+        const val FLEE_SYNTH = "synth.hunting_smokepuff_escape"
         const val PERMILLE = 1000
         private val RULES by lazy { HunterTrackingRulesRow.getRow("dbrow.hunter_tracking_rules") }
         val FAIL_LEVELS: Int get() = RULES.failLevels
