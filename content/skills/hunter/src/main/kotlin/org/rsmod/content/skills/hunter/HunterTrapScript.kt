@@ -5,6 +5,7 @@ import dev.openrune.rscm.RSCM
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import dev.openrune.types.ItemServerType
+import dev.openrune.types.aconverted.SynthType
 import dev.openrune.types.enums.EnumTypeMap
 import dev.openrune.types.enums.enum
 import jakarta.inject.Inject
@@ -144,7 +145,7 @@ constructor(
                 }
         val salted = kind.smokeRefusal.isEmpty() && invDel(inv, ANTI_ODOUR_SALT).success
         anim(LAY_SEQ)
-        soundSynth(kind.laySynth)
+        soundSynth(SynthType(kind.laySynth))
         delay(LAY_TICKS)
         if (traps.containsKey(tile) || !objRepo.del(laid, Int.MAX_VALUE)) return
         anim(LAY_SEQ)
