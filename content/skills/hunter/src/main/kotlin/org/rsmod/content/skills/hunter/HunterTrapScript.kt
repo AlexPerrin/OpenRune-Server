@@ -583,11 +583,11 @@ constructor(
         const val BAIT_SEQ = "seq.hunting_baiting_small_traps"
         const val BIRD_LEAVE_SEQ = "seq.bird_leavetrap"
         const val ANTI_ODOUR_SALT = "obj.anti_odour_salt"
-        const val DISMANTLE_SYNTH = "synth.hunting_trap_dismantle"
-        const val BOX_TRAPPING_SYNTH = "synth.hunting_box_trap_trapping"
-        const val BOX_FULL_SYNTH = "synth.hunting_box_trap_full"
-        const val SNARE_TRAPPING_SYNTH = "synth.hunting_snare_trapping"
-        const val SNARE_FULL_SYNTH = "synth.hunting_snare_full"
+        const val DISMANTLE_SYNTH = "synth.hunting_dismantle"
+        const val BOX_TRAPPING_SYNTH = "synth.hunting_boxtrap"
+        const val BOX_FULL_SYNTH = "synth.chinchompa_trapped"
+        const val SNARE_TRAPPING_SYNTH = "synth.hunting_noose"
+        const val SNARE_FULL_SYNTH = "synth.hunting_birdcaught"
         val TORCHES = listOf("obj.torch_lit", "obj.wint_torch")
         const val LAY_TICKS = 3
         const val STEP_OFF_TICKS = 2

@@ -33,8 +33,8 @@ object HunterGoatLureTable {
                 column(TRAVEL, "spotanim.telegrab_travel")
                 column(IMPACT, "spotanim.telegrab_impact")
                 column(IMPACT_HEIGHT, 100)
-                column(SYNTH, "synth.telegrab_cast")
-                column(IMPACT_SYNTH, "synth.telegrab_impact")
+                column(SYNTH, "synth.telegrab_cast_and_fire")
+                column(IMPACT_SYNTH, "synth.telegrab_hit")
                 column(PROJANIM, "projanim.telegrab")
             }
             row("dbrow.hunter_goat_lure_dark_lure") {

@@ -354,52 +354,6 @@ vampyrium_stymphikes = 32756
 [gamevals.category]
 hunting_antler_bolts = 584
 
-[gamevals.synth]
-telegrab_cast = 3006
-telegrab_impact = 3007
-hunting_lay_box_trap = 2636
-hunting_lay_bird_snare = 2646
-hunting_trap_dismantle = 2632
-hunting_box_trap_trapping = 2627
-hunting_box_trap_full = 362
-hunting_snare_trapping = 2637
-hunting_snare_full = 2625
-hunting_net_trap_set = 2644
-salamander_hit = 739
-hunting_net_trap_spring = 2652
-hunting_deadfall_set = 2645
-hunting_deadfall_trapping = 2631
-hunting_deadfall_kebbit = 524
-hunting_deadfall_fox = 7894
-hunting_graahk_attack = 666
-hunting_kyatt_attack = 835
-hunting_antelope_attack = 7879
-hunting_graahk_caught = 667
-hunting_kyatt_caught = 836
-hunting_antelope_caught = 7890
-hunting_pitfall_set = 2639
-hunting_pitfall_dismantle = 2649
-hunting_tease = 2524
-hunting_pitfall_jump = 2635
-hunting_pitfall_collapse = 2638
-hunting_pitfall_leap = 2619
-hunting_moth_release = 7870
-herbiboar_tunnel_kick = 1644
-herbiboar_escape = 1641
-hunting_noose_kick = 2700
-hunting_kebbit_flee = 2648
-moss_lizard_trap_half = 1774
-moss_lizard_trap_finish = 7924
-moss_lizard_rustle = 7925
-moss_lizard_spawn = 607
-moss_lizard_trigger = 7912
-moss_lizard_caught = 606
-birdhouse_place = 2433
-birdhouse_make = 2605
-impling_caught = 2623
-hunter_loot_sack_open = 59
-hunter_kit_open = 3616
-
 [gamevals.enum]
 hunter_guild_bar_prices = 65447
 birdhouse_feather_counts = 65446

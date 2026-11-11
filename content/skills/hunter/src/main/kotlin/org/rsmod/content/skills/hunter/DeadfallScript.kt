@@ -348,9 +348,9 @@ constructor(
         const val TRAP = "loc.hunting_deadfall_trap"
         const val FAILING = "loc.hunting_deadfall_failing"
         const val SET_SEQ = "seq.hunting_setting_trap_small"
-        const val SET_SYNTH = "synth.hunting_deadfall_set"
-        const val TRAPPING_SYNTH = "synth.hunting_deadfall_trapping"
-        const val CHECK_SYNTH = "synth.hunting_trap_dismantle"
+        const val SET_SYNTH = "synth.hunting_setdeadfall"
+        const val TRAPPING_SYNTH = "synth.hunting_deadfall"
+        const val CHECK_SYNTH = "synth.hunting_dismantle"
         val KNIVES = listOf("obj.knife", "obj.fletching_knife")
         val REFUSED_LOGS = setOf("obj.redwood_logs", "obj.arctic_pine_log")
         private val RULES by lazy { HunterDeadfallRulesRow.getRow("dbrow.hunter_deadfall_rules") }

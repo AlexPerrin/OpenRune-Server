@@ -467,12 +467,12 @@ constructor(
         const val LEAP_SEQ = "seq.hunter_bigcat_leap_npc"
         const val COLLAPSE_SPOT = "spotanim.hunting_pitfall_collapse_0"
         const val COLLAPSE_SPOT_180 = "spotanim.hunting_pitfall_collapse_2"
-        const val SET_SYNTH = "synth.hunting_pitfall_set"
-        const val DISMANTLE_SYNTH = "synth.hunting_pitfall_dismantle"
-        const val TEASE_SYNTH = "synth.hunting_tease"
-        const val JUMP_SYNTH = "synth.hunting_pitfall_jump"
+        const val SET_SYNTH = "synth.hunting_placebranches"
+        const val DISMANTLE_SYNTH = "synth.hunting_takebranches"
+        const val TEASE_SYNTH = "synth.scythe_slash"
+        const val JUMP_SYNTH = "synth.hunting_jump"
         const val FALL_SYNTH = "synth.hunting_pitfall_collapse"
-        const val LEAP_SYNTH = "synth.hunting_pitfall_leap"
+        const val LEAP_SYNTH = "synth.hunting_bigcat_jump"
         const val COLLAPSE_TEXT = "The pitfall trap that you constructed has collapsed."
         const val PIT_COUNT = 25
         const val PIT_SIZE = 2

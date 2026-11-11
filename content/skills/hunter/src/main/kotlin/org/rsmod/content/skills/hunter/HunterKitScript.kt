@@ -66,7 +66,7 @@ constructor(private val spells: MagicSpellRegistry, private val runes: MagicRune
         const val CAST_SEQ = "seq.dream_player_hunter_box_spell"
         const val CAST_SPOTANIM = "spotanim.dream_hunter_spell_spotanim"
         const val CAST_SPOTANIM_HEIGHT = 92
-        const val OPEN_SYNTH = "synth.hunter_kit_open"
+        const val OPEN_SYNTH = "synth.lunar_hunter_kit_inv"
         const val CAST_TICKS = 3
         val CONTENTS by lazy { hunter_kit_contents.values.filterNotNull().map { it.internalName } }
     }
