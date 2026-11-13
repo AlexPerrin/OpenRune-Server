@@ -211,7 +211,7 @@ constructor(
         const val DRINK_SEQ = "seq.human_eat"
         const val SUNLIGHT_OUT = "spotanim.hunting_moth_sunlight_out_spot_anim"
         const val MOONLIGHT_OUT = "spotanim.hunting_moth_moonlight_out_spot_anim"
-        const val RELEASE_SYNTH = "synth.hunting_moth_release"
+        const val RELEASE_SYNTH = "synth.moth_catch_bare_handed_01"
         const val MOTH = "moth"
         const val RELEASE_DELAY = 45
         const val RELEASE_HEIGHT = 190

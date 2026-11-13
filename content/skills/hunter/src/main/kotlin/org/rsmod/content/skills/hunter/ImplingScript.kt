@@ -138,7 +138,7 @@ constructor(
         const val NET_CATCH_SEQ = "seq.ii_human_net_throw_oldnet"
         const val MAGIC_NET_CATCH_SEQ = "seq.ii_human_net_throw"
         const val CAUGHT_SEQ = "seq.ii_impling_caught"
-        const val CAUGHT_SYNTH = "synth.impling_caught"
+        const val CAUGHT_SYNTH = "synth.hunting_butterflynet"
         private val RULES by lazy { HunterImplingRulesRow.getRow("dbrow.hunter_impling_rules") }
         val BAREHANDED_EXTRA_LEVELS: Int get() = RULES.barehandedExtraLevels
         const val ATTEMPT_TICKS = 2

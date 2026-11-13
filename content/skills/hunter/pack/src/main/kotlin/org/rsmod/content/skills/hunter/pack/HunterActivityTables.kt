@@ -292,11 +292,9 @@ object HunterActivityTables {
     fun cape() =
         dbTable("dbtable.hunter_cape", serverOnly = true) {
             column("guild_level", 0, VarType.INT)
-            column("daily_teleports", 1, VarType.INT)
 
             row("dbrow.hunter_cape") {
                 column(0, 46)
-                column(1, 5)
             }
         }
 

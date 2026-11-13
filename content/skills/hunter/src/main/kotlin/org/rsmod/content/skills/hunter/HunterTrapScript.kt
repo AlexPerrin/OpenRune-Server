@@ -5,6 +5,7 @@ import dev.openrune.rscm.RSCM
 import dev.openrune.rscm.RSCM.asRSCM
 import dev.openrune.rscm.RSCMType
 import dev.openrune.types.ItemServerType
+import dev.openrune.types.aconverted.SynthType
 import dev.openrune.types.enums.EnumTypeMap
 import dev.openrune.types.enums.enum
 import jakarta.inject.Inject
@@ -144,7 +145,7 @@ constructor(
                 }
         val salted = kind.smokeRefusal.isEmpty() && invDel(inv, ANTI_ODOUR_SALT).success
         anim(LAY_SEQ)
-        soundSynth(kind.laySynth)
+        soundSynth(SynthType(kind.laySynth))
         delay(LAY_TICKS)
         if (traps.containsKey(tile) || !objRepo.del(laid, Int.MAX_VALUE)) return
         anim(LAY_SEQ)
@@ -583,11 +584,11 @@ constructor(
         const val BAIT_SEQ = "seq.hunting_baiting_small_traps"
         const val BIRD_LEAVE_SEQ = "seq.bird_leavetrap"
         const val ANTI_ODOUR_SALT = "obj.anti_odour_salt"
-        const val DISMANTLE_SYNTH = "synth.hunting_trap_dismantle"
-        const val BOX_TRAPPING_SYNTH = "synth.hunting_box_trap_trapping"
-        const val BOX_FULL_SYNTH = "synth.hunting_box_trap_full"
-        const val SNARE_TRAPPING_SYNTH = "synth.hunting_snare_trapping"
-        const val SNARE_FULL_SYNTH = "synth.hunting_snare_full"
+        const val DISMANTLE_SYNTH = "synth.hunting_dismantle"
+        const val BOX_TRAPPING_SYNTH = "synth.hunting_boxtrap"
+        const val BOX_FULL_SYNTH = "synth.chinchompa_trapped"
+        const val SNARE_TRAPPING_SYNTH = "synth.hunting_noose"
+        const val SNARE_FULL_SYNTH = "synth.hunting_birdcaught"
         val TORCHES = listOf("obj.torch_lit", "obj.wint_torch")
         const val LAY_TICKS = 3
         const val STEP_OFF_TICKS = 2

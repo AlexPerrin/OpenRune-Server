@@ -32,7 +32,7 @@ object HunterDeadfallTable {
         val bait: String,
         val approachSeq: String = "seq.huntingbeast_approach",
         val respawnTicks: Int = 1,
-        val fullSynth: String = "synth.hunting_deadfall_kebbit",
+        val fullSynth: String = "synth.huntingbeast_death",
     )
 
     private val CREATURES =
@@ -54,7 +54,7 @@ object HunterDeadfallTable {
                 "obj.hunting_jerboa_tail",
                 approachSeq = "seq.huntingfox_approach",
                 respawnTicks = 2,
-                fullSynth = "synth.hunting_deadfall_fox",
+                fullSynth = "synth.hunter_fox_death01",
             ),
         )
 
