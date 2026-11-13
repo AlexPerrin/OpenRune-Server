@@ -15,5 +15,4 @@ dependencies {
     implementation(projects.content.quest)
     implementation(projects.api.utils.utilsSkills)
     implementation(projects.content.skills.utils)
-    implementation(projects.api.utils.utilsTime)
 }

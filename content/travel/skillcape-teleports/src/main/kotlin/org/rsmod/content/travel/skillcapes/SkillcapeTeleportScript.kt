@@ -14,6 +14,7 @@ import org.rsmod.api.script.onOpWorn4
 import org.rsmod.api.script.onOpWorn5
 import org.rsmod.api.script.onOpWornSubOp
 import org.rsmod.api.table.SkillcapeTeleportDestinationsRow
+import org.rsmod.api.utils.time.epochMinute
 import org.rsmod.plugin.scripts.PluginScript
 import org.rsmod.plugin.scripts.ScriptContext
 
@@ -89,10 +90,40 @@ class SkillcapeTeleportScript @Inject constructor(private val caster: ItemTelepo
             mes("You need to have a level of $MAX_LEVEL in that skill.")
             return
         }
-        with(caster) { cast(TeleportType.Standard, row.coords) }
+        val unlock = row.unlockVarp?.let { RSCM.getReverseMapping(RSCMType.VARP, it) }
+        if (unlock != null && vars[unlock] == 0) {
+            mes("Your cape cannot take you there yet.")
+            return
+        }
+        val limit = row.dailyLimit
+        if (limit != null && dailyUsed(row) >= limit) {
+            mes("You have used all of your cape's teleports there for today.")
+            return
+        }
+        with(caster) {
+            cast(TeleportType.Standard, row.coords) {
+                if (limit != null) {
+                    val used = RSCM.getReverseMapping(RSCMType.VARBIT, checkNotNull(row.dailyVarbit))
+                    vars[used] = dailyUsed(row) + 1
+                }
+                true
+            }
+        }
+    }
+
+    private fun ProtectedAccess.dailyUsed(row: SkillcapeTeleportDestinationsRow): Int {
+        val used = RSCM.getReverseMapping(RSCMType.VARBIT, checkNotNull(row.dailyVarbit))
+        val day = RSCM.getReverseMapping(RSCMType.VARP, checkNotNull(row.dailyDayVarp))
+        val today = epochMinute() / MINUTES_PER_DAY
+        if (vars[day] != today) {
+            vars[day] = today
+            vars[used] = 0
+        }
+        return vars[used]
     }
 
     private companion object {
         private const val MAX_LEVEL = 99
+        private const val MINUTES_PER_DAY = 1440
     }
 }
