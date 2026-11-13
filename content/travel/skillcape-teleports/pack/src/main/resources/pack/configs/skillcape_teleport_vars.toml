@@ -1,0 +1,5 @@
+[[varp]]
+isServerOnly = true
+id = "varp.hunter_cape_teleport_day"
+scope = "Perm"
+transmit = "Never"
