@@ -1,26 +1,18 @@
 package org.rsmod.content.skills.hunter
 
-import dev.openrune.types.enums.enum
 import org.rsmod.api.player.dialogue.Dialogue
-import org.rsmod.api.player.hook.TeleportType
 import org.rsmod.api.player.protect.ProtectedAccess
 import org.rsmod.api.player.stat.statBase
 import org.rsmod.api.player.vars.VarPlayerIntMapSetter
-import org.rsmod.api.script.onOpHeld3
 import org.rsmod.api.script.onOpNpc1
 import org.rsmod.api.script.onOpWorn2
-import org.rsmod.api.script.onOpWorn3
 import org.rsmod.api.table.hunter.HunterCapeRow
-import org.rsmod.api.utils.time.epochMinute
-import org.rsmod.map.CoordGrid
 import org.rsmod.plugin.scripts.PluginScript
 import org.rsmod.plugin.scripts.ScriptContext
 
 class HunterCapeScript : PluginScript() {
     override fun ScriptContext.startup() {
         for (cape in CAPES) {
-            onOpHeld3(cape) { teleportMenu() }
-            onOpWorn3(cape) { teleportMenu() }
             onOpWorn2(cape) { boost() }
         }
         onOpNpc1(APATURA) { startDialogue(it.npc) { apatura() } }
@@ -35,55 +27,6 @@ class HunterCapeScript : PluginScript() {
         if (player.statBase(HUNTER) >= 99) return true
         mes("You need a Hunter level of 99 to do that.")
         return false
-    }
-
-    private fun utcDay(): Int = epochMinute() / MINUTES_PER_DAY
-
-    private suspend fun ProtectedAccess.teleportMenu() {
-        if (!isMaster()) return
-        if (vars[TELEPORT_DAY] != utcDay()) {
-            VarPlayerIntMapSetter.set(player, TELEPORT_DAY, utcDay())
-            VarPlayerIntMapSetter.set(player, TELEPORTS_USED, 0)
-        }
-        val left = DAILY_TELEPORTS - vars[TELEPORTS_USED]
-        val guild = vars[GUILD_UNLOCKED] != 0
-        val dest =
-            if (guild) {
-                choice3(
-                    "Feldip Hunter area ($left left today)",
-                    FELDIP,
-                    "Wilderness Hunter area ($left left today)",
-                    WILDERNESS,
-                    "Hunter Guild",
-                    GUILD,
-                    "Hunter Areas",
-                )
-            } else {
-                choice2(
-                    "Feldip Hunter area ($left left today)",
-                    FELDIP,
-                    "Wilderness Hunter area ($left left today)",
-                    WILDERNESS,
-                    "Hunter Areas",
-                )
-            }
-        if (dest != GUILD) {
-            if (left <= 0) {
-                mes("You have used all of your Hunter cape teleports for today.")
-                return
-            }
-            VarPlayerIntMapSetter.set(player, TELEPORTS_USED, vars[TELEPORTS_USED] + 1)
-        }
-        teleport(dest)
-    }
-
-    private suspend fun ProtectedAccess.teleport(dest: CoordGrid) {
-        anim(TELEPORT_SEQ)
-        spotanim(TELEPORT_SPOTANIM, height = TELEPORT_SPOTANIM_HEIGHT)
-        soundSynth(TELEPORT_SYNTH)
-        delay(TELEPORT_DELAY)
-        telejump(dest, TeleportType.Standard)
-        resetAnim()
     }
 
     private suspend fun Dialogue.apatura() {
@@ -140,21 +83,8 @@ class HunterCapeScript : PluginScript() {
         const val APATURA = "npc.hg_apatura"
         private val RULES by lazy { HunterCapeRow.getRow("dbrow.hunter_cape") }
         val GUILD_LEVEL: Int get() = RULES.guildLevel
-        const val TELEPORTS_USED = "varbit.chinchompa_teleports"
-        const val TELEPORT_DAY = "varp.hunter_cape_teleport_day"
         const val GUILD_UNLOCKED = "varp.hunter_cape_guild_teleport"
         const val APATURA_MET = "varp.hunter_guild_apatura_met"
-        val DAILY_TELEPORTS: Int get() = RULES.dailyTeleports
-        const val MINUTES_PER_DAY = 1440
-        const val TELEPORT_SEQ = "seq.human_castteleport"
-        const val TELEPORT_SPOTANIM = "spotanim.teleport_casting"
-        const val TELEPORT_SPOTANIM_HEIGHT = 92
-        const val TELEPORT_SYNTH = "synth.teleport_all"
-        const val TELEPORT_DELAY = 4
         val CAPES = listOf("obj.skillcape_hunting", "obj.skillcape_hunting_trimmed")
-        private val TELEPORTS by lazy { enum<Int, CoordGrid>("hunter_cape_teleports") }
-        val FELDIP: CoordGrid get() = checkNotNull(TELEPORTS[0])
-        val WILDERNESS: CoordGrid get() = checkNotNull(TELEPORTS[1])
-        val GUILD: CoordGrid get() = checkNotNull(TELEPORTS[2])
     }
 }
