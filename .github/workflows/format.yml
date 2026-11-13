@@ -5,7 +5,7 @@ permissions:
 
 on:
   workflow_dispatch:
-  pull_request:
+  workflow_call:
 
 concurrency:
   group: format-${{ github.ref }}
@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
