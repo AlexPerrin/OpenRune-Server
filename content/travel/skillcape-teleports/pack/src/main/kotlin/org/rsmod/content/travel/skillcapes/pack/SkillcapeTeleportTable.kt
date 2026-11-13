@@ -10,7 +10,9 @@ import org.rsmod.map.CoordGrid
  * One row per cape teleport. `held_op` is the inventory op that triggers it and `worn_op` the
  * equipment op, each narrowed by `held_subop`/`worn_subop` when the op has a sub-menu. `capes`
  * includes the worn transform of a cape that changes when equipped. A `stat` row needs that stat
- * at level 99.
+ * at level 99. An `unlock_varp` row needs that varp set. A `daily_limit` row shares that many
+ * teleports a UTC day with the rows of the same `daily_varbit`, which counts them, the day kept in
+ * `daily_day_varp`.
  */
 object SkillcapeTeleportTable {
     const val CAPES = 0
@@ -21,11 +23,16 @@ object SkillcapeTeleportTable {
     const val HELD_SUBOP = 5
     const val WORN_OP = 6
     const val WORN_SUBOP = 7
+    const val UNLOCK_VARP = 8
+    const val DAILY_LIMIT = 9
+    const val DAILY_VARBIT = 10
+    const val DAILY_DAY_VARP = 11
 
     private const val GUILD_TELEPORTS = 4
     private const val SKILLING_AREAS = 5
     private const val POH_PORTALS = 6
     private const val MAX_CAPE_SKILL_TELEPORTS = 9
+    private const val HUNTER_DAILY_TELEPORTS = 5
 
     private val STRENGTH = listOf("obj.skillcape_strength", "obj.skillcape_strength_trimmed")
     private val FARMING = listOf("obj.skillcape_farming", "obj.skillcape_farming_trimmed")
@@ -54,6 +61,10 @@ object SkillcapeTeleportTable {
             column("held_subop", HELD_SUBOP, VarType.INT)
             column("worn_op", WORN_OP, VarType.INT)
             column("worn_subop", WORN_SUBOP, VarType.INT)
+            column("unlock_varp", UNLOCK_VARP, VarType.VARP)
+            column("daily_limit", DAILY_LIMIT, VarType.INT)
+            column("daily_varbit", DAILY_VARBIT, VarType.INT)
+            column("daily_day_varp", DAILY_DAY_VARP, VarType.VARP)
 
             teleport(
                 "dbrow.skillcape_teleport_strength_warriors_guild",
@@ -100,6 +111,7 @@ object SkillcapeTeleportTable {
                 heldOp = 3,
                 heldSubop = 0,
                 wornOp = 3,
+                unlockVarp = "varp.hunter_cape_guild_teleport",
             )
             teleport(
                 "dbrow.skillcape_teleport_hunter_carnivorous_chinchompas",
@@ -110,6 +122,7 @@ object SkillcapeTeleportTable {
                 heldOp = 3,
                 heldSubop = 1,
                 wornOp = 4,
+                hunterDaily = true,
             )
             teleport(
                 "dbrow.skillcape_teleport_hunter_black_chinchompas",
@@ -120,6 +133,7 @@ object SkillcapeTeleportTable {
                 heldOp = 3,
                 heldSubop = 2,
                 wornOp = 5,
+                hunterDaily = true,
             )
             maxCape(
                 "dbrow.skillcape_teleport_max_warriors_guild",
@@ -302,6 +316,8 @@ object SkillcapeTeleportTable {
         heldOp: Int,
         heldSubop: Int? = null,
         wornOp: Int,
+        unlockVarp: String? = null,
+        hunterDaily: Boolean = false,
     ) {
         row(name) {
             columnRSCM(CAPES, capes)
@@ -311,6 +327,12 @@ object SkillcapeTeleportTable {
             column(HELD_OP, heldOp)
             heldSubop?.let { column(HELD_SUBOP, it) }
             column(WORN_OP, wornOp)
+            unlockVarp?.let { columnRSCM(UNLOCK_VARP, it) }
+            if (hunterDaily) {
+                column(DAILY_LIMIT, HUNTER_DAILY_TELEPORTS)
+                columnRSCM(DAILY_VARBIT, "varbit.chinchompa_teleports")
+                columnRSCM(DAILY_DAY_VARP, "varp.hunter_cape_teleport_day")
+            }
         }
     }
 

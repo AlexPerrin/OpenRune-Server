@@ -403,7 +403,6 @@ hunter_kit_open = 3616
 [gamevals.enum]
 hunter_guild_bar_prices = 65447
 birdhouse_feather_counts = 65446
-hunter_cape_teleports = 65445
 hunter_goat_pit_tiles = 65444
 butterfly_restored_stats = 65443
 herbiboar_spot_messages = 65455
