@@ -33,6 +33,7 @@ import dev.openrune.gamevals.GeneratedGameVals
 import dev.openrune.impl.GameframeTable
 import dev.openrune.impl.Music
 import dev.openrune.map.packing.MapPackers
+import dev.openrune.pack.NameCs2Groups
 import dev.openrune.pack.PluginPacks
 import dev.openrune.tables.CollectionLogCategoriesTable
 import dev.openrune.tables.DidYouKnow
@@ -266,7 +267,7 @@ fun buildCache(type: TaskType, force: Boolean = false) {
 
 private fun buildServerCache(packTasks: List<CacheTask>, packs: PluginPacks) {
     val serverTasks = packTasks.filterNot {
-        it is PackCs2 || it is UnpackDefaultCs2 || it is PackIfType ||
+        it is PackCs2 || it is NameCs2Groups || it is UnpackDefaultCs2 || it is PackIfType ||
             it is PackModels || it is PackSprites || it is PackWorldMap
     }
     val serverOnly = listOf(

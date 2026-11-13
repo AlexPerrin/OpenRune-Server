@@ -1,21 +1,20 @@
 package dev.openrune.pack
 
 import dev.openrune.DirectoryConstants
+import dev.openrune.cache.tools.cs2.Cs2Overrides
 import dev.openrune.cache.tools.cs2.PackCs2
+import dev.openrune.cache.tools.cs2.UnpackDefaultCs2
 import dev.openrune.cache.tools.iftype.PackIfType
 import dev.openrune.cache.tools.tasks.CacheTask
 import dev.openrune.cache.tools.tasks.impl.PackDBTables
-import dev.openrune.cache.tools.tasks.impl.PackWorldMap
 import dev.openrune.cache.tools.tasks.impl.PackModels
+import dev.openrune.cache.tools.tasks.impl.PackSprites
+import dev.openrune.cache.tools.tasks.impl.PackWorldMap
 import dev.openrune.cache.tools.tasks.impl.defs.PackConfig
 import dev.openrune.definition.dbtables.DBTable
 import dev.openrune.gamevals.GameValProvider
-import dev.openrune.cache.tools.cs2.Cs2Overrides
-import dev.openrune.cache.tools.cs2.UnpackDefaultCs2
-import dev.openrune.cache.tools.tasks.impl.PackSprites
 import io.github.classgraph.ClassGraph
 import java.io.File
-
 
 class PluginPacks(val projectRoot: File, val all: List<PluginPack>) {
     val active: List<PluginPack> = all.filter { it.shouldPack(projectRoot) }
@@ -70,6 +69,7 @@ class PluginPacks(val projectRoot: File, val all: List<PluginPack>) {
 
         tasks += UnpackDefaultCs2(DirectoryConstants.CS2_PATH.toFile())
         tasks += PackCs2(DirectoryConstants.CS2_PATH.toFile(), cs2Overrides)
+        tasks += NameCs2Groups(cs2Overrides.symbols["clientscript"].orEmpty())
 
         val tables = baseTables + active.flatMap { it.dbTables() }
         tasks += PackDBTables(tables)
